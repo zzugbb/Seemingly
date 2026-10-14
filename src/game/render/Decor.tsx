@@ -8,6 +8,7 @@ import { level } from '../levels/prototype'
 import type { IslandDef, Vec3 } from '../levels/types'
 import { material } from './materials'
 import { palette } from './palette'
+import type { QualitySettings } from './quality'
 
 const STRATA = ['#dcae84', '#cf9372', '#b77a73', '#93677d', '#735479', '#5d4569']
 const LAYER_HEIGHT = 0.62
@@ -104,7 +105,15 @@ function Window({ pos, face }: { pos: Vec3; face: 'x' | 'z' }) {
   )
 }
 
-export function GoalArch({ reached }: { reached: boolean }) {
+export function GoalArch({
+  reached,
+  sparkleScale,
+  reducedMotion,
+}: {
+  reached: boolean
+  sparkleScale: number
+  reducedMotion: boolean
+}) {
   const [gx, gy, gz] = level.goal
   const top = surfaceY(gy)
   const glowRef = useRef<Mesh>(null)
@@ -138,19 +147,21 @@ export function GoalArch({ reached }: { reached: boolean }) {
         <meshBasicMaterial color="#ffc46e" transparent opacity={0.4} depthWrite={false} />
       </mesh>
       <pointLight ref={lightRef} position={[x + 0.4, top + 0.5, gz]} color={palette.glow} distance={4} decay={2} />
-      <Sparkles
-        position={[x, top + 0.5, gz]}
-        count={reached ? 60 : 18}
-        scale={reached ? [2.4, 2, 2.4] : [1.2, 1.1, 1.2]}
-        size={reached ? 5 : 3}
-        speed={reached ? 0.8 : 0.3}
-        color={palette.glow}
-      />
+      {!reducedMotion && (
+        <Sparkles
+          position={[x, top + 0.5, gz]}
+          count={Math.max(1, Math.round((reached ? 60 : 18) * sparkleScale))}
+          scale={reached ? [2.4, 2, 2.4] : [1.2, 1.1, 1.2]}
+          size={reached ? 5 : 3}
+          speed={reached ? 0.8 : 0.3}
+          color={palette.glow}
+        />
+      )}
     </group>
   )
 }
 
-function Cloud({ start, speed, scale }: { start: Vec3; speed: number; scale: number }) {
+function Cloud({ start, speed, scale, still }: { start: Vec3; speed: number; scale: number; still: boolean }) {
   const ref = useRef<Group>(null)
   const puffs = useMemo(
     () => [
@@ -162,12 +173,12 @@ function Cloud({ start, speed, scale }: { start: Vec3; speed: number; scale: num
     [],
   )
   useFrame(({ clock }) => {
-    if (!ref.current) return
+    if (!ref.current || still) return
     const travel = ((clock.elapsedTime * speed + start[0]) % 36) - 18
     ref.current.position.set(travel, start[1], start[2] - travel * 0.4)
   })
   return (
-    <group ref={ref} scale={[scale, scale * 0.62, scale]}>
+    <group ref={ref} position={still ? start : undefined} scale={[scale, scale * 0.62, scale]}>
       {puffs.map(([x, y, z, r], i) => (
         <mesh key={i} position={[x, y, z]}>
           <sphereGeometry args={[r, 20, 14]} />
@@ -178,7 +189,13 @@ function Cloud({ start, speed, scale }: { start: Vec3; speed: number; scale: num
   )
 }
 
-export function Decor() {
+const CLOUDS: { start: Vec3; speed: number; scale: number }[] = [
+  { start: [3, 8, -6], speed: 0.22, scale: 1.1 },
+  { start: [24, 2, -10], speed: 0.16, scale: 1.4 },
+  { start: [14, 10, -9], speed: 0.15, scale: 0.8 },
+]
+
+export function Decor({ quality, reducedMotion }: { quality: QualitySettings; reducedMotion: boolean }) {
   return (
     <group>
       {level.decor.islands.map((island, i) => (
@@ -193,18 +210,26 @@ export function Decor() {
       {level.decor.windows.map((w, i) => (
         <Window key={i} pos={w.pos} face={w.face} />
       ))}
-      <Cloud start={[3, 8, -6]} speed={0.22} scale={1.1} />
-      <Cloud start={[24, 2, -10]} speed={0.16} scale={1.4} />
-      <Cloud start={[14, 10, -9]} speed={0.15} scale={0.8} />
-      <Sparkles
-        position={[6, 2, 3]}
-        count={50}
-        scale={[22, 12, 22]}
-        size={2.2}
-        speed={0.2}
-        opacity={0.55}
-        color="#fff4dd"
-      />
+      {CLOUDS.slice(0, quality.cloudCount).map((cloud) => (
+        <Cloud
+          key={cloud.start.join(',')}
+          start={cloud.start}
+          speed={cloud.speed}
+          scale={cloud.scale}
+          still={reducedMotion}
+        />
+      ))}
+      {!reducedMotion && (
+        <Sparkles
+          position={[6, 2, 3]}
+          count={Math.max(1, Math.round(50 * quality.sparkleScale))}
+          scale={[22, 12, 22]}
+          size={2.2}
+          speed={0.2}
+          opacity={0.55}
+          color="#fff4dd"
+        />
+      )}
     </group>
   )
 }

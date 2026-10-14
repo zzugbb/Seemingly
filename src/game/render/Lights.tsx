@@ -3,7 +3,7 @@ import { Object3D, Vector3, type DirectionalLight } from 'three'
 
 const SCENE_CENTER = new Vector3(6, 1.2, 2.4)
 
-export function Lights() {
+export function Lights({ shadows }: { shadows: boolean }) {
   const lightRef = useRef<DirectionalLight>(null)
   const target = useMemo(() => {
     const obj = new Object3D()
@@ -23,8 +23,8 @@ export function Lights() {
         position={[SCENE_CENTER.x - 7, SCENE_CENTER.y + 14, SCENE_CENTER.z + 5]}
         intensity={2.5}
         color="#fff3e2"
-        castShadow
-        shadow-mapSize={[2048, 2048]}
+        castShadow={shadows}
+        shadow-mapSize={shadows ? [2048, 2048] : [1, 1]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
         shadow-camera-left={-14}

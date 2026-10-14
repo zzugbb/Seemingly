@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { LevelSim } from '../../game/core/sim'
 import { levels } from '../../game/levels'
 import { Scene } from '../../game/render/Scene'
+import { prefersReducedMotion, qualitySettings } from '../../game/render/quality'
 import { CompleteBanner } from '../hud/CompleteBanner'
 import { Hud } from '../hud/Hud'
 import { Toast } from '../hud/Toast'
@@ -18,6 +19,8 @@ export function PlayScreen() {
   const goEnding = useApp((state) => state.goEnding)
   const toggleMute = useApp((state) => state.toggleMute)
   const muted = useApp((state) => state.save.muted)
+  const settings = qualitySettings(useApp((state) => state.quality))
+  const reducedMotion = prefersReducedMotion()
   const level = levels[levelIndex] ?? levels[0]!
   const [runId, setRunId] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
@@ -51,8 +54,8 @@ export function PlayScreen() {
       <Canvas
         className="stage"
         orthographic
-        shadows
-        dpr={[1, 2]}
+        shadows={settings.shadows}
+        dpr={[1, settings.maxDpr]}
         gl={{ antialias: true, alpha: true }}
         camera={{ position: [30, 30, 30], zoom: 40 }}
         onPointerMissed={() => (document.body.style.cursor = '')}
@@ -61,6 +64,8 @@ export function PlayScreen() {
           key={runId}
           level={level}
           sim={sim}
+          quality={settings}
+          reducedMotion={reducedMotion}
           onWon={() => {
             setWon(true)
             completeLevel(level.id)

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { levels } from '../game/levels'
+import { detectQuality } from '../game/render/quality'
 import { loadSave, writeSave, type SaveData } from './save'
 
 export type Screen = 'title' | 'select' | 'play' | 'ending'
@@ -17,16 +18,11 @@ interface AppState {
   toggleMute: () => void
 }
 
-const initialQuality = (): 'high' | 'low' => {
-  const param = new URLSearchParams(window.location.search).get('quality')
-  return param === 'low' ? 'low' : 'high'
-}
-
 export const useApp = create<AppState>((set, get) => ({
   screen: 'title',
   levelIndex: 0,
   save: loadSave(),
-  quality: initialQuality(),
+  quality: detectQuality(),
   goTitle: () => set({ screen: 'title' }),
   goSelect: () => set({ screen: 'select' }),
   goEnding: () => set({ screen: 'ending' }),

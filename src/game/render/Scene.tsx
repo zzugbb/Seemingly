@@ -11,6 +11,7 @@ import { Decor, GoalArch } from './Decor'
 import { Lights } from './Lights'
 import { Mechanisms } from './Mechanisms'
 import { palette } from './palette'
+import type { QualitySettings } from './quality'
 
 const SWAY = (6 * Math.PI) / 180
 const BOB = 0.06
@@ -23,12 +24,16 @@ export function Scene({
   onWon,
   onBlocked,
   interactive = true,
+  quality,
+  reducedMotion,
 }: {
   level: LevelDef
   sim: LevelSim
   onWon: () => void
   onBlocked: (message: string) => void
   interactive?: boolean
+  quality: QualitySettings
+  reducedMotion: boolean
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [won, setWon] = useState(false)
@@ -103,9 +108,9 @@ export function Scene({
 
   return (
     <group>
-      <Lights />
+      <Lights shadows={quality.shadows} />
       <CameraRig level={level} />
-      <FloatingWorld>
+      <FloatingWorld still={reducedMotion}>
         <Blocks blocks={blocks} hovered={hovered} onHover={setHovered} onSelect={selectTile} />
         <Mechanisms
           level={level}
@@ -118,17 +123,18 @@ export function Scene({
         />
         <Character ref={characterRef} />
         <Marker marker={marker} />
-        <GoalArch reached={won} />
-        <Decor />
+        <GoalArch reached={won} sparkleScale={quality.sparkleScale} reducedMotion={reducedMotion} />
+        <Decor quality={quality} reducedMotion={reducedMotion} />
       </FloatingWorld>
     </group>
   )
 }
 
-function FloatingWorld({ children }: { children: ReactNode }) {
+function FloatingWorld({ children, still }: { children: ReactNode; still: boolean }) {
   const ref = useRef<Group>(null)
   useFrame(({ clock }) => {
-    if (ref.current) ref.current.position.y = Math.sin(clock.elapsedTime * 0.8) * 0.06
+    if (!ref.current) return
+    ref.current.position.y = still ? 0 : Math.sin(clock.elapsedTime * 0.8) * 0.06
   })
   return <group ref={ref}>{children}</group>
 }
