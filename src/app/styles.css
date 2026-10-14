@@ -67,8 +67,9 @@ body {
   color: var(--ink-soft);
 }
 
-.restart,
-.result-card button {
+.hud-button,
+.result-card button,
+.title-actions button {
   border: 1px solid rgba(74, 58, 82, 0.18);
   background: var(--card);
   color: var(--ink);
@@ -84,17 +85,122 @@ body {
     background 0.15s ease;
 }
 
-.restart:hover,
-.result-card button:hover {
+.hud-button:hover,
+.result-card button:hover,
+.title-actions button:hover {
   background: #fffaf3;
   transform: translateY(-1px);
 }
 
-.restart {
+.hud-button[aria-pressed='true'] {
+  background: rgba(74, 58, 82, 0.82);
+  color: #fff7ea;
+}
+
+.hud-actions {
   position: absolute;
   top: 30px;
   right: 32px;
   z-index: 1;
+  display: flex;
+  gap: 8px;
+}
+
+.screen {
+  position: relative;
+  height: 100%;
+}
+
+.title-center {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.title-center h1 {
+  margin: 0;
+  font-size: 64px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+.title-center p {
+  margin: 12px 0 28px;
+  letter-spacing: 0.42em;
+  color: var(--ink-soft);
+}
+
+.title-actions {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.select-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back {
+  position: absolute;
+  top: 28px;
+  left: 32px;
+}
+
+.level-list {
+  display: flex;
+  gap: 16px;
+  padding: 24px;
+}
+
+.level-card {
+  width: 160px;
+  min-height: 180px;
+  border: 1px solid rgba(74, 58, 82, 0.16);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font: inherit;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.level-card:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.level-index {
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.level-name {
+  letter-spacing: 0.2em;
+}
+
+.lantern {
+  width: 18px;
+  height: 22px;
+  border-radius: 9px 9px 8px 8px;
+  background: #cbb8a2;
+  box-shadow: inset 0 -6px 0 rgba(74, 58, 82, 0.15);
+}
+
+.lantern.lit {
+  background: #ffd98a;
+  box-shadow: 0 0 16px #ffd98a;
 }
 
 .hints {
@@ -189,7 +295,7 @@ body {
     font-size: 22px;
   }
 
-  .restart {
+  .hud-actions {
     top: 20px;
     right: 20px;
   }

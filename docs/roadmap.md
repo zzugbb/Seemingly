@@ -50,7 +50,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [x] **T1.6 渲染由模拟器驱动**
   - 按目标目录拆分 `World.tsx`：`Scene`、`CameraRig`、`Lights`、`Blocks`、`Mechanisms`，每帧调用 `sim.update`，删除 `World.tsx`。
   - 验收：小样的玩法与画面不变；`render/` 中不再有寻路或机关规则的代码。
-- [ ] **T1.7 页面与存档**
+- [x] **T1.7 页面与存档**
   - 引入 zustand；新增 `app/store.ts`、`app/save.ts`、`app/screens/`、`app/hud/`，按[设计稿](design.md#界面流程)实现标题页、选关页、游戏页、结尾页的骨架。关卡列表暂时只有小样。
   - 验收：标题 → 选关 → 游戏 → 通关 → 下一关或结尾，流程走通；刷新页面后通关记录还在；`R`、`Esc` 快捷键生效。
 - [ ] **T1.8 线上验证**

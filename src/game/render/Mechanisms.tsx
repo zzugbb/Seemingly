@@ -107,6 +107,7 @@ function RotatorView({
   onHover,
   onSelect,
   onBlocked,
+  interactive,
 }: {
   rotator: RotatorDef
   sim: LevelSim
@@ -114,6 +115,7 @@ function RotatorView({
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
   onBlocked: (message: string) => void
+  interactive: boolean
 }) {
   const groupRef = useRef<Group>(null)
   const crankRef = useRef<Group>(null)
@@ -131,6 +133,7 @@ function RotatorView({
 
   const onCrank = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation()
+    if (!interactive) return
     const result = sim.command({ type: 'operate', mechanism: rotator.id })
     if (result === 'standing-on-mechanism') {
       shake.current = 0.5
@@ -176,6 +179,7 @@ function MoverView({
   onHover,
   onSelect,
   onBlocked,
+  interactive,
 }: {
   mover: MoverDef
   sim: LevelSim
@@ -183,6 +187,7 @@ function MoverView({
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
   onBlocked: (message: string) => void
+  interactive: boolean
 }) {
   const groupRef = useRef<Group>(null)
   const crankRef = useRef<Group>(null)
@@ -203,6 +208,7 @@ function MoverView({
 
   const onCrank = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation()
+    if (!interactive) return
     const result = sim.command({ type: 'operate', mechanism: mover.id })
     if (result === 'standing-on-mechanism') {
       shake.current = 0.5
@@ -242,6 +248,7 @@ export function Mechanisms({
   onHover,
   onSelect,
   onBlocked,
+  interactive = true,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -249,6 +256,7 @@ export function Mechanisms({
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
   onBlocked: (message: string) => void
+  interactive?: boolean
 }) {
   return (
     <group>
@@ -263,6 +271,7 @@ export function Mechanisms({
               onHover={onHover}
               onSelect={onSelect}
               onBlocked={onBlocked}
+              interactive={interactive}
             />
           )
         }
@@ -276,6 +285,7 @@ export function Mechanisms({
               onHover={onHover}
               onSelect={onSelect}
               onBlocked={onBlocked}
+              interactive={interactive}
             />
           )
         }

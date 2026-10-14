@@ -17,11 +17,13 @@ export function Scene({
   sim,
   onWon,
   onBlocked,
+  interactive = true,
 }: {
   level: LevelDef
   sim: LevelSim
   onWon: () => void
   onBlocked: (message: string) => void
+  interactive?: boolean
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [won, setWon] = useState(false)
@@ -54,6 +56,7 @@ export function Scene({
   })
 
   const selectTile = (id: string) => {
+    if (!interactive) return
     const tile = sim.tiles().get(id)
     if (!tile) return
     const result = sim.command({ type: 'walk', tileId: id })
@@ -82,6 +85,7 @@ export function Scene({
           onHover={setHovered}
           onSelect={selectTile}
           onBlocked={onBlocked}
+          interactive={interactive}
         />
         <Character ref={characterRef} />
         <Marker marker={marker} />
