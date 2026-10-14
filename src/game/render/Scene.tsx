@@ -140,7 +140,7 @@ export function Scene({
         <Character ref={characterRef} />
         <Marker marker={marker} />
         <Lantern goal={level.goal} reached={won} sparkleScale={quality.sparkleScale} reducedMotion={reducedMotion} />
-        <Decor quality={quality} reducedMotion={reducedMotion} />
+        <Decor decor={level.decor} quality={quality} reducedMotion={reducedMotion} />
       </FloatingWorld>
     </group>
   )

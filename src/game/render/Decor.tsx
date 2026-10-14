@@ -3,8 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'
 import type { Group } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { level } from '../levels/prototype'
-import type { IslandDef, Vec3 } from '../levels/types'
+import type { DecorDef, IslandDef, Vec3 } from '../levels/types'
 import { material } from './materials'
 import { palette } from './palette'
 import type { QualitySettings } from './quality'
@@ -138,19 +137,27 @@ const CLOUDS: { start: Vec3; speed: number; scale: number }[] = [
   { start: [14, 10, -9], speed: 0.15, scale: 0.8 },
 ]
 
-export function Decor({ quality, reducedMotion }: { quality: QualitySettings; reducedMotion: boolean }) {
+export function Decor({
+  decor,
+  quality,
+  reducedMotion,
+}: {
+  decor: DecorDef
+  quality: QualitySettings
+  reducedMotion: boolean
+}) {
   return (
     <group>
-      {level.decor.islands.map((island, i) => (
+      {decor.islands.map((island, i) => (
         <Island key={i} island={island} />
       ))}
-      {level.decor.trees.map((pos, i) => (
+      {decor.trees.map((pos, i) => (
         <Tree key={i} pos={pos} seed={i * 1.7} />
       ))}
-      {level.decor.flowers.map((pos, i) => (
+      {decor.flowers.map((pos, i) => (
         <Flower key={i} pos={pos} index={i} />
       ))}
-      {level.decor.windows.map((w, i) => (
+      {decor.windows.map((w, i) => (
         <Window key={i} pos={w.pos} face={w.face} />
       ))}
       {CLOUDS.slice(0, quality.cloudCount).map((cloud) => (

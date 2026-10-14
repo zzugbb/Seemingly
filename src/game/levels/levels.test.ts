@@ -8,7 +8,7 @@ describe('关卡校验', () => {
   })
 
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
-    const prototype = levels[0]
+    const prototype = levels.find((level) => level.id === 'prototype')
     if (!prototype) throw new Error('缺少小样')
     const broken = structuredClone(prototype)
     const block = broken.blocks.find((item) => item.pos[0] === 7 && item.pos[1] === 0 && item.pos[2] === 4)
