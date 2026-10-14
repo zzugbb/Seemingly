@@ -47,7 +47,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
   - 新增 `core/validate.ts`、`core/solve.ts`、`levels/index.ts`、`levels/levels.test.ts`，实现 [level-design.md](level-design.md#校验) 的 7 项检查。
   - 小样的终点连接违反遮挡规则，在本任务中调整终点位置使其合格（例如把终点基座放到高度不低于桥臂的位置），并为小样写好解法。
   - 验收：小样通过全部校验；故意改坏一处坐标，测试能报出具体是哪一项、哪一格。
-- [ ] **T1.6 渲染由模拟器驱动**
+- [x] **T1.6 渲染由模拟器驱动**
   - 按目标目录拆分 `World.tsx`：`Scene`、`CameraRig`、`Lights`、`Blocks`、`Mechanisms`，每帧调用 `sim.update`，删除 `World.tsx`。
   - 验收：小样的玩法与画面不变；`render/` 中不再有寻路或机关规则的代码。
 - [ ] **T1.7 页面与存档**

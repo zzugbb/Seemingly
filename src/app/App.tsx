@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { World } from '../game/render/World'
+import { LevelSim } from '../game/core/sim'
+import { level } from '../game/levels/prototype'
+import { Scene } from '../game/render/Scene'
 
 export function App() {
   const [runId, setRunId] = useState(0)
@@ -21,6 +23,8 @@ export function App() {
     setRunId((id) => id + 1)
   }
 
+  const sim = useMemo(() => new LevelSim(level), [runId])
+
   return (
     <div className="app">
       <Canvas
@@ -32,7 +36,7 @@ export function App() {
         camera={{ position: [30, 30, 30], zoom: 40 }}
         onPointerMissed={() => (document.body.style.cursor = '')}
       >
-        <World key={runId} onGoal={() => setReached(true)} onBlocked={showToast} />
+        <Scene key={runId} level={level} sim={sim} onWon={() => setReached(true)} onBlocked={showToast} />
       </Canvas>
 
       <header className="title">
