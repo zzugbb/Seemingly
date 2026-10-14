@@ -12,6 +12,11 @@ import { Lights } from './Lights'
 import { Mechanisms } from './Mechanisms'
 import { palette } from './palette'
 
+const SWAY = (6 * Math.PI) / 180
+const BOB = 0.06
+const ARRIVE_TIME = 0.15
+const TURN_SPEED = 8
+
 export function Scene({
   level,
   sim,
@@ -29,6 +34,7 @@ export function Scene({
   const [won, setWon] = useState(false)
   const [marker, setMarker] = useState<{ pos: Vec3; ok: boolean; at: number } | null>(null)
   const characterRef = useRef<Group>(null)
+  const motion = useRef({ heading: 0, phase: 0, wasWalking: false, arrive: 0 })
 
   useFrame(({ clock }, delta) => {
     const events = sim.update(delta)
@@ -43,16 +49,39 @@ export function Scene({
     const pose = sim.characterPose()
     const [x, y, z] = pose.position
     character.position.set(x, y, z)
-    character.rotation.y = pose.heading
+    const anim = motion.current
+    let turn = pose.heading - anim.heading
+    if (turn > Math.PI) turn -= Math.PI * 2
+    if (turn < -Math.PI) turn += Math.PI * 2
+    const step = Math.min(Math.abs(turn), TURN_SPEED * delta)
+    anim.heading += Math.sign(turn) * step
+    character.rotation.y = anim.heading
     const body = character.getObjectByName('body')
     if (!body) return
     if (pose.walking) {
-      body.position.y = Math.abs(Math.sin(clock.elapsedTime * Math.PI * 2.6)) * 0.07
+      anim.phase += delta * Math.PI * 2.6
+      anim.arrive = 0
+      body.rotation.z = Math.sin(anim.phase) * SWAY
+      body.position.y = Math.abs(Math.sin(anim.phase)) * BOB
       body.scale.y = 1
-    } else {
+    } else if (anim.wasWalking) {
+      anim.arrive = ARRIVE_TIME
+      body.rotation.z = 0
       body.position.y = 0
-      body.scale.y = 1 + Math.sin(clock.elapsedTime * 2.4) * 0.02
     }
+    if (!pose.walking && anim.arrive > 0) {
+      anim.arrive = Math.max(0, anim.arrive - delta)
+      const t = 1 - anim.arrive / ARRIVE_TIME
+      const squash = Math.sin(t * Math.PI)
+      body.scale.y = 1 - squash * 0.1
+      body.position.y = 0
+      body.rotation.z = 0
+    } else if (!pose.walking) {
+      body.rotation.z = 0
+      body.position.y = 0
+      body.scale.y = 1 + Math.sin(clock.elapsedTime * 1.6) * 0.02
+    }
+    anim.wasWalking = pose.walking
   })
 
   const selectTile = (id: string) => {
