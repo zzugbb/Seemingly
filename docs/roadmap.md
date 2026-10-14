@@ -40,7 +40,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [x] **T1.3 可见性检测**
   - 新增 `core/visibility.ts`，实现顶面 5 点采样与射线检测。
   - 验收：测试覆盖「被前方柱子挡住」「错觉连接合格」「错觉连接违反遮挡规则」三种情况。
-- [ ] **T1.4 模拟器**
+- [x] **T1.4 模拟器**
   - 新增 `core/sim.ts`，按 [architecture.md](architecture.md#模拟器) 实现 `LevelSim`。
   - 验收：`core/sim.test.ts` 覆盖行走、走不通、机关运动中拒绝指令、站在机关上拒绝操作、压板触发、通关后拒绝指令。
 - [ ] **T1.5 关卡校验与解法验证**
