@@ -8,6 +8,13 @@
   浏览器里的等距视角解谜游戏：路看似相连，就能走过去。
 </p>
 
+<p align="center">
+  <a href="https://zzugbb.github.io/Seemingly/">在线试玩</a> ·
+  <a href="docs/design.md">设计稿</a> ·
+  <a href="docs/roadmap.md">路线图</a> ·
+  <a href="LICENSE">MIT</a>
+</p>
+
 ---
 
 ![画面小样](docs/assets/prototype-v0.png)

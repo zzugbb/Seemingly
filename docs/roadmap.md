@@ -13,7 +13,8 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [x] 中文名定为「积木错位」
 - [x] 许可证定为 MIT
 - [x] 当前仓库配置 git 用户名和邮箱
-- [ ] 在仓库设置里把 GitHub Pages 的来源设为 GitHub Actions（用户处理）
+- [x] 在仓库设置里把 GitHub Pages 的来源设为 GitHub Actions
+- [x] 首次发布成功：https://zzugbb.github.io/Seemingly/
 
 ## M0 画面小样（已完成）
 
@@ -52,9 +53,9 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [ ] **T1.7 页面与存档**
   - 引入 zustand；新增 `app/store.ts`、`app/save.ts`、`app/screens/`、`app/hud/`，按[设计稿](design.md#界面流程)实现标题页、选关页、游戏页、结尾页的骨架。关卡列表暂时只有小样。
   - 验收：标题 → 选关 → 游戏 → 通关 → 下一关或结尾，流程走通；刷新页面后通关记录还在；`R`、`Esc` 快捷键生效。
-- [ ] **T1.8 首次发布**
-  - 推送到 `main`，确认 GitHub Actions 通过，`https://zzugbb.github.io/Seemingly/` 能打开并游玩；在 README 顶部加上在线地址。
-  - 验收：线上页面截图正常，没有 404 资源。
+- [ ] **T1.8 线上验证**
+  - 推送 M1 的全部改动后，确认 GitHub Actions 通过，`https://zzugbb.github.io/Seemingly/` 能打开新的标题页并游玩小样。
+  - 验收：线上页面截图正常，浏览器控制台没有 404 资源。
 
 ## M2 角色与手感
 

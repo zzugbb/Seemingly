@@ -310,8 +310,8 @@ interface AppState {
 ## 部署
 
 - `.github/workflows/pages.yml`：推送到 `main` 或提交 PR 时，执行类型检查、格式检查、测试和构建；只有推送到 `main` 时才发布到 GitHub Pages。
-- 首次发布前，需要在仓库设置的 Pages 页面把来源设为 GitHub Actions。
-- 地址：`https://zzugbb.github.io/Seemingly/`。
+- 仓库的 Pages 来源已设为 GitHub Actions。
+- 地址：`https://zzugbb.github.io/Seemingly/`（已上线）。
 
 ## 提交约定
 
