@@ -16,6 +16,13 @@ body,
   margin: 0;
   height: 100%;
   overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+button,
+a {
+  touch-action: manipulation;
 }
 
 body {
@@ -285,25 +292,60 @@ body {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .title {
-    top: 20px;
-    left: 20px;
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
   }
 
   .title h1 {
-    font-size: 22px;
+    font-size: 18px;
   }
 
   .hud-actions {
-    top: 20px;
-    right: 20px;
+    top: calc(46px + env(safe-area-inset-top));
+    right: auto;
+    left: calc(12px + env(safe-area-inset-left));
+    max-width: calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    flex-wrap: wrap;
+  }
+
+  .hud-button {
+    padding: 7px 12px;
+    font-size: 12px;
   }
 
   .hints {
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    bottom: 20px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: calc(100% - 24px);
+  }
+
+  .hints span {
+    white-space: normal;
+    text-align: center;
+  }
+
+  .title-center h1 {
+    font-size: 40px;
+  }
+
+  .level-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(100%, 420px);
+  }
+
+  .level-card {
+    width: auto;
+    min-height: 140px;
+  }
+
+  .back {
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
   }
 }
