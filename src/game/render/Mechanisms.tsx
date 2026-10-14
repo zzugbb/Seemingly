@@ -137,7 +137,7 @@ function RotatorView({
     const result = sim.command({ type: 'operate', mechanism: rotator.id })
     if (result === 'standing-on-mechanism') {
       shake.current = 0.5
-      onBlocked('站在桥上可转不动')
+      onBlocked('站在上面可转不动')
     }
   }
 
@@ -212,7 +212,7 @@ function MoverView({
     const result = sim.command({ type: 'operate', mechanism: mover.id })
     if (result === 'standing-on-mechanism') {
       shake.current = 0.5
-      onBlocked('站在桥上可转不动')
+      onBlocked('站在上面可转不动')
     }
   }
 
