@@ -172,6 +172,68 @@ function RotatorView({
   )
 }
 
+const LEVER_REST = 0.15
+const LEVER_PULLED = 1.05
+
+function Lever({
+  position,
+  rotationY,
+  sim,
+  mechanismId,
+  interactive,
+  onBlocked,
+}: {
+  position: Vec3
+  rotationY: number
+  sim: LevelSim
+  mechanismId: string
+  interactive: boolean
+  onBlocked: (message: string) => void
+}) {
+  const barRef = useRef<Group>(null)
+  const shake = useRef(0)
+  const pulled = useRef(false)
+  const angle = useRef(LEVER_REST)
+  useFrame(({ clock }, delta) => {
+    const target = pulled.current ? LEVER_PULLED : LEVER_REST
+    angle.current += (target - angle.current) * Math.min(1, delta * 8)
+    const bar = barRef.current
+    if (!bar) return
+    bar.rotation.x = angle.current
+    shake.current = Math.max(0, shake.current - delta)
+    bar.position.x = Math.sin(clock.elapsedTime * 60) * shake.current * 0.08
+  })
+  const onClick = (event: ThreeEvent<MouseEvent>) => {
+    event.stopPropagation()
+    if (!interactive) return
+    const result = sim.command({ type: 'operate', mechanism: mechanismId })
+    if (result === 'ok') pulled.current = !pulled.current
+    if (result === 'standing-on-mechanism') {
+      shake.current = 0.5
+      onBlocked('站在上面可转不动')
+    }
+  }
+  return (
+    <group position={position} rotation={[0, rotationY, 0]}>
+      <mesh position={[0, 0, -0.02]} material={material(palette.terracotta)}>
+        <cylinderGeometry args={[0.08, 0.08, 0.06, 12]} />
+      </mesh>
+      <group ref={barRef} onClick={onClick} onPointerOver={pointer(true)} onPointerOut={pointer(false)}>
+        <mesh position={[0, 0.2, 0]} material={material(palette.glow)} castShadow>
+          <boxGeometry args={[0.06, 0.4, 0.06]} />
+        </mesh>
+        <mesh position={[0, 0.42, 0]} material={material(palette.glow)} castShadow>
+          <sphereGeometry args={[0.07, 12, 10]} />
+        </mesh>
+        <mesh>
+          <circleGeometry args={[0.32, 16]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      </group>
+    </group>
+  )
+}
+
 function MoverView({
   mover,
   sim,
@@ -190,9 +252,7 @@ function MoverView({
   interactive: boolean
 }) {
   const groupRef = useRef<Group>(null)
-  const crankRef = useRef<Group>(null)
-  const shake = useRef(0)
-  useFrame(({ clock }, delta) => {
+  useFrame(() => {
     const pose = sim.mechanismPose(mover.id)
     if (!('offset' in pose) || !groupRef.current) return
     groupRef.current.position.set(
@@ -200,21 +260,7 @@ function MoverView({
       mover.origin[1] + pose.offset[1],
       mover.origin[2] + pose.offset[2],
     )
-    const crank = crankRef.current
-    if (!crank) return
-    shake.current = Math.max(0, shake.current - delta)
-    crank.position.x = Math.sin(clock.elapsedTime * 60) * shake.current * 0.08
   })
-
-  const onCrank = (event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation()
-    if (!interactive) return
-    const result = sim.command({ type: 'operate', mechanism: mover.id })
-    if (result === 'standing-on-mechanism') {
-      shake.current = 0.5
-      onBlocked('站在上面可转不动')
-    }
-  }
 
   return (
     <>
@@ -231,11 +277,13 @@ function MoverView({
           onSelect={onSelect}
         />
       </group>
-      <Handle
+      <Lever
         position={handlePosition(mover.handle.block, mover.handle.face)}
         rotationY={mover.handle.face === 'x' ? Math.PI / 2 : 0}
-        onClick={onCrank}
-        crankRef={crankRef}
+        sim={sim}
+        mechanismId={mover.id}
+        interactive={interactive}
+        onBlocked={onBlocked}
       />
     </>
   )
