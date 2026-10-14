@@ -1,0 +1,15 @@
+export const palette = {
+  path: '#f7ecd6',
+  sand: '#ecc795',
+  terracotta: '#de8d64',
+  rose: '#e9a7a1',
+  teal: '#5f9894',
+  tealLight: '#8cc0b6',
+  plum: '#7a5f86',
+  plumDeep: '#5b4569',
+  leaf: '#9cbf8f',
+  leafDeep: '#7aa477',
+  trunk: '#a8745a',
+  glow: '#ffd98a',
+  cream: '#fff7ea',
+}
