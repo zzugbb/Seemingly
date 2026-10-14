@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { Group, Mesh } from 'three'
 import { cellId, surfaceY } from '../core/iso'
@@ -9,7 +9,7 @@ import { CameraRig } from './CameraRig'
 import { Character } from './Character'
 import { Decor, GoalArch } from './Decor'
 import { Lights } from './Lights'
-import { Mechanisms } from './Mechanisms'
+import { Mechanisms, type PlateFx } from './Mechanisms'
 import { palette } from './palette'
 import type { QualitySettings } from './quality'
 
@@ -39,7 +39,13 @@ export function Scene({
   const [won, setWon] = useState(false)
   const [marker, setMarker] = useState<{ pos: Vec3; ok: boolean; at: number } | null>(null)
   const characterRef = useRef<Group>(null)
+  const plateFx = useRef<PlateFx>({ spent: new Set(), flashAt: new Map() })
   const motion = useRef({ heading: 0, phase: 0, wasWalking: false, arrive: 0 })
+  const plateTiles = useMemo(
+    () =>
+      new Set(level.mechanisms.flatMap((mechanism) => (mechanism.type === 'plate' ? [cellId(mechanism.tile)] : []))),
+    [level],
+  )
 
   useFrame(({ clock }, delta) => {
     const events = sim.update(delta)
@@ -47,6 +53,14 @@ export function Scene({
       if (event.type === 'won') {
         setWon(true)
         onWon()
+      }
+      if (event.type === 'plate') {
+        if (event.triggered) {
+          const plate = level.mechanisms.find((mechanism) => mechanism.id === event.id)
+          if (plate?.type === 'plate' && plate.once) plateFx.current.spent.add(event.id)
+        } else if (!plateFx.current.spent.has(event.id)) {
+          plateFx.current.flashAt.set(event.id, clock.elapsedTime)
+        }
       }
     }
     const character = characterRef.current
@@ -111,7 +125,7 @@ export function Scene({
       <Lights shadows={quality.shadows} />
       <CameraRig level={level} />
       <FloatingWorld still={reducedMotion}>
-        <Blocks blocks={blocks} hovered={hovered} onHover={setHovered} onSelect={selectTile} />
+        <Blocks blocks={blocks} hovered={hovered} onHover={setHovered} onSelect={selectTile} bareCaps={plateTiles} />
         <Mechanisms
           level={level}
           sim={sim}
@@ -119,6 +133,7 @@ export function Scene({
           onHover={setHovered}
           onSelect={selectTile}
           onBlocked={onBlocked}
+          plateFx={plateFx}
           interactive={interactive}
         />
         <Character ref={characterRef} />

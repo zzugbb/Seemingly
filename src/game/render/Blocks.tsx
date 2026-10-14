@@ -14,12 +14,14 @@ export function WalkTile({
   hovered,
   onHover,
   onSelect,
+  cap = true,
 }: {
   position: Vec3
   color: string
   hovered: boolean
   onHover: (on: boolean) => void
   onSelect: (event: ThreeEvent<MouseEvent>) => void
+  cap?: boolean
 }) {
   const hover = (on: boolean) => (event: ThreeEvent<PointerEvent>) => {
     pointer(on)(event)
@@ -28,12 +30,14 @@ export function WalkTile({
   return (
     <group position={position} onClick={onSelect} onPointerOver={hover(true)} onPointerOut={hover(false)}>
       <mesh geometry={blockGeometry} material={material(color)} castShadow receiveShadow />
-      <mesh
-        geometry={slabGeometry}
-        position={[0, hovered ? 0.53 : 0.5, 0]}
-        material={material(hovered ? palette.cream : palette.path)}
-        receiveShadow
-      />
+      {cap && (
+        <mesh
+          geometry={slabGeometry}
+          position={[0, hovered ? 0.53 : 0.5, 0]}
+          material={material(hovered ? palette.cream : palette.path)}
+          receiveShadow
+        />
+      )}
     </group>
   )
 }
@@ -43,11 +47,13 @@ export function Blocks({
   hovered,
   onHover,
   onSelect,
+  bareCaps,
 }: {
   blocks: { pos: Vec3; color: string; kind: 'path' | 'solid'; id: string }[]
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
+  bareCaps?: ReadonlySet<string>
 }) {
   return (
     <group>
@@ -59,6 +65,7 @@ export function Blocks({
               position={block.pos}
               color={block.color}
               hovered={hovered === block.id}
+              cap={!bareCaps?.has(block.id)}
               onHover={(on) => onHover(on ? block.id : null)}
               onSelect={(event) => {
                 event.stopPropagation()

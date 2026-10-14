@@ -1,10 +1,11 @@
 import { useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import type { Group } from 'three'
+import { BoxGeometry, type Group, type Mesh } from 'three'
+import { cellId, surfaceY } from '../core/iso'
 import type { LevelSim } from '../core/sim'
-import type { LevelDef, MoverDef, RotatorDef, Vec3 } from '../levels/types'
+import type { LevelDef, MoverDef, PlateDef, RotatorDef, Vec3 } from '../levels/types'
 import { WalkTile, pointer } from './Blocks'
-import { blockGeometry, material } from './materials'
+import { blockGeometry, material, slabGeometry } from './materials'
 import { palette } from './palette'
 
 const HANDLE_CLEARANCE = 0.56
@@ -175,6 +176,107 @@ function RotatorView({
 const LEVER_REST = 0.15
 const LEVER_PULLED = 1.05
 
+const FRAME_SPAN = 0.72
+const FRAME_WIDTH = 0.05
+const FRAME_OFFSET = FRAME_SPAN / 2 - FRAME_WIDTH / 2
+const frameBar = new BoxGeometry(FRAME_SPAN, 0.02, FRAME_WIDTH)
+const SINK_TIME = 0.32
+const FLASH_TIME = 0.22
+
+export type PlateFx = {
+  spent: Set<string>
+  flashAt: Map<string, number>
+}
+
+function PlateView({
+  plate,
+  sim,
+  hovered,
+  plateFx,
+}: {
+  plate: PlateDef
+  sim: LevelSim
+  hovered: boolean
+  plateFx: { current: PlateFx }
+}) {
+  const topRef = useRef<Group>(null)
+  const frameRef = useRef<Group>(null)
+  const slabRef = useRef<Mesh>(null)
+  const bars = useRef<Array<Mesh | null>>([])
+  const sink = useRef(0)
+  const wasOn = useRef(false)
+  const [x, y, z] = plate.tile
+  useFrame(({ clock }, delta) => {
+    const pose = sim.characterPose()
+    const on =
+      !pose.walking &&
+      Math.abs(pose.position[0] - x) < 0.2 &&
+      Math.abs(pose.position[2] - z) < 0.2 &&
+      Math.abs(pose.position[1] - surfaceY(y)) < 0.25
+    if (on && !wasOn.current) sink.current = 1
+    wasOn.current = on
+    if (sink.current > 0) sink.current = Math.max(0, sink.current - delta / SINK_TIME)
+    if (topRef.current) topRef.current.position.y = (hovered ? 0.03 : 0) - Math.sin(sink.current * Math.PI) * 0.03
+    const flashAge = clock.elapsedTime - (plateFx.current.flashAt.get(plate.id) ?? -10)
+    const flashing = flashAge >= 0 && flashAge < FLASH_TIME
+    if (frameRef.current) {
+      const pulse = flashing ? 1 + Math.sin((flashAge / FLASH_TIME) * Math.PI) * 0.12 : 1
+      frameRef.current.scale.set(pulse, 1, pulse)
+    }
+    const spent = plate.once === true && plateFx.current.spent.has(plate.id)
+    const color = spent ? palette.plum : flashing ? palette.cream : palette.glow
+    const mat = material(color)
+    for (const bar of bars.current) {
+      if (bar) bar.material = mat
+    }
+    if (slabRef.current) slabRef.current.material = material(hovered ? palette.cream : palette.path)
+  })
+  const bindBar = (index: number) => (mesh: Mesh | null) => {
+    bars.current[index] = mesh
+  }
+  return (
+    <group position={[x, 0, z]}>
+      <group ref={topRef}>
+        <mesh
+          ref={slabRef}
+          geometry={slabGeometry}
+          position={[0, 0.5, 0]}
+          material={material(palette.path)}
+          receiveShadow
+        />
+        <group ref={frameRef} position={[0, 0.57, 0]}>
+          <mesh
+            ref={bindBar(0)}
+            position={[0, 0, FRAME_OFFSET]}
+            geometry={frameBar}
+            material={material(palette.glow)}
+          />
+          <mesh
+            ref={bindBar(1)}
+            position={[0, 0, -FRAME_OFFSET]}
+            geometry={frameBar}
+            material={material(palette.glow)}
+          />
+          <mesh
+            ref={bindBar(2)}
+            position={[FRAME_OFFSET, 0, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+            geometry={frameBar}
+            material={material(palette.glow)}
+          />
+          <mesh
+            ref={bindBar(3)}
+            position={[-FRAME_OFFSET, 0, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+            geometry={frameBar}
+            material={material(palette.glow)}
+          />
+        </group>
+      </group>
+    </group>
+  )
+}
+
 function Lever({
   position,
   rotationY,
@@ -296,6 +398,7 @@ export function Mechanisms({
   onHover,
   onSelect,
   onBlocked,
+  plateFx,
   interactive = true,
 }: {
   level: LevelDef
@@ -304,6 +407,7 @@ export function Mechanisms({
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
   onBlocked: (message: string) => void
+  plateFx: { current: PlateFx }
   interactive?: boolean
 }) {
   return (
@@ -337,16 +441,14 @@ export function Mechanisms({
             />
           )
         }
-        const [x, y, z] = mechanism.tile
         return (
-          <mesh
+          <PlateView
             key={mechanism.id}
-            position={[x, y + 0.57, z]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            material={material(palette.glow)}
-          >
-            <torusGeometry args={[0.42, 0.03, 8, 32]} />
-          </mesh>
+            plate={mechanism}
+            sim={sim}
+            hovered={hovered === cellId(mechanism.tile)}
+            plateFx={plateFx}
+          />
         )
       })}
     </group>
