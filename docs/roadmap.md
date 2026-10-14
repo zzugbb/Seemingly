@@ -30,7 +30,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
 
 目标：把小样改造成目标架构，画面和玩法不变。
 
-- [ ] **T1.1 关卡数据格式**
+- [x] **T1.1 关卡数据格式**
   - 按 [architecture.md](architecture.md#关卡数据) 重写 `levels/types.ts`，新增 `levels/builders.ts`（`defineLevel` 及 `island`、`path`、`solid`、`column`、`rotator`、`mover`、`plate`、`start`、`goal`、`tree`、`flower`、`window`）。
   - 用新格式重写 `levels/prototype.ts`，转盘放进 `mechanisms` 列表；`World.tsx` 改为读取新格式。
   - 验收：画面与改造前的截图一致；`prototype.ts` 中不再出现十六进制色值。

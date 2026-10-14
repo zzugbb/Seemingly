@@ -181,16 +181,16 @@ function Cloud({ start, speed, scale }: { start: Vec3; speed: number; scale: num
 export function Decor() {
   return (
     <group>
-      {level.islands.map((island, i) => (
+      {level.decor.islands.map((island, i) => (
         <Island key={i} island={island} />
       ))}
-      {level.trees.map((pos, i) => (
+      {level.decor.trees.map((pos, i) => (
         <Tree key={i} pos={pos} seed={i * 1.7} />
       ))}
-      {level.flowers.map((pos, i) => (
+      {level.decor.flowers.map((pos, i) => (
         <Flower key={i} pos={pos} index={i} />
       ))}
-      {level.windows.map((w, i) => (
+      {level.decor.windows.map((w, i) => (
         <Window key={i} pos={w.pos} face={w.face} />
       ))}
       <Cloud start={[3, 8, -6]} speed={0.22} scale={1.1} />
