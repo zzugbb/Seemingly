@@ -7,8 +7,7 @@ function buildLevel(): LevelDef {
 
   const solid = (x: number, y: number, z: number, color: string) =>
     blocks.push({ pos: [x, y, z], color, kind: 'solid' })
-  const path = (x: number, y: number, z: number, color: string) =>
-    blocks.push({ pos: [x, y, z], color, kind: 'path' })
+  const path = (x: number, y: number, z: number, color: string) => blocks.push({ pos: [x, y, z], color, kind: 'path' })
   const column = (x: number, z: number, y0: number, y1: number, color: string) => {
     for (let y = y0; y <= y1; y++) solid(x, y, z, color)
   }

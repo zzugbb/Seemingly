@@ -38,7 +38,13 @@ function Island({ island }: { island: IslandDef }) {
   return (
     <group position={[cx, top, cz]}>
       {layers.map((layer, i) => (
-        <mesh key={i} geometry={layer.geometry} position={layer.position} material={material(layer.color)} receiveShadow />
+        <mesh
+          key={i}
+          geometry={layer.geometry}
+          position={layer.position}
+          material={material(layer.color)}
+          receiveShadow
+        />
       ))}
     </group>
   )
@@ -84,7 +90,8 @@ function Flower({ pos, index }: { pos: Vec3; index: number }) {
 
 function Window({ pos, face }: { pos: Vec3; face: 'x' | 'z' }) {
   const offset = 0.495
-  const position: Vec3 = face === 'z' ? [pos[0], pos[1] - 0.04, pos[2] + offset] : [pos[0] + offset, pos[1] - 0.04, pos[2]]
+  const position: Vec3 =
+    face === 'z' ? [pos[0], pos[1] - 0.04, pos[2] + offset] : [pos[0] + offset, pos[1] - 0.04, pos[2]]
   return (
     <group position={position} rotation={[0, face === 'x' ? Math.PI / 2 : 0, 0]}>
       <mesh material={material(palette.plumDeep)}>
@@ -189,7 +196,15 @@ export function Decor() {
       <Cloud start={[3, 8, -6]} speed={0.22} scale={1.1} />
       <Cloud start={[24, 2, -10]} speed={0.16} scale={1.4} />
       <Cloud start={[14, 10, -9]} speed={0.15} scale={0.8} />
-      <Sparkles position={[6, 2, 3]} count={50} scale={[22, 12, 22]} size={2.2} speed={0.2} opacity={0.55} color="#fff4dd" />
+      <Sparkles
+        position={[6, 2, 3]}
+        count={50}
+        scale={[22, 12, 22]}
+        size={2.2}
+        speed={0.2}
+        opacity={0.55}
+        color="#fff4dd"
+      />
     </group>
   )
 }

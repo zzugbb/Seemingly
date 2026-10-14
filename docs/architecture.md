@@ -1,109 +1,319 @@
 # 架构说明
 
-> 描述小样的实际实现，以及正式开发时计划做的调整。计划中的内容都标注了「计划」。
+> 「现状」描述画面小样的实际代码；「目标架构」是正式开发要达到的结构，接口定义按本文执行。
 
 ## 技术栈
 
-| 层 | 选择 | 说明 |
-| --- | --- | --- |
-| 构建 | Vite 8 | 开发端口 5180，`base: './'`，构建产物可放在任意子路径 |
-| 界面 | React 19 + TypeScript | 严格模式 |
-| 3D | Three.js + React Three Fiber 9 + drei 10 | 用 React 组件描述场景 |
-| 部署 | GitHub Pages | 纯静态，无后端 |
+| 层 | 选择 |
+| --- | --- |
+| 构建 | Vite 8，开发端口 5180，`base: './'` |
+| 界面 | React 19 + TypeScript（严格模式） |
+| 3D | Three.js + React Three Fiber 9 + drei 10 |
+| 页面状态 | zustand（M1 引入） |
+| 测试 | Vitest |
+| 格式化 | Prettier（无分号、单引号、行宽 120） |
+| 部署 | GitHub Actions + GitHub Pages |
 
-## 目录职责
+## 现状（画面小样）
 
 ```text
 src/
-├── main.tsx              挂载 React
+├── main.tsx
 ├── app/
-│   ├── App.tsx           画布、标题、提示、通关横幅、重新开始
-│   └── styles.css        页面背景与界面样式
+│   ├── App.tsx            画布、标题、提示、通关横幅、重新开始
+│   └── styles.css
 └── game/
     ├── core/
-    │   └── iso.ts        屏幕坐标、连通图、寻路、移动插值、旋转偏移
+    │   ├── iso.ts         屏幕坐标、连通图、寻路、移动插值、旋转偏移
+    │   └── iso.test.ts
     ├── levels/
-    │   ├── types.ts      关卡数据类型
-    │   └── prototype.ts  小样关卡
+    │   ├── types.ts       小样用的关卡类型（只支持一个转盘）
+    │   └── prototype.ts   小样关卡
     └── render/
-        ├── World.tsx     场景总装：积木、转盘、转轮、角色、灯光、相机、交互与每帧更新
-        ├── Character.tsx 角色模型
-        ├── Decor.tsx     岛屿岩层、树、花、窗、云、光点、终点门
-        ├── materials.ts  共享几何体与材质缓存
-        └── palette.ts    配色
+        ├── World.tsx      状态、交互、渲染全部在这里（M1 要拆开）
+        ├── Character.tsx
+        ├── Decor.tsx
+        ├── materials.ts
+        └── palette.ts
 ```
 
-依赖方向：`render → levels → core`，`app → render`。`core` 不依赖 Three.js 和 React，后续可以直接写单元测试。
+## 目标架构
+
+### 目录
+
+```text
+src/
+├── main.tsx
+├── app/                       页面与界面（React DOM）
+│   ├── App.tsx                按 store.screen 切换页面
+│   ├── store.ts               zustand：页面、当前关卡、存档、静音、画质
+│   ├── save.ts                本地存储读写，键名 seemingly:save:v1
+│   ├── screens/
+│   │   ├── TitleScreen.tsx
+│   │   ├── LevelSelect.tsx
+│   │   ├── PlayScreen.tsx     创建模拟器，挂载画布与 HUD
+│   │   └── Ending.tsx
+│   ├── hud/
+│   │   ├── Hud.tsx            关名、重新开始、选关、静音
+│   │   ├── Toast.tsx
+│   │   └── CompleteBanner.tsx
+│   └── styles.css
+├── audio/                     Web Audio 合成，不依赖 React
+│   ├── engine.ts              AudioContext、主音量、静音
+│   ├── sfx.ts                 脚步、机关、走不通、点亮灯笼
+│   └── ambient.ts             环境和弦
+└── game/
+    ├── core/                  纯 TypeScript，禁止导入 three / react
+    │   ├── iso.ts             屏幕坐标、连通、寻路、移动插值
+    │   ├── mechanisms.ts      转盘、平移台、压板的状态与积木位置计算
+    │   ├── sim.ts             LevelSim 模拟器
+    │   ├── visibility.ts      顶面可见性射线检测
+    │   ├── validate.ts        关卡校验
+    │   ├── solve.ts           按解法运行模拟器
+    │   └── *.test.ts
+    ├── levels/
+    │   ├── types.ts           关卡数据类型
+    │   ├── builders.ts        defineLevel 与搭建辅助函数
+    │   ├── index.ts           按顺序导出 9 个关卡
+    │   ├── level-00.ts … level-08.ts
+    │   └── levels.test.ts     对全部关卡运行校验
+    └── render/                Three.js / React Three Fiber
+        ├── Scene.tsx          一关的完整场景，每帧驱动模拟器
+        ├── CameraRig.tsx
+        ├── Lights.tsx
+        ├── Blocks.tsx         静态积木
+        ├── Mechanisms.tsx     转盘、平移台、压板、把手的显示
+        ├── Character.tsx
+        ├── Lantern.tsx        终点灯笼
+        ├── Decor.tsx          岛屿岩层、树、花、窗、云、光点
+        ├── quality.ts         画质档位
+        ├── materials.ts
+        └── palette.ts
+```
+
+依赖方向只能是：`app → render → core`、`app → audio`、`render → levels → core`。`core` 和 `levels` 不能导入 `render`、`app`、`audio`。
+
+### 关卡数据
+
+`src/game/levels/types.ts` 的目标定义：
+
+```ts
+export type Vec3 = [number, number, number]
+export type Axis = 'x' | 'y' | 'z'
+export type Face = 'x' | 'z' // 只允许可见的 +x、+z 两个侧面
+
+export type ColorName = 'sand' | 'terracotta' | 'rose' | 'teal' | 'tealLight' | 'plum' | 'cream'
+
+export interface BlockDef {
+  pos: Vec3
+  color: ColorName
+  kind: 'path' | 'solid'
+}
+
+export interface MechBlockDef {
+  offset: Vec3 // 相对于转盘中心或平移台原点
+  color?: ColorName // 默认 tealLight
+  kind?: 'path' | 'solid' // 默认 path
+}
+
+export interface HandleDef {
+  block: Vec3 // 把手所在的静态结构积木
+  face: Face
+}
+
+export interface RotatorDef {
+  type: 'rotator'
+  id: string
+  pivot: Vec3 // 必须是一块静态积木，本身不转
+  blocks: MechBlockDef[]
+  initialStep?: 0 | 1 | 2 | 3
+  handle: HandleDef
+}
+
+export interface MoverDef {
+  type: 'mover'
+  id: string
+  origin: Vec3
+  axis: Axis
+  stops: number[] // 沿 axis 的整数偏移，升序，如 [0, 2, 3]
+  initialStop?: number // stops 的下标，默认 0
+  blocks: MechBlockDef[]
+  handle: HandleDef
+}
+
+export interface PlateDef {
+  type: 'plate'
+  id: string
+  tile: Vec3 // 必须是一块静态路面
+  target: string // 被触发的转盘或平移台的 id
+  once?: boolean
+}
+
+export type MechanismDef = RotatorDef | MoverDef | PlateDef
+
+export interface IslandDef {
+  x: [number, number]
+  z: [number, number]
+  y: number
+  depth: number
+}
+
+export interface DecorDef {
+  islands: IslandDef[]
+  trees: Vec3[]
+  flowers: Vec3[]
+  windows: { pos: Vec3; face: Face }[]
+}
+
+export type SolutionStep = { type: 'walk'; to: Vec3 } | { type: 'operate'; mechanism: string }
+
+export interface LevelDef {
+  id: string // 'level-00' … 'level-08'
+  title: string // 中文关名
+  blocks: BlockDef[]
+  mechanisms: MechanismDef[]
+  start: Vec3
+  goal: Vec3
+  decor: DecorDef
+  hints?: string[] // 底部操作提示，只在教学关使用
+  solution: SolutionStep[]
+}
+```
+
+约定：
+
+- 静态路面的格子编号是 `"x,y,z"`，机关积木的编号是 `"机关id#下标"`。
+- 转盘积木的世界坐标 = `pivot + rotateOffset(offset, step)`。
+- 平移台积木的世界坐标 = `origin + offset + 轴方向单位向量 × stops[stopIndex]`。
+- `palette.ts` 必须为每个 `ColorName` 提供颜色。
+
+### 模拟器
+
+`src/game/core/sim.ts` 是唯一的游戏逻辑来源。渲染层、界面和测试都只通过它读写游戏状态。
+
+```ts
+export type Command = { type: 'walk'; tileId: string } | { type: 'operate'; mechanism: string }
+
+export type CommandResult = 'ok' | 'busy' | 'unreachable' | 'standing-on-mechanism' | 'unknown-target'
+
+export type SimEvent =
+  | { type: 'walk-start'; route: string[] }
+  | { type: 'step'; tileId: string } // 每到达一格
+  | { type: 'mechanism-start'; id: string }
+  | { type: 'mechanism-tick'; id: string } // 转盘每 90 度、平移台每 1 格
+  | { type: 'mechanism-end'; id: string }
+  | { type: 'plate'; id: string; triggered: boolean }
+  | { type: 'won' }
+
+export class LevelSim {
+  constructor(level: LevelDef)
+  readonly level: LevelDef
+  readonly status: 'playing' | 'won'
+
+  command(cmd: Command): CommandResult
+  update(dt: number): SimEvent[] // dt 单位秒，内部上限 1/30
+  isIdle(): boolean // 没有行走、没有机关在动
+
+  tiles(): Map<string, Tile> // 当前静止状态下的全部路面
+  tileAt(pos: Vec3): Tile | undefined
+  characterPose(): { position: Vec3; heading: number; walking: boolean }
+  mechanismPose(id: string): { rotationY: number } | { offset: Vec3 }
+}
+```
+
+行为要求：
+
+- `command` 立即返回结果，不推进时间；动作在后续的 `update` 中进行。
+- 机关运动中或小人行走中，`operate` 返回 `busy`；机关运动中，`walk` 返回 `busy`；小人行走中发出新的 `walk`，在当前这一格走完后改走新路线。
+- 小人所在格子属于目标机关时，`operate` 返回 `standing-on-mechanism`。
+- 压板在小人停在其上、路线走完时触发，规则见[设计稿](design.md#压板)。
+- 抵达终点且路线走完时，产生 `won` 事件，此后拒绝所有指令。
+- 所有时长常量（行走速度、动画时长）定义在 `sim.ts` 顶部，和设计稿一致。
+
+### 渲染与驱动
+
+- `PlayScreen` 用 `useMemo` 按关卡和重开次数创建 `LevelSim`，传给 `Scene`。
+- `Scene` 的 `useFrame` 是**唯一**调用 `sim.update(dt)` 的地方。返回的事件交给 `PlayScreen` 传入的回调，回调负责播放音效和更新界面。
+- 渲染组件每帧从 `characterPose()`、`mechanismPose()` 读取位置，写到 `ref` 上，不经过 React 状态。
+- 机关积木作为一个组渲染：转盘组放在 `pivot`，设置 `rotation.y`；平移台组放在 `origin`，设置 `position` 偏移。
+- 点击路面调用 `sim.command({ type: 'walk', tileId })`；点击把手调用 `sim.command({ type: 'operate', mechanism })`；返回值不是 `ok` 时显示对应提示。
+
+### 页面状态
+
+`src/app/store.ts`：
+
+```ts
+interface SaveData {
+  version: 1
+  completed: string[] // 已通关的关卡 id
+  muted: boolean
+}
+
+interface AppState {
+  screen: 'title' | 'select' | 'play' | 'ending'
+  levelIndex: number
+  save: SaveData
+  quality: 'high' | 'low'
+  goTitle(): void
+  goSelect(): void
+  play(levelIndex: number): void
+  completeLevel(id: string): void // 写入存档
+  toggleMute(): void // 写入存档
+}
+```
+
+- 存档读写集中在 `save.ts`；读取失败或版本不符时使用空存档，不报错。
+- 画质初始值见 `render/quality.ts`：网址参数 `quality` 优先，其次粗指针设备为 `low`，其余为 `high`。
+
+### 画质档位
+
+| 项目 | 高 | 低 |
+| --- | --- | --- |
+| 像素比上限 | 2 | 1.5 |
+| 阴影 | 2048 | 关闭 |
+| 光点粒子 | 全量 | 减半 |
+| 云 | 3 朵 | 1 朵 |
+
+开启「减少动态效果」时，额外关闭场景漂浮、云朵移动和光点粒子。
 
 ## 核心算法
 
 ### 屏幕坐标与连通
 
-相机沿 `(1, 1, 1)` 方向正交观察，积木 `(x, y, z)` 的屏幕坐标为 `(x - y, z - y)`，见 `screenKey`。
+积木 `(x, y, z)` 的屏幕坐标为 `(x - y, z - y)`，见 `screenKey`。`buildGraph`：
 
-`buildGraph` 的步骤：
+1. 收集当前所有路面（静态路面加机关路面的当前位置）。
+2. 过滤掉顶上压着积木的格子。
+3. 屏幕坐标上下左右相邻的格子互相连通。
 
-1. 收集所有路面积木，包括转盘桥臂在当前角度下的位置。
-2. 过滤掉顶上压着其他积木的格子。
-3. 按屏幕坐标分组，屏幕坐标上下左右相邻的格子互相连通。
-
-`findPath` 在这张图上做广度优先搜索，得到最少步数的路径。
+`findPath` 做广度优先搜索，返回最少步数的路线。
 
 ### 跨越错觉连接的移动
 
-两个屏幕相邻的格子，三维位置的差可以分解为一个水平单位方向 `d`，加上沿视线方向的偏移 `k × (1, 1, 1)`。`segmentPoint` 的处理：
+两格的三维差可以分解为水平单位方向 `d` 加 `k × (1, 1, 1)`。`segmentPoint` 前半程沿 `d` 走到中点，过中点后切到目标一侧的等价位置继续走。两点只差 `k × (1, 1, 1)`，正交视角下投影相同，看不出跳变。
 
-- 前半程从起点沿 `d` 走到边界中点；
-- 过了中点，直接切换到目标格一侧的等价位置，继续沿 `d` 走到目标。
+### 可见性检测
 
-切换前后两点只差 `k × (1, 1, 1)`，在正交视角下投影完全相同，所以玩家看不出跳变。
-
-### 转盘
-
-- 桥臂作为一组放在转盘中心，用 `rotateOffset` 计算每个 90 度档位下桥臂的格子位置，和 Three.js 的绕 Y 轴旋转方向一致。
-- 动画 0.9 秒，三次缓入缓出；结束后档位加一，连通图随之重建。
-- 小人站在桥臂上时禁止旋转。
+`visibility.ts` 判断一个点沿 `(1, 1, 1)` 方向的射线是否碰到任何积木（射线与立方体的分轴相交测试），供关卡校验使用，规则见 [level-design.md](level-design.md#校验)。
 
 ### 相机取景
 
-`CameraRig` 把所有积木（包括桥臂四个档位的位置和岛屿底部）投影到相机的右方向和上方向上，求出包围范围，自动设置中心和缩放，窗口尺寸变化时重新计算。
+把所有积木（含机关所有状态下的位置和岛屿底部）投影到相机的右方向 `(1, 0, -1)/√2` 和上方向 `(-1, 2, -1)/√6`，求包围范围，设置中心和缩放；窗口尺寸变化时重新计算。
 
-## 渲染与性能
+## 性能预算
 
-- 所有积木共用一份圆角方块几何体，材质按颜色缓存复用。
-- 设备像素比上限为 2，平行光阴影贴图为 2048。
-- 小样场景约 160 个网格、每帧约 260 次绘制调用。
-- 构建产物约 1.1 MB，压缩后约 320 KB，没有任何外部模型、贴图或音频。
+- 首次加载传输量（压缩后）不超过 1 MB。小样为 320 KB。
+- 集成显卡笔记本、中端手机保持 60 帧。
+- 单关绘制调用不超过 400 次；超出时，同色静态积木改用 `InstancedMesh`。
+- 所有积木共用一份几何体，材质按颜色缓存；不在渲染或每帧中新建几何体和材质。
 
-性能预算（计划）：
+## 部署
 
-- 首次加载传输量控制在 1 MB 以内（压缩后）。
-- 集成显卡的笔记本和中端手机上保持 60 帧。
-- 单关绘制调用控制在 400 次以内，超出时对同色积木改用实例化渲染。
-- 提供画质档位：低档关闭阴影、降低像素比、减少光点粒子。
+- `.github/workflows/pages.yml`：推送到 `main` 或提交 PR 时，执行类型检查、格式检查、测试和构建；只有推送到 `main` 时才发布到 GitHub Pages。
+- 首次发布前，需要在仓库设置的 Pages 页面把来源设为 GitHub Actions。
+- 地址：`https://zzugbb.github.io/Seemingly/`。
 
-## 正式开发的调整（计划）
+## 提交约定
 
-1. **机关通用化**：`LevelDef` 目前只支持一个转盘，改为机关列表，每种机关实现统一接口：
-   - 当前占用的格子；
-   - 当前的路面格子；
-   - 是否正在运动；
-   - 推进一帧；
-   - 处理一次操作。
-2. **游戏状态和渲染分离**：`World.tsx` 目前同时负责状态、交互和渲染。拆出纯逻辑的关卡状态（小人位置、机关档位、通关判定），渲染层只读状态、发操作。
-3. **关卡数据**：继续用 TypeScript 编写，借助类型检查；增加关卡校验，在开发时检查起点、终点可达，以及没有重叠积木。
-4. **关卡流程**：关卡列表、切换动画、本地存储进度。
-5. **测试**：引入 Vitest，为 `core` 编写单元测试，覆盖屏幕坐标、连通、寻路、移动插值；每关加一条「能通关」的自动测试。
-6. **代码拆分**：构建时提示单个脚本超过 500 KB，可以按需拆出 Three.js 相关的分包，不影响功能。
-
-## 部署（计划）
-
-- GitHub Actions：推送到 `main` 时执行类型检查和构建，把 `dist/` 发布到 GitHub Pages。
-- 需要先在仓库设置的 Pages 页面，把来源选为 GitHub Actions。
-- 发布地址：`https://zzugbb.github.io/Seemingly/`。
-
-## 开发约定
-
-- 提交信息用中文，格式沿用 `feat: …`、`fix: …`、`docs: …`、`chore: …`。
-- 提交前至少运行 `npm run typecheck` 和 `npm run build`。
-- 新增颜色放进 `palette.ts`，新增关卡放进 `levels/`，纯逻辑放进 `core/`。
+- 提交信息用中文，前缀沿用 `feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`chore:`。
+- 一个任务一个提交，提交信息里写上任务编号，例如 `feat: 实现转盘机关的模拟逻辑（T1.3）`。

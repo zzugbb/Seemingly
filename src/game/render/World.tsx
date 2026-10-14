@@ -187,7 +187,14 @@ export function World({ onGoal, onBlocked }: Props) {
             )
           }
           return (
-            <mesh key={id} position={block.pos} geometry={blockGeometry} material={material(block.color)} castShadow receiveShadow />
+            <mesh
+              key={id}
+              position={block.pos}
+              geometry={blockGeometry}
+              material={material(block.color)}
+              castShadow
+              receiveShadow
+            />
           )
         })}
 
@@ -227,8 +234,9 @@ export function World({ onGoal, onBlocked }: Props) {
             <mesh position={[0.3, 0, 0.08]} material={material(palette.terracotta)}>
               <sphereGeometry args={[0.07, 12, 10]} />
             </mesh>
-            <mesh visible={false}>
+            <mesh>
               <circleGeometry args={[0.42, 20]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
           </group>
         </group>
