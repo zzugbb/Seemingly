@@ -7,11 +7,20 @@ export const slabGeometry = new RoundedBoxGeometry(0.84, SLAB_HEIGHT * 2, 0.84, 
 
 const cache = new Map<string, MeshStandardMaterial>()
 
-export function material(color: string, options: { flat?: boolean } = {}) {
-  const key = `${color}:${options.flat ? 'flat' : 'smooth'}`
+export function material(color: string, options: { flat?: boolean; opacity?: number } = {}) {
+  const opacity = options.opacity ?? 1
+  const key = `${color}:${options.flat ? 'flat' : 'smooth'}:${opacity}`
   let mat = cache.get(key)
   if (!mat) {
-    mat = new MeshStandardMaterial({ color, roughness: 0.88, metalness: 0, flatShading: options.flat ?? false })
+    mat = new MeshStandardMaterial({
+      color,
+      roughness: 0.88,
+      metalness: 0,
+      flatShading: options.flat ?? false,
+      transparent: opacity < 1,
+      opacity,
+      depthWrite: opacity >= 1,
+    })
     cache.set(key, mat)
   }
   return mat
