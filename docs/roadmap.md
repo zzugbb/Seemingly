@@ -43,7 +43,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [x] **T1.4 模拟器**
   - 新增 `core/sim.ts`，按 [architecture.md](architecture.md#模拟器) 实现 `LevelSim`。
   - 验收：`core/sim.test.ts` 覆盖行走、走不通、机关运动中拒绝指令、站在机关上拒绝操作、压板触发、通关后拒绝指令。
-- [ ] **T1.5 关卡校验与解法验证**
+- [x] **T1.5 关卡校验与解法验证**
   - 新增 `core/validate.ts`、`core/solve.ts`、`levels/index.ts`、`levels/levels.test.ts`，实现 [level-design.md](level-design.md#校验) 的 7 项检查。
   - 小样的终点连接违反遮挡规则，在本任务中调整终点位置使其合格（例如把终点基座放到高度不低于桥臂的位置），并为小样写好解法。
   - 验收：小样通过全部校验；故意改坏一处坐标，测试能报出具体是哪一项、哪一格。

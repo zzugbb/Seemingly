@@ -13,8 +13,8 @@ export const level = defineLevel({
     b.path([1, 0, 0], 'terracotta')
     b.path([2, 0, 0], 'terracotta')
 
-    // 高塔：塔顶在屏幕上紧贴起点步道的尽头
-    b.island({ x: [6, 11], z: [3, 5], y: -1, depth: 4 })
+    // 高塔：塔顶在屏幕上紧贴起点步道的尽头，右侧延伸到终点柱
+    b.island({ x: [6, 13], z: [3, 5], y: -1, depth: 4 })
     b.column({ x: 7, z: 4, from: 0, to: 3 }, 'rose')
     b.column({ x: 8, z: 4, from: 0, to: 3 }, 'rose')
     b.path([7, 4, 4], 'rose')
@@ -31,15 +31,15 @@ export const level = defineLevel({
       handle: { block: [10, 2, 4], face: 'z' },
     })
 
-    // 终点基座：比桥低得多，但转盘转到位后看起来正好接上
+    // 终点和桥臂同高，转到位后从侧面接上，避免桥臂挡住终点顶面
     b.island({ x: [8, 11], z: [0, 1], y: -1, depth: 2.6 })
-    b.solid([9, 0, 1], 'terracotta')
-    b.solid([10, 0, 1], 'terracotta')
-    b.path([9, 1, 1], 'terracotta')
-    b.path([10, 1, 1], 'terracotta')
+    b.column({ x: 12, z: 4, from: 0, to: 3 }, 'terracotta')
+    b.column({ x: 13, z: 4, from: 0, to: 3 }, 'terracotta')
+    b.path([12, 4, 4], 'terracotta')
+    b.path([13, 4, 4], 'terracotta')
 
     b.start([0, 0, 3])
-    b.goal([10, 1, 1])
+    b.goal([13, 4, 4])
 
     b.tree([-1, -1, 1])
     b.tree([2, -1, 3])
@@ -63,6 +63,6 @@ export const level = defineLevel({
   solution: [
     { type: 'walk', to: [8, 4, 4] },
     { type: 'operate', mechanism: 'bridge' },
-    { type: 'walk', to: [10, 1, 1] },
+    { type: 'walk', to: [13, 4, 4] },
   ],
 })
