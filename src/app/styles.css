@@ -205,16 +205,20 @@ body {
 }
 
 .lantern {
-  width: 18px;
-  height: 22px;
-  border-radius: 9px 9px 8px 8px;
-  background: #cbb8a2;
-  box-shadow: inset 0 -6px 0 rgba(74, 58, 82, 0.15);
+  width: 10px;
+  height: 14px;
+  border: 2px solid #fff7ea;
+  outline: 1px solid #5b4569;
+  border-radius: 3px;
+  background: #7a5f86;
+  box-shadow: 0 7px 0 -5px #de8d64;
 }
 
 .lantern.lit {
   background: #ffd98a;
-  box-shadow: 0 0 16px #ffd98a;
+  box-shadow:
+    0 8px 0 -6px #de8d64,
+    0 0 12px #ffd98a;
 }
 
 .hints {

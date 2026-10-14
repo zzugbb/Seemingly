@@ -7,7 +7,8 @@ import type { LevelDef, Vec3 } from '../levels/types'
 import { Blocks } from './Blocks'
 import { CameraRig } from './CameraRig'
 import { Character } from './Character'
-import { Decor, GoalArch } from './Decor'
+import { Decor } from './Decor'
+import { Lantern } from './Lantern'
 import { Lights } from './Lights'
 import { Mechanisms, type PlateFx } from './Mechanisms'
 import { palette } from './palette'
@@ -138,7 +139,7 @@ export function Scene({
         />
         <Character ref={characterRef} />
         <Marker marker={marker} />
-        <GoalArch reached={won} sparkleScale={quality.sparkleScale} reducedMotion={reducedMotion} />
+        <Lantern goal={level.goal} reached={won} sparkleScale={quality.sparkleScale} reducedMotion={reducedMotion} />
         <Decor quality={quality} reducedMotion={reducedMotion} />
       </FloatingWorld>
     </group>

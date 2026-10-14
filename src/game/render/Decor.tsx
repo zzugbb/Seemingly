@@ -1,9 +1,8 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'
-import type { Group, Mesh, PointLight } from 'three'
+import type { Group } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { surfaceY } from '../core/iso'
 import { level } from '../levels/prototype'
 import type { IslandDef, Vec3 } from '../levels/types'
 import { material } from './materials'
@@ -101,62 +100,6 @@ function Window({ pos, face }: { pos: Vec3; face: 'x' | 'z' }) {
       <mesh position={[0, 0.17, 0]} rotation={[Math.PI / 2, 0, 0]} material={material(palette.plumDeep)}>
         <cylinderGeometry args={[0.1, 0.1, 0.02, 16, 1, false, 0, Math.PI]} />
       </mesh>
-    </group>
-  )
-}
-
-export function GoalArch({
-  reached,
-  sparkleScale,
-  reducedMotion,
-}: {
-  reached: boolean
-  sparkleScale: number
-  reducedMotion: boolean
-}) {
-  const [gx, gy, gz] = level.goal
-  const top = surfaceY(gy)
-  const glowRef = useRef<Mesh>(null)
-  const lightRef = useRef<PointLight>(null)
-  useFrame(({ clock }) => {
-    const pulse = 0.5 + Math.sin(clock.elapsedTime * 2.2) * 0.5
-    const boost = reached ? 1.8 : 1
-    if (lightRef.current) lightRef.current.intensity = (1.4 + pulse * 1.2) * boost
-    if (glowRef.current) {
-      const mat = glowRef.current.material as { opacity: number }
-      mat.opacity = Math.min(0.85, (0.28 + pulse * 0.18) * boost)
-    }
-  })
-  const x = gx + 0.3
-  return (
-    <group>
-      <mesh position={[x, top + 0.36, gz - 0.36]} castShadow material={material(palette.cream)}>
-        <boxGeometry args={[0.1, 0.72, 0.1]} />
-      </mesh>
-      <mesh position={[x, top + 0.36, gz + 0.36]} castShadow material={material(palette.cream)}>
-        <boxGeometry args={[0.1, 0.72, 0.1]} />
-      </mesh>
-      <mesh position={[x, top + 0.76, gz]} castShadow material={material(palette.cream)}>
-        <boxGeometry args={[0.14, 0.1, 0.86]} />
-      </mesh>
-      <mesh position={[x, top + 0.86, gz]} material={material(palette.glow)}>
-        <octahedronGeometry args={[0.07, 0]} />
-      </mesh>
-      <mesh ref={glowRef} position={[x - 0.01, top + 0.35, gz]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.62, 0.68]} />
-        <meshBasicMaterial color="#ffc46e" transparent opacity={0.4} depthWrite={false} />
-      </mesh>
-      <pointLight ref={lightRef} position={[x + 0.4, top + 0.5, gz]} color={palette.glow} distance={4} decay={2} />
-      {!reducedMotion && (
-        <Sparkles
-          position={[x, top + 0.5, gz]}
-          count={Math.max(1, Math.round((reached ? 60 : 18) * sparkleScale))}
-          scale={reached ? [2.4, 2, 2.4] : [1.2, 1.1, 1.2]}
-          size={reached ? 5 : 3}
-          speed={reached ? 0.8 : 0.3}
-          color={palette.glow}
-        />
-      )}
     </group>
   )
 }
