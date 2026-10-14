@@ -37,7 +37,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [x] **T1.2 机关计算**
   - 新增 `core/mechanisms.ts`：根据机关定义和当前档位或停靠位，算出每块机关积木的世界坐标；平移台的往返规则；压板的触发判断。
   - 验收：`core/mechanisms.test.ts` 覆盖转盘 4 个档位、平移台往返、`once` 压板。
-- [ ] **T1.3 可见性检测**
+- [x] **T1.3 可见性检测**
   - 新增 `core/visibility.ts`，实现顶面 5 点采样与射线检测。
   - 验收：测试覆盖「被前方柱子挡住」「错觉连接合格」「错觉连接违反遮挡规则」三种情况。
 - [ ] **T1.4 模拟器**
