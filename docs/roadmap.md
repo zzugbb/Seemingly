@@ -64,7 +64,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [x] **T2.3 反馈打磨**：按[设计稿的反馈表](design.md#反馈与手感)逐项实现并核对文字与时长。
 - [x] **T2.4 手机适配**：触控点击、禁止页面滚动和双指缩放、刘海屏安全区、HUD 布局。验收：用 375×667 和 390×844 两种尺寸模拟截图，界面不重叠，路面和把手都能点中。
 - [x] **T2.5 画质与减少动态效果**：实现 `render/quality.ts` 和 [architecture.md](architecture.md#画质档位) 中的档位表。验收：`?quality=low` 时阴影关闭；开启减少动态效果时场景静止。
-- [ ] **T2.6 不支持 WebGL2 时的提示**：显示一行说明文字，不白屏。
+- [x] **T2.6 不支持 WebGL2 时的提示**：显示一行说明文字，不白屏。
 
 ## M3 机关与关卡
 
