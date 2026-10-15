@@ -12,6 +12,15 @@ const settle = (sim: LevelSim) => {
 }
 
 describe('关卡校验', () => {
+  it('回环：开局任意切换平移台，都不能一次行走直达终点', () => {
+    const level = levels.find((item) => item.id === 'level-07')!
+    const sim = new LevelSim(level)
+    for (let index = 0; index < 8; index++) {
+      expect(sim.command({ type: 'walk', tileId: sim.tileAt(level.goal)!.id })).toBe('unreachable')
+      expect(sim.command({ type: 'operate', mechanism: 'loop-bridge' })).toBe('ok')
+      settle(sim)
+    }
+  })
   it('归来的结尾有九盏灯笼和序章塔，位置均有静态积木承托', () => {
     const level = levels.find((item) => item.id === 'level-08')!
     const ending = level.ending
@@ -41,28 +50,23 @@ describe('关卡校验', () => {
     const sim = new LevelSim(level)
     expect(sim.command({ type: 'walk', tileId: sim.tileAt(level.goal)!.id })).toBe('unreachable')
   })
-  it('回环：路过压板不触发，折返停下再触发后改接终点', () => {
-    const level = levels.find((item) => item.id === 'level-07')
-    expect(level).toBeDefined()
-    if (!level) throw new Error('缺少回环')
-    expect(level.solution.length).toBeGreaterThanOrEqual(6)
-    expect(level.solution.length).toBeLessThanOrEqual(12)
+  it('回环：三段路逐段折返，压板把入口改接为下一段出口', () => {
+    const level = levels.find((item) => item.id === 'level-07')!
+    expect(level.solution.length).toBe(6)
     const sim = new LevelSim(level)
     const walk = (pos: [number, number, number]) => {
       expect(sim.command({ type: 'walk', tileId: sim.tileAt(pos)!.id })).toBe('ok')
       return settle(sim)
     }
     const goal = sim.tileAt(level.goal)!.id
+    expect(walk([0, 0, 4])).toContainEqual({ type: 'plate', id: 'first-plate', triggered: true })
+    expect(walk([2, 0, 2])).toContainEqual({ type: 'step', tileId: '0,0,3' })
     expect(sim.command({ type: 'walk', tileId: goal })).toBe('unreachable')
-    expect(walk([0, 0, 3])).toContainEqual({ type: 'plate', id: 'loop-plate', triggered: true })
+    expect(walk([2, 0, 4])).toContainEqual({ type: 'plate', id: 'middle-plate', triggered: true })
+    expect(walk([4, 0, 2])).toContainEqual({ type: 'step', tileId: '2,0,3' })
     expect(sim.command({ type: 'walk', tileId: goal })).toBe('unreachable')
-    walk([2, 0, 3])
-    const passing = walk([0, 0, 5])
-    expect(passing).toContainEqual({ type: 'step', tileId: '0,0,3' })
-    expect(passing.some((event) => event.type === 'plate')).toBe(false)
-    expect(walk([0, 0, 3])).toContainEqual({ type: 'plate', id: 'loop-plate', triggered: true })
-    walk([2, 0, 5])
-    walk(level.goal)
+    expect(walk([4, 0, 4])).toContainEqual({ type: 'plate', id: 'last-plate', triggered: true })
+    expect(walk(level.goal)).toContainEqual({ type: 'step', tileId: '4,0,3' })
     expect(sim.status).toBe('won')
   })
   it('交错：滑台换接落脚点后，转塔分别打开入口与出口', () => {
