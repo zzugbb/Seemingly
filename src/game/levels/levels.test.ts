@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { validateLevels } from '../core/validate'
 import { levels } from './index'
 import { LevelSim } from '../core/sim'
+import { runSolution } from '../core/solve'
 
 const settle = (sim: LevelSim) => {
   const events = []
@@ -11,6 +12,22 @@ const settle = (sim: LevelSim) => {
 }
 
 describe('关卡校验', () => {
+  it('归来：用三种机关回到序章起点与原来的灯笼', () => {
+    const level = levels.find((item) => item.id === 'level-08')
+    const prologue = levels.find((item) => item.id === 'level-00')
+    expect(level).toBeDefined()
+    if (!level || !prologue) throw new Error('缺少归来或序章')
+    expect(new Set(level.mechanisms.map((item) => item.type))).toEqual(new Set(['plate', 'rotator', 'mover']))
+    expect(level.solution.length).toBeGreaterThanOrEqual(6)
+    expect(level.solution.length).toBeLessThanOrEqual(12)
+    expect(level.goal).toEqual(prologue.goal)
+    for (const block of prologue.blocks) expect(level.blocks).toContainEqual(block)
+    const run = runSolution(level)
+    expect(run.ok).toBe(true)
+    expect(run.walks.flatMap((walk) => walk.positions)).toContainEqual(prologue.start)
+    const sim = new LevelSim(level)
+    expect(sim.command({ type: 'walk', tileId: sim.tileAt(level.goal)!.id })).toBe('unreachable')
+  })
   it('回环：路过压板不触发，折返停下再触发后改接终点', () => {
     const level = levels.find((item) => item.id === 'level-07')
     expect(level).toBeDefined()
