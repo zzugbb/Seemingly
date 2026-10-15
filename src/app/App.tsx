@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { audioEngine } from '../audio/engine'
 import { LevelSelect } from './screens/LevelSelect'
 import { PlayScreen } from './screens/PlayScreen'
 import { TitleScreen } from './screens/TitleScreen'
@@ -16,6 +17,22 @@ function hasWebGL2() {
 export function App() {
   const [supported] = useState(hasWebGL2)
   const screen = useApp((state) => state.screen)
+  useEffect(() => {
+    audioEngine.setMuted(useApp.getState().save.muted)
+    const unsubscribe = useApp.subscribe((state, previous) => {
+      if (state.save.muted !== previous.save.muted) audioEngine.setMuted(state.save.muted)
+    })
+    const unlock = (event: Event) => {
+      if (event.isTrusted) void audioEngine.unlock()
+    }
+    window.addEventListener('click', unlock, true)
+    window.addEventListener('keydown', unlock, true)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('click', unlock, true)
+      window.removeEventListener('keydown', unlock, true)
+    }
+  }, [])
   if (!supported) {
     return (
       <div className="app">
