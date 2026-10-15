@@ -11,6 +11,30 @@ const settle = (sim: LevelSim) => {
 }
 
 describe('关卡校验', () => {
+  it('回环：路过压板不触发，折返停下再触发后改接终点', () => {
+    const level = levels.find((item) => item.id === 'level-07')
+    expect(level).toBeDefined()
+    if (!level) throw new Error('缺少回环')
+    expect(level.solution.length).toBeGreaterThanOrEqual(6)
+    expect(level.solution.length).toBeLessThanOrEqual(12)
+    const sim = new LevelSim(level)
+    const walk = (pos: [number, number, number]) => {
+      expect(sim.command({ type: 'walk', tileId: sim.tileAt(pos)!.id })).toBe('ok')
+      return settle(sim)
+    }
+    const goal = sim.tileAt(level.goal)!.id
+    expect(sim.command({ type: 'walk', tileId: goal })).toBe('unreachable')
+    expect(walk([0, 0, 3])).toContainEqual({ type: 'plate', id: 'loop-plate', triggered: true })
+    expect(sim.command({ type: 'walk', tileId: goal })).toBe('unreachable')
+    walk([2, 0, 3])
+    const passing = walk([0, 0, 5])
+    expect(passing).toContainEqual({ type: 'step', tileId: '0,0,3' })
+    expect(passing.some((event) => event.type === 'plate')).toBe(false)
+    expect(walk([0, 0, 3])).toContainEqual({ type: 'plate', id: 'loop-plate', triggered: true })
+    walk([2, 0, 5])
+    walk(level.goal)
+    expect(sim.status).toBe('won')
+  })
   it('交错：滑台换接落脚点后，转塔分别打开入口与出口', () => {
     const level = levels.find((item) => item.id === 'level-06')
     expect(level).toBeDefined()
