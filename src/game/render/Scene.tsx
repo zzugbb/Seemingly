@@ -8,6 +8,7 @@ import { Blocks } from './Blocks'
 import { CameraRig } from './CameraRig'
 import { Character } from './Character'
 import { Decor } from './Decor'
+import { Finale } from './Finale'
 import { Lantern } from './Lantern'
 import { Lights } from './Lights'
 import { Mechanisms, type PlateFx } from './Mechanisms'
@@ -27,6 +28,7 @@ export function Scene({
   interactive = true,
   quality,
   reducedMotion,
+  onEndingReady,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -35,9 +37,11 @@ export function Scene({
   interactive?: boolean
   quality: QualitySettings
   reducedMotion: boolean
+  onEndingReady?: () => void
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [won, setWon] = useState(false)
+  const [towerLit, setTowerLit] = useState(false)
   const [marker, setMarker] = useState<{ pos: Vec3; ok: boolean; at: number } | null>(null)
   const characterRef = useRef<Group>(null)
   const plateFx = useRef<PlateFx>({ spent: new Set(), flashAt: new Map() })
@@ -47,6 +51,8 @@ export function Scene({
       new Set(level.mechanisms.flatMap((mechanism) => (mechanism.type === 'plate' ? [cellId(mechanism.tile)] : []))),
     [level],
   )
+
+  const towerTiles = useMemo(() => new Set(level.ending?.tower.map(cellId)), [level])
 
   useFrame(({ clock }, delta) => {
     const events = sim.update(delta)
@@ -119,13 +125,14 @@ export function Scene({
     pos: block.pos,
     color: palette[block.color],
     kind: block.kind,
+    lit: towerLit && towerTiles.has(cellId(block.pos)),
   }))
 
   return (
     <group>
       <Lights shadows={quality.shadows} />
       <CameraRig level={level} />
-      <FloatingWorld still={reducedMotion}>
+      <FloatingWorld still={reducedMotion} frozen={won && Boolean(level.ending)}>
         <Blocks blocks={blocks} hovered={hovered} onHover={setHovered} onSelect={selectTile} bareCaps={plateTiles} />
         <Mechanisms
           level={level}
@@ -140,16 +147,25 @@ export function Scene({
         <Character ref={characterRef} />
         <Marker marker={marker} />
         <Lantern goal={level.goal} reached={won} sparkleScale={quality.sparkleScale} reducedMotion={reducedMotion} />
+        {won && level.ending && (
+          <Finale
+            ending={level.ending}
+            sparkleScale={quality.sparkleScale}
+            reducedMotion={reducedMotion}
+            onTowerLit={() => setTowerLit(true)}
+            onReady={() => onEndingReady?.()}
+          />
+        )}
         <Decor decor={level.decor} quality={quality} reducedMotion={reducedMotion} />
       </FloatingWorld>
     </group>
   )
 }
 
-function FloatingWorld({ children, still }: { children: ReactNode; still: boolean }) {
+function FloatingWorld({ children, still, frozen }: { children: ReactNode; still: boolean; frozen: boolean }) {
   const ref = useRef<Group>(null)
   useFrame(({ clock }) => {
-    if (!ref.current) return
+    if (!ref.current || frozen) return
     ref.current.position.y = still ? 0 : Math.sin(clock.elapsedTime * 0.8) * 0.06
   })
   return <group ref={ref}>{children}</group>

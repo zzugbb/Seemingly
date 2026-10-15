@@ -5,6 +5,24 @@ import { defineLevel } from './builders'
 export default defineLevel({
   id: 'level-08',
   title: '归来',
+  ending: {
+    lanterns: [
+      [1, 0, 0],
+      [0, 0, 0],
+      [0, 0, 1],
+      [0, 0, 2],
+      [1, 0, 1],
+      [2, 0, 1],
+      [-1, -1, 3],
+      [2, -1, 3],
+      [2, 2, -1],
+    ],
+    tower: [
+      [2, 0, -1],
+      [2, 1, -1],
+      [2, 2, -1],
+    ],
+  },
   build: (b) => {
     b.island({ x: [-1, 2], z: [-1, 3], y: -1 })
     b.path([0, 0, 2], 'terracotta')

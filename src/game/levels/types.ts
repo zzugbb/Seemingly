@@ -67,6 +67,11 @@ export interface DecorDef {
 
 export type SolutionStep = { type: 'walk'; to: Vec3 } | { type: 'operate'; mechanism: string }
 
+export interface EndingDef {
+  lanterns: Vec3[] // 第一盏为终点，其余按点亮顺序排列
+  tower: Vec3[]
+}
+
 export interface LevelDef {
   id: string // 'level-00' … 'level-08'
   title: string // 中文关名
@@ -77,4 +82,5 @@ export interface LevelDef {
   decor: DecorDef
   hints?: string[] // 底部操作提示，只在教学关使用
   solution: SolutionStep[]
+  ending?: EndingDef
 }

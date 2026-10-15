@@ -102,7 +102,7 @@ export function Lantern({
         ].map(([px, pz]) => (
           <mesh key={`${px},${pz}`} position={[px, 0, pz]} geometry={ribGeometry} material={material(palette.cream)} />
         ))}
-        <mesh geometry={coreGeometry} material={material(reached ? palette.glow : palette.plum)} />
+        <mesh geometry={coreGeometry} material={material(reached ? palette.glow : palette.plum, { glow: reached })} />
         <pointLight
           position={[0.05, 0, 0.05]}
           color={palette.glow}

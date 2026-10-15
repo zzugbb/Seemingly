@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Ending } from './screens/Ending'
 import { LevelSelect } from './screens/LevelSelect'
 import { PlayScreen } from './screens/PlayScreen'
 import { TitleScreen } from './screens/TitleScreen'
@@ -30,16 +29,10 @@ export function App() {
         <LevelSelect />
       </div>
     )
-  if (screen === 'play')
+  if (screen === 'play' || screen === 'ending')
     return (
       <div className="app">
         <PlayScreen />
-      </div>
-    )
-  if (screen === 'ending')
-    return (
-      <div className="app">
-        <Ending />
       </div>
     )
   return (

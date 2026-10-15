@@ -177,6 +177,7 @@ export interface LevelDef {
   decor: DecorDef
   hints?: string[] // 底部操作提示，只在教学关使用
   solution: SolutionStep[]
+  ending?: { lanterns: Vec3[]; tower: Vec3[] } // 最终关布景，第一盏灯笼为终点
 }
 ```
 
@@ -237,6 +238,10 @@ export class LevelSim {
 - 渲染组件每帧从 `characterPose()`、`mechanismPose()` 读取位置，写到 `ref` 上，不经过 React 状态。
 - 机关积木作为一个组渲染：转盘组放在 `pivot`，设置 `rotation.y`；平移台组放在 `origin`，设置 `position` 偏移。
 - 点击路面调用 `sim.command({ type: 'walk', tileId })`；点击把手调用 `sim.command({ type: 'operate', mechanism })`；返回值不是 `ok` 时显示对应提示。
+
+### 结尾
+
+最终关在 `ending` 数据中列出九盏灯笼与序章塔的静态积木位置。通关时切换到 `ending` 页面状态，但 `App` 对 `play` 和 `ending` 共用同一个 `PlayScreen` 挂载分支，保留 Canvas、模拟器和相机。场景停止漂浮，终点灯笼先亮，其余每隔 0.45 秒点亮；全部亮后 0.6 秒照亮塔，再过 0.9 秒显示「谢谢游玩」和「回到标题」。`Finale` 每帧只累计 ref，在点亮阈值变化时更新 React 状态。发光材质由 `materials.ts` 缓存。
 
 ### 页面状态
 

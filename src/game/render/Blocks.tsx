@@ -49,7 +49,7 @@ export function Blocks({
   onSelect,
   bareCaps,
 }: {
-  blocks: { pos: Vec3; color: string; kind: 'path' | 'solid'; id: string }[]
+  blocks: { pos: Vec3; color: string; kind: 'path' | 'solid'; id: string; lit?: boolean }[]
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
@@ -79,7 +79,7 @@ export function Blocks({
             key={block.id}
             position={block.pos}
             geometry={blockGeometry}
-            material={material(block.color)}
+            material={material(block.color, { glow: block.lit })}
             castShadow
             receiveShadow
           />

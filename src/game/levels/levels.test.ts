@@ -12,6 +12,19 @@ const settle = (sim: LevelSim) => {
 }
 
 describe('关卡校验', () => {
+  it('归来的结尾有九盏灯笼和序章塔，位置均有静态积木承托', () => {
+    const level = levels.find((item) => item.id === 'level-08')!
+    const ending = level.ending
+    expect(ending).toBeDefined()
+    if (!ending) throw new Error('缺少结尾布景')
+    expect(ending.lanterns).toHaveLength(9)
+    expect(new Set(ending.lanterns.map((pos) => pos.join(','))).size).toBe(9)
+    expect(new Set(ending.lanterns.map(([x, y, z]) => `${x - y},${z - y}`)).size).toBe(9)
+    expect(ending.lanterns[0]).toEqual(level.goal)
+    for (const pos of [...ending.lanterns, ...ending.tower]) {
+      expect(level.blocks.some((block) => block.pos.join(',') === pos.join(','))).toBe(true)
+    }
+  })
   it('归来：用三种机关回到序章起点与原来的灯笼', () => {
     const level = levels.find((item) => item.id === 'level-08')
     const prologue = levels.find((item) => item.id === 'level-00')

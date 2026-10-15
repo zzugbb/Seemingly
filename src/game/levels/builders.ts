@@ -2,6 +2,7 @@ import type {
   BlockDef,
   ColorName,
   DecorDef,
+  EndingDef,
   Face,
   LevelDef,
   MechanismDef,
@@ -35,6 +36,7 @@ export function defineLevel(spec: {
   title: string
   hints?: string[]
   solution: SolutionStep[]
+  ending?: EndingDef
   build: (b: LevelBuilder) => void
 }): LevelDef {
   const blocks: BlockDef[] = []
@@ -100,5 +102,6 @@ export function defineLevel(spec: {
     decor,
     hints: spec.hints,
     solution: spec.solution,
+    ending: spec.ending,
   }
 }
