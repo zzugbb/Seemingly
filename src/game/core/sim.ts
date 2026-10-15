@@ -116,19 +116,19 @@ export class LevelSim {
     for (const block of this.level.blocks) {
       if (block.kind !== 'path') continue
       const id = cellId(block.pos)
-      map.set(id, { id, pos: block.pos, onRotator: false })
+      map.set(id, { id, pos: block.pos })
     }
     for (const mechanism of this.level.mechanisms) {
       if (mechanism.type === 'rotator') {
         for (const block of rotatorBlocks(mechanism, this.rotatorStep.get(mechanism.id) ?? 0)) {
           if (block.kind !== 'path') continue
-          map.set(block.id, { id: block.id, pos: block.pos, onRotator: true })
+          map.set(block.id, { id: block.id, pos: block.pos })
         }
       } else if (mechanism.type === 'mover') {
         const stopIndex = this.moverState.get(mechanism.id)?.stopIndex ?? 0
         for (const block of moverBlocks(mechanism, stopIndex)) {
           if (block.kind !== 'path') continue
-          map.set(block.id, { id: block.id, pos: block.pos, onRotator: false })
+          map.set(block.id, { id: block.id, pos: block.pos })
         }
       }
     }

@@ -13,7 +13,6 @@ import type {
   Vec3,
 } from './types'
 
-// 关卡示例省略 depth。小样会显式传入原来的厚度。
 const DEFAULT_ISLAND_DEPTH = 3
 
 export interface LevelBuilder {

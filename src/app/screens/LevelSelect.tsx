@@ -24,7 +24,7 @@ export function LevelSelect() {
               onClick={() => play(index)}
             >
               <span className={done ? 'lantern lit' : 'lantern'} aria-hidden="true" />
-              <span className="level-index">{index + 1}</span>
+              <span className="level-index">{index === 0 ? '序章' : index}</span>
               <span className="level-name">{level.title}</span>
             </button>
           )

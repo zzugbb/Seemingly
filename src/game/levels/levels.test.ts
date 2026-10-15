@@ -21,6 +21,9 @@ describe('关卡校验', () => {
       settle(sim)
     }
   })
+  it('只按顺序提供序章与第 1～8 关，不再包含小样', () => {
+    expect(levels.map((level) => level.id)).toEqual(Array.from({ length: 9 }, (_, index) => `level-0${index}`))
+  })
   it('归来的结尾有九盏灯笼和序章塔，位置均有静态积木承托', () => {
     const level = levels.find((item) => item.id === 'level-08')!
     const ending = level.ending
@@ -120,18 +123,18 @@ describe('关卡校验', () => {
     settle(sim)
     expect(sim.status).toBe('won')
   })
-  it('小样通过全部校验', () => {
+  it('全部正式关卡通过七项校验', () => {
     expect(validateLevels(levels)).toEqual([])
   })
 
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
-    const prototype = levels.find((level) => level.id === 'prototype')
-    if (!prototype) throw new Error('缺少小样')
-    const broken = structuredClone(prototype)
-    const block = broken.blocks.find((item) => item.pos[0] === 7 && item.pos[1] === 0 && item.pos[2] === 4)
+    const level = levels.find((level) => level.id === 'level-02')
+    if (!level) throw new Error('缺少转动')
+    const broken = structuredClone(level)
+    const block = broken.blocks.find((item) => item.pos[0] === 1 && item.pos[1] === 3 && item.pos[2] === 2)
     if (!block) throw new Error('找不到要改坏的积木')
-    block.pos = [7, 1, 4]
+    block.pos = [2, 3, 2]
     const issues = validateLevels([broken])
-    expect(issues).toContainEqual({ check: '无重叠', cell: '7,1,4', detail: '两块积木占用同一格' })
+    expect(issues).toContainEqual({ check: '无重叠', cell: '2,3,2', detail: '两块积木占用同一格' })
   })
 })

@@ -181,6 +181,7 @@ body {
 }
 
 .select-screen {
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -196,10 +197,14 @@ body {
   display: flex;
   gap: 16px;
   padding: 24px;
+  width: min(100%, 1616px);
+  min-width: 0;
 }
 
 .level-card {
   width: 160px;
+  min-width: 0;
+  flex: 1 1 0;
   min-height: 180px;
   border: 1px solid rgba(74, 58, 82, 0.16);
   border-radius: 24px;
@@ -221,7 +226,7 @@ body {
 }
 
 .level-index {
-  font-size: 28px;
+  font-size: clamp(20px, 2.2vw, 28px);
   letter-spacing: 0.08em;
 }
 
@@ -413,6 +418,10 @@ body {
   .level-card {
     width: auto;
     min-height: 140px;
+  }
+
+  .level-index {
+    font-size: 28px;
   }
 
   .back {

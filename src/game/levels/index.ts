@@ -7,6 +7,5 @@ import level05 from './level-05'
 import level06 from './level-06'
 import level07 from './level-07'
 import level08 from './level-08'
-import { level as prototype } from './prototype'
 
-export const levels = [level00, level01, level02, level03, level04, level05, level06, level07, level08, prototype]
+export const levels = [level00, level01, level02, level03, level04, level05, level06, level07, level08]

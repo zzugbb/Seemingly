@@ -81,7 +81,7 @@ npm run typecheck && npm run format:check && npm test && npm run build
 - [x] **T3.11 第 7 关「回环」**
 - [x] **T3.12 第 8 关「归来」**
 - [x] **T3.13 结尾**：全部灯笼依次点亮、塔亮起、「谢谢游玩」。
-- [ ] **T3.14 移除小样**：删除 `levels/prototype.ts` 及只为小样存在的代码。
+- [x] **T3.14 移除小样**：删除 `levels/prototype.ts` 及只为小样存在的代码。
 
 T3.4～T3.12 每关的验收：
 

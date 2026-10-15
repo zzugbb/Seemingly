@@ -1,6 +1,6 @@
 # 架构说明
 
-> 「现状」描述画面小样的实际代码；「目标架构」是正式开发要达到的结构，接口定义按本文执行。
+> M3 已完成：使用纯 TypeScript 模拟器驱动九个正式关卡和结尾。下方目标目录中的音频模块在 M4 实现。
 
 ## 技术栈
 
@@ -13,29 +13,6 @@
 | 测试 | Vitest |
 | 格式化 | Prettier（无分号、单引号、行宽 120） |
 | 部署 | GitHub Actions + GitHub Pages |
-
-## 现状（画面小样）
-
-```text
-src/
-├── main.tsx
-├── app/
-│   ├── App.tsx            画布、标题、提示、通关横幅、重新开始
-│   └── styles.css
-└── game/
-    ├── core/
-    │   ├── iso.ts         屏幕坐标、连通图、寻路、移动插值、旋转偏移
-    │   └── iso.test.ts
-    ├── levels/
-    │   ├── types.ts       小样用的关卡类型（只支持一个转盘）
-    │   └── prototype.ts   小样关卡
-    └── render/
-        ├── World.tsx      状态、交互、渲染全部在这里（M1 要拆开）
-        ├── Character.tsx
-        ├── Decor.tsx
-        ├── materials.ts
-        └── palette.ts
-```
 
 ## 目标架构
 
@@ -52,7 +29,7 @@ src/
 │   │   ├── TitleScreen.tsx
 │   │   ├── LevelSelect.tsx
 │   │   ├── PlayScreen.tsx     创建模拟器，挂载画布与 HUD
-│   │   └── Ending.tsx
+│   │   └── Ending.tsx         同一游戏场景上的结尾文字与按钮
 │   ├── hud/
 │   │   ├── Hud.tsx            关名、重新开始、选关、静音
 │   │   ├── Toast.tsx
@@ -85,6 +62,8 @@ src/
         ├── Mechanisms.tsx     转盘、平移台、压板、把手的显示
         ├── Character.tsx
         ├── Lantern.tsx        终点灯笼
+        ├── Finale.tsx         最终关灯笼与塔的点亮
+        ├── ending.ts          结尾时序
         ├── Decor.tsx          岛屿岩层、树、花、窗、云、光点
         ├── quality.ts         画质档位
         ├── materials.ts

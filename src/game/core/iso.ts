@@ -25,7 +25,6 @@ export const addVec = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2
 export interface Tile {
   id: string
   pos: Vec3
-  onRotator: boolean
 }
 
 export type Graph = Map<string, string[]>

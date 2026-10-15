@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Vec3 } from '../levels/types'
 import { buildGraph, cellId, findPath, rotateOffset, screenKey, segmentPoint, surfaceY, type Tile } from './iso'
 
-const tile = (pos: Vec3): Tile => ({ id: cellId(pos), pos, onRotator: false })
+const tile = (pos: Vec3): Tile => ({ id: cellId(pos), pos })
 
 describe('screenKey', () => {
   it('沿视线方向平移的格子屏幕坐标相同', () => {

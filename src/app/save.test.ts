@@ -20,8 +20,8 @@ const installStorage = () => {
 describe('存档', () => {
   it('写入后能读回，坏数据退回空存档', () => {
     installStorage()
-    writeSave({ version: 1, completed: ['prototype'], muted: true })
-    expect(loadSave()).toEqual({ version: 1, completed: ['prototype'], muted: true })
+    writeSave({ version: 1, completed: ['level-00'], muted: true })
+    expect(loadSave()).toEqual({ version: 1, completed: ['level-00'], muted: true })
     memory.set('seemingly:save:v1', '{')
     expect(loadSave()).toEqual(emptySave())
   })

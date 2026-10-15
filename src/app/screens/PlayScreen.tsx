@@ -10,8 +10,6 @@ import { Ending } from './Ending'
 import { Toast } from '../hud/Toast'
 import { useApp } from '../store'
 
-const TEACHING_HINTS = ['点击路面，小人会走过去', '点击金色转轮，旋转桥梁', '看起来连着，就能走过去']
-
 export function PlayScreen() {
   const ending = useApp((state) => state.screen === 'ending')
   const levelIndex = useApp((state) => state.levelIndex)
@@ -29,7 +27,6 @@ export function PlayScreen() {
   const [won, setWon] = useState(false)
   const [endingReady, setEndingReady] = useState(false)
   const sim = useMemo(() => new LevelSim(level), [level, runId])
-  const hasNext = levelIndex + 1 < levels.length
 
   const restart = () => {
     setWon(false)
@@ -83,30 +80,29 @@ export function PlayScreen() {
       </Canvas>
       {!ending && (
         <Hud
-          label={`${levelIndex + 1} · ${level.title}`}
+          label={`${levelIndex === 0 ? '序章' : levelIndex} · ${level.title}`}
           muted={muted}
           onRestart={restart}
           onSelect={goSelect}
           onToggleMute={toggleMute}
         />
       )}
-      {levelIndex <= 2 && (
+      {!ending && level.hints && (
         <footer className="hints">
-          {(level.hints ?? TEACHING_HINTS).map((hint) => (
+          {level.hints.map((hint) => (
             <span key={hint}>{hint}</span>
           ))}
         </footer>
       )}
       <Toast message={toast} />
-      {ending && (endingReady || !level.ending) && <Ending />}
-      {won && !ending && (
+      {ending && endingReady && <Ending />}
+      {won && !ending && !level.ending && (
         <CompleteBanner
           title={level.title}
-          action={hasNext ? '下一关' : '结尾'}
+          action="下一关"
           onAction={() => {
             setWon(false)
-            if (hasNext) play(levelIndex + 1)
-            else goEnding()
+            play(levelIndex + 1)
           }}
         />
       )}
