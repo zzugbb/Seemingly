@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ambient } from '../audio/ambient'
 import { audioEngine } from '../audio/engine'
 import { LevelSelect } from './screens/LevelSelect'
 import { PlayScreen } from './screens/PlayScreen'
@@ -18,16 +19,26 @@ export function App() {
   const [supported] = useState(hasWebGL2)
   const screen = useApp((state) => state.screen)
   useEffect(() => {
+    let active = true
     audioEngine.setMuted(useApp.getState().save.muted)
     const unsubscribe = useApp.subscribe((state, previous) => {
-      if (state.save.muted !== previous.save.muted) audioEngine.setMuted(state.save.muted)
+      if (state.save.muted !== previous.save.muted) {
+        audioEngine.setMuted(state.save.muted)
+        ambient.sync(audioEngine.getBus())
+      }
     })
     const unlock = (event: Event) => {
-      if (event.isTrusted) void audioEngine.unlock()
+      if (event.isTrusted) {
+        void audioEngine.unlock().then(() => {
+          if (active) ambient.sync(audioEngine.getBus())
+        })
+      }
     }
     window.addEventListener('click', unlock, true)
     window.addEventListener('keydown', unlock, true)
     return () => {
+      active = false
+      ambient.stop()
       unsubscribe()
       window.removeEventListener('click', unlock, true)
       window.removeEventListener('keydown', unlock, true)

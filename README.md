@@ -21,7 +21,7 @@
 
 ## 项目状态
 
-本地开发已完成 **M3 机关与关卡**：序章加第 1～8 关，以及灯笼依次点亮、塔亮起的结尾。声音与发布打磨按[路线图](docs/roadmap.md)继续推进。
+本地开发已完成 **M4 声音**：九关与结尾已接入脚步、机关、走不通、灯笼音效及低音量环境和弦。首次交互后播放，静音状态保存在浏览器本地。发布打磨按[路线图](docs/roadmap.md)继续推进。
 
 ## 玩法
 
@@ -49,7 +49,7 @@ npm run preview       # 预览构建产物
 
 - Vite + React 19 + TypeScript
 - Three.js + React Three Fiber + drei
-- 画面全部由代码生成，声音计划用 Web Audio 合成，不依赖任何外部素材
+- 画面全部由代码生成，声音用 Web Audio 实时合成，不依赖任何外部素材
 - 纯静态站点，通过 GitHub Actions 发布到 GitHub Pages
 
 ## 目录结构
@@ -62,6 +62,7 @@ Seemingly/
 └── src/
     ├── main.tsx         入口
     ├── app/             页面外壳与界面
+    ├── audio/           Web Audio 引擎、合成音效与环境和弦
     └── game/
         ├── core/        纯逻辑：屏幕坐标、连通、寻路、移动（不依赖 Three.js）
         ├── levels/      关卡数据与类型
