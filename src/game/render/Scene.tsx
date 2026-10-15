@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { Group, Mesh } from 'three'
 import { cellId, surfaceY } from '../core/iso'
-import type { LevelSim } from '../core/sim'
+import type { LevelSim, SimEvent } from '../core/sim'
 import type { LevelDef, Vec3 } from '../levels/types'
 import { Blocks } from './Blocks'
 import { CameraRig } from './CameraRig'
@@ -29,6 +29,9 @@ export function Scene({
   quality,
   reducedMotion,
   onEndingReady,
+  onEvent,
+  onUnreachable,
+  onLanternLit,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -38,6 +41,9 @@ export function Scene({
   quality: QualitySettings
   reducedMotion: boolean
   onEndingReady?: () => void
+  onEvent?: (event: SimEvent) => void
+  onUnreachable?: () => void
+  onLanternLit?: () => void
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [won, setWon] = useState(false)
@@ -57,6 +63,7 @@ export function Scene({
   useFrame(({ clock }, delta) => {
     const events = sim.update(delta)
     for (const event of events) {
+      onEvent?.(event)
       if (event.type === 'won') {
         setWon(true)
         onWon()
@@ -117,7 +124,10 @@ export function Scene({
     const result = sim.command({ type: 'walk', tileId: id })
     if (result === 'busy') return
     setMarker({ pos: tile.pos, ok: result === 'ok', at: performance.now() })
-    if (result === 'unreachable') onBlocked('看起来连不上，换个角度试试')
+    if (result === 'unreachable') {
+      onBlocked('看起来连不上，换个角度试试')
+      onUnreachable?.()
+    }
   }
 
   const blocks = level.blocks.map((block) => ({
@@ -154,6 +164,7 @@ export function Scene({
             reducedMotion={reducedMotion}
             onTowerLit={() => setTowerLit(true)}
             onReady={() => onEndingReady?.()}
+            onLanternLit={() => onLanternLit?.()}
           />
         )}
         <Decor decor={level.decor} quality={quality} reducedMotion={reducedMotion} />

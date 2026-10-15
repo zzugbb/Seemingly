@@ -11,12 +11,14 @@ export function Finale({
   reducedMotion,
   onTowerLit,
   onReady,
+  onLanternLit,
 }: {
   ending: EndingDef
   sparkleScale: number
   reducedMotion: boolean
   onTowerLit: () => void
   onReady: () => void
+  onLanternLit?: () => void
 }) {
   const elapsed = useRef(0)
   const progress = useRef(endingProgress(0, ending.lanterns.length))
@@ -26,7 +28,10 @@ export function Finale({
     if (progress.current.finished) return
     elapsed.current += Math.min(delta, 1 / 30)
     const next = endingProgress(elapsed.current, ending.lanterns.length)
-    if (next.litCount !== progress.current.litCount) setLitCount(next.litCount)
+    if (next.litCount !== progress.current.litCount) {
+      setLitCount(next.litCount)
+      onLanternLit?.()
+    }
     if (next.towerLit && !progress.current.towerLit) {
       setTowerLit(true)
       onTowerLit()

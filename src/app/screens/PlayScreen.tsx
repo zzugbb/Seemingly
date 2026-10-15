@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { useEffect, useMemo, useState } from 'react'
+import { playSound } from '../../audio/sfx'
 import { LevelSim } from '../../game/core/sim'
 import { levels } from '../../game/levels'
 import { Scene } from '../../game/render/Scene'
@@ -9,6 +10,7 @@ import { Hud } from '../hud/Hud'
 import { Ending } from './Ending'
 import { Toast } from '../hud/Toast'
 import { useApp } from '../store'
+import { playSimEvent } from '../sounds'
 
 export function PlayScreen() {
   const ending = useApp((state) => state.screen === 'ending')
@@ -70,6 +72,9 @@ export function PlayScreen() {
           reducedMotion={reducedMotion}
           interactive={!ending}
           onEndingReady={() => setEndingReady(true)}
+          onEvent={playSimEvent}
+          onUnreachable={() => playSound('unreachable')}
+          onLanternLit={() => playSound('lantern')}
           onWon={() => {
             setWon(true)
             completeLevel(level.id)
