@@ -24,6 +24,8 @@ export interface Transition {
 
 type MovingMechanism = RotatorDef | MoverDef
 
+const routeCache = new WeakMap<GameState, { level: LevelDef; key: string; routes: Map<string, string[]> }>()
+
 function* blocksOf(level: LevelDef, state: GameState) {
   for (const block of level.blocks) yield { ...block, id: cellId(block.pos) }
   for (const mechanism of level.mechanisms) {
@@ -69,9 +71,13 @@ export function occupiedOf(level: LevelDef, state: GameState): Set<string> {
   return new Set([...blocksOf(level, state)].map((block) => cellId(block.pos)))
 }
 
-export function reachableFrom(level: LevelDef, state: GameState): Map<string, string[]> {
+function routesOf(level: LevelDef, state: GameState): Map<string, string[]> {
+  const key = stateKey(state)
+  const cached = routeCache.get(state)
+  if (cached?.level === level && cached.key === key) return cached.routes
   const graph = buildGraph([...tilesOf(level, state).values()], occupiedOf(level, state))
   const routes = new Map<string, string[]>()
+  routeCache.set(state, { level, key, routes })
   if (!graph.has(state.at)) return routes
   routes.set(state.at, [])
   const queue = [state.at]
@@ -88,10 +94,14 @@ export function reachableFrom(level: LevelDef, state: GameState): Map<string, st
   return routes
 }
 
+export function reachableFrom(level: LevelDef, state: GameState): Map<string, string[]> {
+  return new Map([...routesOf(level, state)].map(([id, route]) => [id, [...route]]))
+}
+
 export function legalActions(level: LevelDef, state: GameState): Action[] {
   if (state.won) return []
   const actions: Action[] = []
-  for (const tileId of reachableFrom(level, state).keys()) {
+  for (const tileId of routesOf(level, state).keys()) {
     if (tileId !== state.at) actions.push({ type: 'walk', tileId })
   }
   for (const mechanism of level.mechanisms) {
@@ -125,9 +135,9 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
   let operated: MovingMechanism | undefined
   if (action.type === 'walk') {
     if (action.tileId === state.at) return null
-    const reachable = reachableFrom(level, state).get(action.tileId)
+    const reachable = routesOf(level, state).get(action.tileId)
     if (!reachable) return null
-    route = reachable
+    route = [...reachable]
   } else {
     operated = level.mechanisms.find(
       (item): item is MovingMechanism => item.id === action.mechanism && item.type !== 'plate',

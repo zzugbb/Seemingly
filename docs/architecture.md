@@ -392,6 +392,7 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 ```
 
 - 广度优先搜索全部可达状态；每个状态的行走动作用 `reachableFrom` 一次算出，不要对每个目标单独寻路。
+- 规则层复用同一关卡、同一状态的可达路线供动作枚举与执行使用，对外返回的路线保持独立；关卡定义在查询期间视为只读，状态变化会使旧路线失效。求解器的状态扩展只调用 `legalActions`、`applyAction`、`stateKey`；标准解法指标复用 `tilesOf`、`reachableFrom` 的只读视图，不另写规则。
 - 死局：建出状态图后，从所有通关状态反向搜索，搜不到的可达状态即死局。
 - 随机通关率用固定种子的伪随机数（如 mulberry32），不用 `Math.random`。
 - 「取舍」：一次操作或推动前后，从小人当前位置可达的路面集合，既有新增又有减少。
