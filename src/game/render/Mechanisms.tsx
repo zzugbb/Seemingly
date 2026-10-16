@@ -107,7 +107,6 @@ function RotatorView({
   hovered,
   onHover,
   onSelect,
-  onBlocked,
   interactive,
 }: {
   rotator: RotatorDef
@@ -115,31 +114,23 @@ function RotatorView({
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
-  onBlocked: (message: string) => void
   interactive: boolean
 }) {
   const groupRef = useRef<Group>(null)
   const crankRef = useRef<Group>(null)
-  const shake = useRef(0)
-  useFrame(({ clock }, delta) => {
+  useFrame(() => {
     const pose = sim.mechanismPose(rotator.id)
     if (!('rotationY' in pose)) return
     if (groupRef.current) groupRef.current.rotation.y = pose.rotationY
     const crank = crankRef.current
     if (!crank) return
     crank.rotation.z = -pose.rotationY * 2
-    shake.current = Math.max(0, shake.current - delta)
-    crank.position.x = Math.sin(clock.elapsedTime * 60) * shake.current * 0.08
   })
 
   const onCrank = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation()
     if (!interactive) return
-    const result = sim.command({ type: 'operate', mechanism: rotator.id })
-    if (result === 'standing-on-mechanism') {
-      shake.current = 0.5
-      onBlocked('站在上面可转不动')
-    }
+    sim.command({ type: 'operate', mechanism: rotator.id })
   }
 
   return (
@@ -285,37 +276,28 @@ function Lever({
   sim,
   mechanismId,
   interactive,
-  onBlocked,
 }: {
   position: Vec3
   rotationY: number
   sim: LevelSim
   mechanismId: string
   interactive: boolean
-  onBlocked: (message: string) => void
 }) {
   const barRef = useRef<Group>(null)
-  const shake = useRef(0)
   const pulled = useRef(false)
   const angle = useRef(LEVER_REST)
-  useFrame(({ clock }, delta) => {
+  useFrame((_, delta) => {
     const target = pulled.current ? LEVER_PULLED : LEVER_REST
     angle.current += (target - angle.current) * Math.min(1, delta * 8)
     const bar = barRef.current
     if (!bar) return
     bar.rotation.x = angle.current
-    shake.current = Math.max(0, shake.current - delta)
-    bar.position.x = Math.sin(clock.elapsedTime * 60) * shake.current * 0.08
   })
   const onClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation()
     if (!interactive) return
     const result = sim.command({ type: 'operate', mechanism: mechanismId })
     if (result === 'ok') pulled.current = !pulled.current
-    if (result === 'standing-on-mechanism') {
-      shake.current = 0.5
-      onBlocked('站在上面可转不动')
-    }
   }
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
@@ -344,7 +326,6 @@ function MoverView({
   hovered,
   onHover,
   onSelect,
-  onBlocked,
   interactive,
 }: {
   mover: MoverDef
@@ -352,7 +333,6 @@ function MoverView({
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
-  onBlocked: (message: string) => void
   interactive: boolean
 }) {
   const groupRef = useRef<Group>(null)
@@ -388,7 +368,6 @@ function MoverView({
           sim={sim}
           mechanismId={mover.id}
           interactive={interactive}
-          onBlocked={onBlocked}
         />
       )}
     </>
@@ -401,7 +380,6 @@ export function Mechanisms({
   hovered,
   onHover,
   onSelect,
-  onBlocked,
   plateFx,
   interactive = true,
 }: {
@@ -410,7 +388,6 @@ export function Mechanisms({
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
-  onBlocked: (message: string) => void
   plateFx: { current: PlateFx }
   interactive?: boolean
 }) {
@@ -426,7 +403,6 @@ export function Mechanisms({
               hovered={hovered}
               onHover={onHover}
               onSelect={onSelect}
-              onBlocked={onBlocked}
               interactive={interactive}
             />
           )
@@ -440,7 +416,6 @@ export function Mechanisms({
               hovered={hovered}
               onHover={onHover}
               onSelect={onSelect}
-              onBlocked={onBlocked}
               interactive={interactive}
             />
           )

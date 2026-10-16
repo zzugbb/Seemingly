@@ -126,7 +126,7 @@ T3.4～T3.12 每关的验收：
   - 新增 `core/rules.ts`，按 [architecture.md](architecture.md#规则层) 实现。
   - 验收：`core/rules.test.ts` 覆盖行走与光点收集、必需光点不足时的 `goalLocked`、压板（含一次性）、联动与 `reverse`、无把手机关不能直接操作、乘坐后小人位置随机关变化、通关后无合法动作；并断言 `reachableFrom` 给出的路线与 `findPath` 一致。
   - 兼容期首版九关统一标为第 1 章、光点为空；模拟器按 T6.3 接入新规则层。
-- [ ] **T6.3 模拟器改造**
+- [x] **T6.3 模拟器改造**
   - `sim.ts` 改为调用规则层；支持多个机关同时运动、乘坐时的小人姿态、`orb`/`goal-locked`/`undo` 事件、撤销与步数；删除 `standing-on-mechanism`。
   - 验收：`core/sim.test.ts` 覆盖乘坐（运动中小人位置在转盘上插值、结束后格子编号不变）、联动同时运动、撤销恢复光点和压板、行走中改道不增加步数、运动中撤销返回 `false`。
 - [ ] **T6.4 求解器**

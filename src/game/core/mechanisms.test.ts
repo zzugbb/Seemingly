@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { MoverDef, PlateDef, RotatorDef, Vec3 } from '../levels/types'
-import { advanceMover, judgePlate, moverBlocks, moverCursor, rotatorBlocks } from './mechanisms'
+import type { MoverDef, RotatorDef, Vec3 } from '../levels/types'
+import { advanceMover, moverBlocks, moverCursor, rotatorBlocks } from './mechanisms'
 
 const positions = (blocks: { pos: Vec3 }[]) => blocks.map((block) => block.pos.map((value) => value + 0))
 
@@ -78,32 +78,5 @@ describe('平移台往返', () => {
     const depth: MoverDef = { ...mover, axis: 'z', stops: [0, 2] }
     expect(moverBlocks(slide, 1)[0]?.pos).toEqual([7, 1, 2])
     expect(moverBlocks(depth, 1)[0]?.pos).toEqual([5, 1, 4])
-  })
-})
-
-describe('压板', () => {
-  const plate: PlateDef = { type: 'plate', id: 'pad', tile: [1, 0, 2], target: 'bridge', once: true }
-  const base = { plate, at: [1, 0, 2] as Vec3, stopped: true, spent: false, targetBusy: false, standingOnTarget: false }
-
-  it('once 压板只在停下时触发一次', () => {
-    const first = judgePlate(base)
-    expect(first).toEqual({ trigger: true, spent: true })
-    expect(judgePlate({ ...base, spent: first.spent })).toEqual({ trigger: false, spent: true })
-  })
-
-  it('路过、机关在动或人站在机关上时不触发，也不消耗', () => {
-    expect(judgePlate({ ...base, stopped: false })).toEqual({ trigger: false, spent: false })
-    expect(judgePlate({ ...base, at: [0, 0, 2] })).toEqual({ trigger: false, spent: false })
-    expect(judgePlate({ ...base, targetBusy: true })).toEqual({ trigger: false, spent: false })
-    expect(judgePlate({ ...base, standingOnTarget: true })).toEqual({ trigger: false, spent: false })
-  })
-
-  it('普通压板每次停下都会再触发', () => {
-    const repeat = judgePlate({ ...base, plate: { ...plate, once: false } })
-    expect(repeat).toEqual({ trigger: true, spent: false })
-    expect(judgePlate({ ...base, plate: { ...plate, once: false }, spent: true })).toEqual({
-      trigger: true,
-      spent: false,
-    })
   })
 })

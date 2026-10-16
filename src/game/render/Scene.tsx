@@ -150,7 +150,6 @@ export function Scene({
           hovered={hovered}
           onHover={setHovered}
           onSelect={selectTile}
-          onBlocked={onBlocked}
           plateFx={plateFx}
           interactive={interactive}
         />
