@@ -50,6 +50,7 @@ src/
     │   ├── rules.ts           规则层：游戏状态与瞬时状态转移
     │   ├── sim.ts             LevelSim：在规则层上做动画、撤销
     │   ├── solver.ts          求解器：最优解、难度指标、提示
+    │   ├── metrics.ts         指标报告与固定种子随机模拟参数
     │   ├── visibility.ts      顶面可见性射线检测
     │   ├── validate.ts        关卡校验
     │   ├── solve.ts           按标准解法运行模拟器
@@ -386,6 +387,7 @@ export interface LevelMetrics {
 }
 
 export function analyze(level: LevelDef): LevelMetrics
+export function reachableStates(level: LevelDef): ReadonlyArray<Readonly<GameState>> // 校验器使用完整可达状态
 export function randomWinRate(level: LevelDef, opts: { runs: number; maxActions: number; seed: number }): number
 export function buildPolicy(level: LevelDef): Map<string, Action | null> // 状态键 → 最优下一步；死局为 null
 export function nextHint(level: LevelDef, state: GameState): Action | null // 测试用；游戏内用 buildPolicy 的结果
@@ -399,6 +401,8 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 - 状态键必须包含 `GameState` 的全部字段；新增字段时同步更新 `stateKey`，否则求解器会把不同状态当成同一个。
 - 「错觉连接」：路线上相邻两格的三维坐标差不是水平单位向量。
 - 性能要求：每关 `analyze` 在测试中不超过 2 秒；规模上限见 [level-design.md](level-design.md#规模上限)。
+- `npm run metrics` 通过根目录 `metrics.mjs` 复用 Vite 加载 TypeScript 模块，输出全部关卡的指标表；随机模拟统一使用种子 `20261016`、500 次，步数预算采用目标表的 `randomWin.steps`，缺省为 30。`core/metrics.ts` 共享这些参数，供指标命令与难度校验使用。
+- `validateLevels(levels, targets)` 只对目标表登记的关卡强制检查难度指标和标准解法最优步数；首版九关不登记目标，仍接受结构、安全与可见性等校验。组合数超过 64 时，无重叠检查覆盖全部可达布局；乘坐安全始终检查全部可达状态；光点检查开局路面顶面中心的可见性。引用错误在模拟和求解前返回，避免无效引用导致异常。
 - **游戏内提示**：`src/app/hint.worker.ts` 是一个 Web Worker（Vite 原生支持，不需要依赖）。进入关卡时把关卡编号发给它，它调用 `buildPolicy` 算出整关的最优策略并保存；点击提示时把当前状态键发过去，立即得到下一步。策略还没算完时，提示按钮显示「思考中…」，算完后自动给出结果。`src/app/hints.ts` 封装与 Worker 的通信。
 
 ## 渲染与驱动

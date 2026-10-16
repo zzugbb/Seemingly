@@ -3,6 +3,7 @@ import { validateLevels } from '../core/validate'
 import { levels } from './index'
 import { LevelSim } from '../core/sim'
 import { runSolution } from '../core/solve'
+import { targets } from './targets'
 
 const settle = (sim: LevelSim) => {
   const events = []
@@ -123,8 +124,11 @@ describe('关卡校验', () => {
     settle(sim)
     expect(sim.status).toBe('won')
   })
-  it('全部正式关卡通过七项校验', () => {
-    expect(validateLevels(levels)).toEqual([])
+  it('全部正式关卡通过适用校验，并强制检查已登记的难度目标', () => {
+    expect(validateLevels(levels, targets)).toEqual([])
+  })
+  it('难度目标只引用已实现的关卡', () => {
+    for (const id of Object.keys(targets)) expect(levels.some((level) => level.id === id)).toBe(true)
   })
 
   it('改坏一处坐标会指出是哪一项、哪一格', () => {

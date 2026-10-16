@@ -1,10 +1,24 @@
 import type { LevelDef, MoverDef, RotatorDef, Vec3 } from '../levels/types'
+import type { LevelTarget } from '../levels/targets'
 import { cellId } from './iso'
 import { moverBlocks, moverCursor, rotatorBlocks, type MoverCursor } from './mechanisms'
+import { measureLevel } from './metrics'
+import { initialState, occupiedOf, tilesOf } from './rules'
 import { placedBlocks, runSolution } from './solve'
+import { reachableStates } from './solver'
 import { rayHitsAny, topVisible } from './visibility'
 
-export type LevelCheck = '基本结构' | '无重叠' | '解法可行' | '可见性' | '遮挡规则' | '把手可见' | '构图范围'
+export type LevelCheck =
+  | '基本结构'
+  | '无重叠'
+  | '乘坐安全'
+  | '解法可行'
+  | '可见性'
+  | '遮挡规则'
+  | '把手可见'
+  | '光点可见'
+  | '构图范围'
+  | '难度指标'
 
 export interface LevelIssue {
   check: LevelCheck
@@ -20,8 +34,6 @@ interface Gear {
 }
 
 const sameVec = (a: Vec3, b: Vec3) => a[0] + 0 === b[0] + 0 && a[1] + 0 === b[1] + 0 && a[2] + 0 === b[2] + 0
-
-const includesVec = (list: readonly Vec3[], pos: Vec3) => list.some((item) => sameVec(item, pos))
 
 const createGear = (level: LevelDef): Gear => {
   const gear: Gear = { rotator: new Map(), mover: new Map() }
@@ -99,7 +111,7 @@ const handlePoint = (block: Vec3, face: 'x' | 'z'): Vec3 => {
 }
 
 const push = (issues: LevelIssue[], seen: Set<string>, issue: LevelIssue) => {
-  const key = `${issue.check}:${issue.cell}`
+  const key = `${issue.check}:${issue.cell}:${issue.detail}`
   if (seen.has(key)) return
   seen.add(key)
   issues.push(issue)
@@ -110,7 +122,8 @@ const checkStructure = (level: LevelDef, ids: Set<string>, issues: LevelIssue[],
   ids.add(level.id)
 
   const gear = createGear(level)
-  const blocks = placedBlocks(level, gear)
+  const state = initialState(level)
+  const paths = [...tilesOf(level, state).values()]
   const mechanismCells = new Set<string>()
   for (const mechanism of level.mechanisms) {
     const positions =
@@ -121,23 +134,10 @@ const checkStructure = (level: LevelDef, ids: Set<string>, issues: LevelIssue[],
           : []
     for (const pos of positions) mechanismCells.add(cellId(pos))
   }
-  const paths = blocks.filter((pos) => {
-    const staticPath = level.blocks.some((block) => block.kind === 'path' && sameVec(block.pos, pos))
-    const mechanismPath = level.mechanisms.some((mechanism) => {
-      if (mechanism.type === 'plate') return false
-      const parts =
-        mechanism.type === 'rotator'
-          ? rotatorBlocks(mechanism, gear.rotator.get(mechanism.id) ?? 0)
-          : moverBlocks(mechanism, gear.mover.get(mechanism.id)?.stopIndex ?? 0)
-      return parts.some((block) => (block.kind ?? 'path') === 'path' && sameVec(block.pos, pos))
-    })
-    return staticPath || mechanismPath
-  })
-
-  if (!includesVec(paths, level.start)) {
+  if (!paths.some((tile) => sameVec(tile.pos, level.start))) {
     push(issues, seen, { check: '基本结构', cell: cellId(level.start), detail: '起点不是路面' })
   }
-  if (!includesVec(paths, level.goal)) {
+  if (!paths.some((tile) => sameVec(tile.pos, level.goal))) {
     push(issues, seen, { check: '基本结构', cell: cellId(level.goal), detail: '终点不是路面' })
   }
   if (mechanismCells.has(cellId(level.goal))) {
@@ -152,12 +152,113 @@ const checkStructure = (level: LevelDef, ids: Set<string>, issues: LevelIssue[],
     mechanismIds.add(mechanism.id)
   }
   for (const mechanism of level.mechanisms) {
-    if (mechanism.type !== 'plate') continue
-    const target = level.mechanisms.find((item) => item.id === mechanism.target)
-    if (!target || target.type === 'plate') {
-      push(issues, seen, { check: '基本结构', cell: cellId(mechanism.tile), detail: '压板没有可触发的机关' })
+    if (mechanism.type === 'plate') {
+      if (!level.blocks.some((block) => block.kind === 'path' && sameVec(block.pos, mechanism.tile))) {
+        push(issues, seen, { check: '基本结构', cell: cellId(mechanism.tile), detail: '压板不在静态路面上' })
+      }
+      const target = level.mechanisms.find((item) => item.id === mechanism.target)
+      if (!target || target.type === 'plate') {
+        push(issues, seen, { check: '基本结构', cell: cellId(mechanism.tile), detail: '压板目标不是可触发的机关' })
+      }
+    } else {
+      for (const link of mechanism.links ?? []) {
+        const target = level.mechanisms.find((item) => item.id === link.target)
+        if (!target || target.type === 'plate' || target === mechanism) {
+          push(issues, seen, { check: '基本结构', cell: mechanism.id, detail: `联动目标 ${link.target} 无效` })
+        }
+      }
     }
   }
+  level.orbs.forEach((orb, index) => {
+    let tileId: string | undefined
+    if ('tile' in orb) {
+      if (level.blocks.some((block) => block.kind === 'path' && sameVec(block.pos, orb.tile))) tileId = cellId(orb.tile)
+    } else {
+      const mechanism = level.mechanisms.find((item) => item.id === orb.mechanism)
+      if (
+        mechanism &&
+        mechanism.type !== 'plate' &&
+        Number.isInteger(orb.block) &&
+        orb.block >= 0 &&
+        mechanism.blocks[orb.block] &&
+        (mechanism.blocks[orb.block].kind ?? 'path') === 'path'
+      ) {
+        tileId = `${mechanism.id}#${orb.block}`
+      }
+    }
+    if (!tileId || tileId === state.at) {
+      push(issues, seen, { check: '基本结构', cell: `orb-${index}`, detail: '光点必须引用起点以外的有效路面积木' })
+    }
+  })
+}
+
+const reachableLayouts = (level: LevelDef, issues: LevelIssue[], seen: Set<string>): Vec3[][] => {
+  const layouts = new Map<string, { blocks: Vec3[]; occupied: Set<string>; tiles: ReturnType<typeof tilesOf> }>()
+  for (const state of reachableStates(level)) {
+    const key = JSON.stringify([
+      state.rotator,
+      Object.entries(state.mover).map(([id, cursor]) => [id, cursor.stopIndex]),
+    ])
+    let layout = layouts.get(key)
+    if (!layout) {
+      const gear: Gear = {
+        rotator: new Map(Object.entries(state.rotator)),
+        mover: new Map(Object.entries(state.mover)),
+      }
+      layout = { blocks: placedBlocks(level, gear), occupied: occupiedOf(level, state), tiles: tilesOf(level, state) }
+      layouts.set(key, layout)
+    }
+    const pos = layout.tiles.get(state.at)?.pos
+    if (pos && layout.occupied.has(cellId([pos[0], pos[1] + 1, pos[2]]))) {
+      push(issues, seen, { check: '乘坐安全', cell: cellId(pos), detail: '小人头顶有积木' })
+    }
+  }
+  return [...layouts.values()].map((layout) => layout.blocks)
+}
+
+const checkOrbs = (level: LevelDef, issues: LevelIssue[], seen: Set<string>) => {
+  const state = initialState(level)
+  const tiles = tilesOf(level, state)
+  const blocks = placedBlocks(level, createGear(level))
+  level.orbs.forEach((orb, index) => {
+    const tile = tiles.get('tile' in orb ? cellId(orb.tile) : `${orb.mechanism}#${orb.block}`)!
+    const [x, y, z] = tile.pos
+    if (rayHitsAny([x, y + 0.5, z], blocks)) {
+      push(issues, seen, { check: '光点可见', cell: `orb-${index}`, detail: '开局光点所在路面的顶面中心被挡住' })
+    }
+  })
+}
+
+const checkDifficulty = (level: LevelDef, target: LevelTarget, issues: LevelIssue[], seen: Set<string>) => {
+  const metrics = measureLevel(level, target.randomWin?.steps)
+  const checks: [boolean, string][] = [
+    [metrics.minActions === target.minActions, `最少步数 ${metrics.minActions}，目标 ${target.minActions}`],
+    [
+      metrics.minActionsAll === target.minActionsAll,
+      `全收集最少步数 ${metrics.minActionsAll}，目标 ${target.minActionsAll}`,
+    ],
+    [
+      level.solution.length === metrics.minActions,
+      `标准解法 ${level.solution.length} 步，最少步数 ${metrics.minActions}`,
+    ],
+    [metrics.illusions >= target.illusionsMin, `错觉连接数 ${metrics.illusions}，至少 ${target.illusionsMin}`],
+  ]
+  if (target.reachableStatesMin !== undefined)
+    checks.push([
+      metrics.reachableStates >= target.reachableStatesMin,
+      `可达状态数 ${metrics.reachableStates}，至少 ${target.reachableStatesMin}`,
+    ])
+  if (target.tradeoffsMin !== undefined)
+    checks.push([
+      metrics.tradeoffs >= target.tradeoffsMin,
+      `取舍次数 ${metrics.tradeoffs}，至少 ${target.tradeoffsMin}`,
+    ])
+  if (target.randomWin)
+    checks.push([
+      metrics.randomRate <= target.randomWin.maxRate,
+      `随机通关率 ${metrics.randomRate}，最多 ${target.randomWin.maxRate}（${metrics.randomSteps} 步）`,
+    ])
+  for (const [passed, detail] of checks) if (!passed) push(issues, seen, { check: '难度指标', cell: level.id, detail })
 }
 
 const checkOverlap = (layouts: Vec3[][], issues: LevelIssue[], seen: Set<string>) => {
@@ -253,23 +354,28 @@ const checkFrame = (level: LevelDef, issues: LevelIssue[], seen: Set<string>) =>
   }
 }
 
-export function validateLevel(level: LevelDef, ids: Set<string> = new Set()): LevelIssue[] {
+export function validateLevel(level: LevelDef, ids: Set<string> = new Set(), target?: LevelTarget): LevelIssue[] {
   const issues: LevelIssue[] = []
   const seen = new Set<string>()
-  const gears = enumerateGears(level)
-  const run = runSolution(level)
-  const layouts = gears.length > 0 ? gears.map((gear) => placedBlocks(level, gear)) : run.layouts
   checkStructure(level, ids, issues, seen)
+  checkOverlap([placedBlocks(level, createGear(level))], issues, seen)
+  if (issues.length > 0) return issues
+  const reachable = reachableLayouts(level, issues, seen)
+  const gears = enumerateGears(level)
+  const layouts = gears.length > 0 ? gears.map((gear) => placedBlocks(level, gear)) : reachable
+  const run = runSolution(level)
   checkOverlap(layouts, issues, seen)
   checkSolution(level, run, issues, seen)
   checkHandles(level, layouts, issues, seen)
+  checkOrbs(level, issues, seen)
   checkFrame(level, issues, seen)
+  if (target) checkDifficulty(level, target, issues, seen)
   return issues
 }
 
-export function validateLevels(levels: readonly LevelDef[]): LevelIssue[] {
+export function validateLevels(levels: readonly LevelDef[], targets: Record<string, LevelTarget> = {}): LevelIssue[] {
   const issues: LevelIssue[] = []
   const ids = new Set<string>()
-  for (const level of levels) issues.push(...validateLevel(level, ids))
+  for (const level of levels) issues.push(...validateLevel(level, ids, targets[level.id]))
   return issues
 }

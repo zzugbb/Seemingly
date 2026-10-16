@@ -52,6 +52,7 @@ npm install
 npm run dev           # http://127.0.0.1:5180
 npm run typecheck     # 类型检查
 npm test              # 单元测试
+npm run metrics       # 关卡难度指标表
 npm run format        # 格式化
 npm run format:check  # 检查格式
 npm run build         # 生成静态站点到 dist/
@@ -59,6 +60,8 @@ npm run preview       # 预览构建产物
 ```
 
 GitHub Actions 在推送到 `main` 后执行类型检查、格式检查、测试和构建，再发布到 GitHub Pages 的 `/Seemingly/` 子路径。文档与截图对应当前仓库，在线版本随发布更新。
+
+`npm run metrics` 输出全部关卡的最少步数、全收集最少步数、可达状态数、死局数、随机通关率、标准解法中的错觉连接数与取舍次数。随机模拟固定种子为 `20261016`，每关运行 500 次，步数预算采用难度目标中的设置，未设置时使用 30 步。首版九关只提供指标基线，不登记难度目标；重制关卡由设计者在 `src/game/levels/targets.ts` 填写目标后，测试会强制检查指标及标准解法最优步数。
 
 ## 技术栈
 

@@ -130,6 +130,10 @@ export function buildPolicy(level: LevelDef): Map<string, Action | null> {
   return policyOf(nodes, winDistances(nodes))
 }
 
+export function reachableStates(level: LevelDef): ReadonlyArray<Readonly<GameState>> {
+  return stateGraph(level, initialState(level)).map((node) => node.state)
+}
+
 export function nextHint(level: LevelDef, state: GameState): Action | null {
   if (state.won) return null
   const nodes = stateGraph(level, state)

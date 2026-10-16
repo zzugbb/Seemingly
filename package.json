@@ -10,6 +10,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
+    "metrics": "node metrics.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

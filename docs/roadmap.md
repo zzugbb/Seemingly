@@ -132,7 +132,7 @@ T3.4～T3.12 每关的验收：
 - [x] **T6.4 求解器**
   - 新增 `core/solver.ts`：`analyze`、`randomWinRate`、`buildPolicy`、`nextHint`，按 [architecture.md](architecture.md#求解器) 实现。求解器的状态扩展只通过 `legalActions`、`applyAction`、`stateKey` 完成；初始状态、标准解法指标通过规则层的只读视图获取，这样后面新增机制时不用改求解器。
   - 验收：`core/solver.test.ts` 用测试文件内手写的 3 个小关卡（直线、需要乘坐、带一次性压板死局）断言最少步数、全收集最少步数、死局数、提示的第一步；每关 `analyze` 不超过 2 秒。
-- [ ] **T6.5 校验升级与难度目标**
+- [x] **T6.5 校验升级与难度目标**
   - `validate.ts` 新增：乘坐安全、联动与光点引用、光点可见、标准解法步数等于最少步数；新增 `levels/targets.ts`；`levels.test.ts` 对 `targets.ts` 中列出的关卡检查[难度指标](level-design.md#难度指标)。
   - 新增 `npm run metrics`：打印所有关卡的指标表（最少步数、全收集最少步数、可达状态数、死局数、随机通关率、错觉连接数、取舍次数），供设计者使用。
   - 验收：对首版九关运行 `npm run metrics` 并把结果贴进提交说明；首版关卡不写进 `targets.ts`，不要求达标。
