@@ -25,6 +25,8 @@ src/
 │   ├── store.ts               zustand：页面、当前关卡、存档、静音、画质
 │   ├── save.ts                本地存储读写，键名 seemingly:save:v2
 │   ├── sounds.ts              模拟器事件 → 音效
+│   ├── hint.worker.ts         后台线程：计算整关最优策略
+│   ├── hints.ts               与提示 Worker 通信
 │   ├── screens/
 │   │   ├── TitleScreen.tsx    含评价总数
 │   │   ├── LevelSelect.tsx    按章分行，卡片含三项评价
@@ -84,7 +86,7 @@ src/
 
 ## 关卡数据
 
-`src/game/levels/types.ts`。注释中「T6.2」表示已实现，「T6.6」「T6.15」「T6.16」表示对应任务中新增：
+`src/game/levels/types.ts`。注释中「T6.2」表示已实现，「T6.6」「T6.16」表示对应任务中新增：
 
 ```ts
 export type Vec3 = [number, number, number]
@@ -154,7 +156,7 @@ export interface GateDef {
   type: 'gate'
   id: string
   tile: Vec3 // 门所在的静态路面
-  mode: 'toggle' | 'hold' // toggle 由把手、触发压板、联动切换；hold 只受按住压板控制
+  mode: 'toggle' | 'hold' // toggle 由把手、触发压板、联动切换；hold 只受按住压板控制（按住压板的 target 指向它）
   initiallyOpen?: boolean // 只对 toggle 有效
   handle?: HandleDef // 只对 toggle 有效
 }
@@ -281,24 +283,22 @@ T6.6 新增：
 - **不可进入的格子**：有积木箱、关着的门（含此刻未被按住的按住门）、巡逻者的格子，不能作为路线中的任何一格，也不能作为行走目标。
 - **单向格**：只能从箭头的反方向那一格、沿箭头方向进入；从其他方向进入的边在寻路时视为不存在。离开不受限制。积木箱同样受约束。
 - **push**：小人与积木箱屏幕相邻（积木箱所在格的屏幕坐标 = 小人屏幕坐标 + 方向 `d`）。目标格 = 积木箱格的屏幕坐标再加 `d` 处的路面；目标格必须存在、可行走（顶上无积木），且不是不可进入的格子；若目标格是单向格，`d` 必须与箭头一致。成立时积木箱移到目标格，小人移到积木箱原来的格子（这一格的光点照常收集）。
-- **按住压板**：在静止状态下被小人、积木箱或巡逻者占着即为「按下」。按住门在按下时打开；绑定的两站平移台在按下时位于第 2 站，松开时位于第 1 站。
-- 按住压板驱动的平移台移动时，站在上面的小人、积木箱、巡逻者按乘坐规则一起移动。
-
-T6.15 新增：
-
-- **遮挡断路**：路面顶面中心沿 `(1, 1, 1)` 的射线碰到任何积木（静态积木与机关积木，不含积木箱、门、巡逻者）时，这一格不能进入、不能作为目标。小人所在格不受此限，仍可离开。
+- **按住压板**：在静止状态下被小人、积木箱或巡逻者占着即为「按下」，按住门在按下时打开。按住压板只能绑定按住门。
+- **自己压着不算**：计算 walk 的可达路线、判断 push 的目标格时，小人当前所在的按住压板按「没有小人」重新计算（只剩积木箱、巡逻者算数），由此得出的关闭的门视为不可进入。模拟器在小人离开压板格的第一步就播放关门动画。
+- **门里有东西时不关**：门所在格有小人、积木箱或巡逻者时门保持打开。切换门在此时被切换为「关」：这次切换对该门无效（`gates` 不变），同一次触发的其他机关照常运动。按住门在这一格空出来后的下一次求值时再关闭。
+- **遮挡断路**：路面顶面中心沿 `(1, 1, 1)` 的射线碰到任何积木（静态积木与机关积木，不含积木箱、门、巡逻者）时，这一格不能进入、不能作为行走目标、不能作为推动目标。小人所在格不受此限，仍可离开。射线检测复用 `visibility.ts`。
 
 T6.16 新增：
 
-- **巡逻者**：沿 `route` 移动。下一格 = `route[index + direction]`（环形路线首尾相接；往返路线到端点时先反向再取下一格）。下一格与当前格此刻屏幕相邻且相连、可进入（不被小人、积木箱、其他巡逻者、关着的门占据，未被遮挡）时移动过去，否则原地等待。
+- **巡逻者**：沿 `route` 移动。下一格 = `route[index + direction]`（环形路线首尾相接；往返路线到端点时先反向再取下一格）。下一格与当前格此刻屏幕相邻且相连、可进入（不被小人、积木箱、其他巡逻者、关着的门占据，未被遮挡，不逆着单向格）时移动过去，否则原地等待。
 
 **每个动作的求值顺序**（必须严格遵守，求解器与模拟器一致）：
 
 1. 执行动作本身（walk 的路线与光点收集、push、operate 及其联动）。
 2. walk 的终点若是触发压板，触发它（等同 operate 其目标，含联动）。
-3. 重新计算所有按住压板的状态，更新按住门和按住平移台。
+3. 重新计算所有按住压板，更新按住门（遵守「门里有东西时不关」）。
 4. 每个巡逻者按编号顺序走一格（T6.16）。
-5. 再次重新计算按住压板（巡逻者可能压上或离开了压板）。
+5. 再次重新计算按住压板与按住门。
 6. 判断通关：小人在终点、必需光点已齐、本次动作是 walk 且终点为灯笼。
 
 ## 模拟器
@@ -387,7 +387,8 @@ export interface LevelMetrics {
 
 export function analyze(level: LevelDef): LevelMetrics
 export function randomWinRate(level: LevelDef, opts: { runs: number; maxActions: number; seed: number }): number
-export function nextHint(level: LevelDef, state: GameState): Action | null // 无法通关时返回 null
+export function buildPolicy(level: LevelDef): Map<string, Action | null> // 状态键 → 最优下一步；死局为 null
+export function nextHint(level: LevelDef, state: GameState): Action | null // 测试用；游戏内用 buildPolicy 的结果
 ```
 
 - 广度优先搜索全部可达状态；每个状态的行走动作用 `reachableFrom` 一次算出，不要对每个目标单独寻路。
@@ -396,7 +397,8 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 - 「取舍」：一次操作或推动前后，从小人当前位置可达的路面集合，既有新增又有减少。
 - 状态键必须包含 `GameState` 的全部字段；新增字段时同步更新 `stateKey`，否则求解器会把不同状态当成同一个。
 - 「错觉连接」：路线上相邻两格的三维坐标差不是水平单位向量。
-- 性能要求：每关 `analyze` 在测试中不超过 2 秒；提示在浏览器中不超过 100 毫秒。
+- 性能要求：每关 `analyze` 在测试中不超过 2 秒；规模上限见 [level-design.md](level-design.md#规模上限)。
+- **游戏内提示**：`src/app/hint.worker.ts` 是一个 Web Worker（Vite 原生支持，不需要依赖）。进入关卡时把关卡编号发给它，它调用 `buildPolicy` 算出整关的最优策略并保存；点击提示时把当前状态键发过去，立即得到下一步。策略还没算完时，提示按钮显示「思考中…」，算完后自动给出结果。`src/app/hints.ts` 封装与 Worker 的通信。
 
 ## 渲染与驱动
 
@@ -404,7 +406,7 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 - `Scene` 的 `useFrame` 是唯一调用 `sim.update(dt)` 的地方，事件交给 `PlayScreen` 的回调（音效、提示、横幅、HUD 数字）。
 - 渲染组件每帧从 `characterPose()`、`mechanismPose()`、`orbPose()` 读取位置，写到 `ref` 上。
 - HUD 的步数和光点数在 `step`、`orb`、`undo`、`mechanism-end` 事件后更新 React 状态，不每帧更新。
-- 撤销按钮调用 `sim.undo()`；提示按钮调用 `nextHint(level, sim.state())`，把结果交给 `Mechanisms` 或 `Blocks` 做 2 秒高亮，并在本局标记「用过提示」。
+- 撤销按钮调用 `sim.undo()`；提示按钮通过 `app/hints.ts` 查询 `stateKey(sim.state())` 的下一步，把结果交给 `Mechanisms`、`Blocks` 或 `Crates` 做 2 秒高亮，并在本局标记「用过提示」。
 
 ## 页面状态与存档
 
@@ -491,7 +493,7 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - 单关绘制调用不超过 400 次；超出时，同色静态积木改用 `InstancedMesh`。
 - 所有积木共用一份几何体，材质按颜色缓存。
 
-首版九关的[性能检查记录](performance.md)：终章最高 360 次调用，首屏约 326 KB。改版后在 T6.14（阶段一）和 T6.19（阶段二）重新测量。
+首版九关的[性能检查记录](performance.md)：终章最高 360 次调用，首屏约 326 KB。改版后在 T6.15（阶段一）、T6.19（阶段二）和 T6.22（阶段三）重新测量。
 
 ## 部署
 
