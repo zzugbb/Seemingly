@@ -17,7 +17,7 @@
 ## 目录
 
 ```text
-docs/levels/                   关卡设计稿 level-01.md … level-14.md（设计者编写）
+docs/levels/                   关卡设计稿 level-01.md … level-15.md、challenge-1.md … challenge-5.md（设计者编写）
 src/
 ├── main.tsx
 ├── app/                       页面与界面（React DOM）
@@ -56,8 +56,9 @@ src/
     │   ├── types.ts
     │   ├── builders.ts
     │   ├── targets.ts         每关难度目标（设计者给出）
-    │   ├── index.ts           按顺序导出 14 关
-    │   ├── level-01.ts … level-14.ts
+    │   ├── index.ts           导出 mainLevels（15 关）与 challengeLevels（5 关）
+    │   ├── level-01.ts … level-15.ts
+    │   ├── challenge-1.ts … challenge-5.ts
     │   └── levels.test.ts     校验加难度指标
     └── render/
         ├── Scene.tsx          一关的完整场景，每帧驱动模拟器
@@ -66,6 +67,9 @@ src/
         ├── Blocks.tsx
         ├── Mechanisms.tsx     转盘、平移台、压板、把手；提示高亮
         ├── Orbs.tsx           光点与收集动画
+        ├── Crates.tsx         积木箱与推动动画
+        ├── Gates.tsx          开关门
+        ├── Patrols.tsx        巡逻者
         ├── Character.tsx
         ├── Lantern.tsx        亮度随光点递增
         ├── Finale.tsx
@@ -80,18 +84,20 @@ src/
 
 ## 关卡数据
 
-`src/game/levels/types.ts`（在现有定义上的改动用注释标出）：
+`src/game/levels/types.ts`。注释中「T6.2」表示已实现，「T6.6」「T6.15」「T6.16」表示对应任务中新增：
 
 ```ts
 export type Vec3 = [number, number, number]
 export type Axis = 'x' | 'y' | 'z'
 export type Face = 'x' | 'z'
 export type ColorName = 'sand' | 'terracotta' | 'rose' | 'teal' | 'tealLight' | 'plum' | 'cream'
+export type ScreenDir = '+a' | '-a' | '+b' | '-b' // T6.6：屏幕方向，+a 即 +x 方向（右下），+b 即 +z 方向（左下）
 
 export interface BlockDef {
   pos: Vec3
   color: ColorName
   kind: 'path' | 'solid'
+  oneWay?: ScreenDir // T6.6：单向格，只能沿该屏幕方向进入
 }
 
 export interface MechBlockDef {
@@ -103,11 +109,12 @@ export interface MechBlockDef {
 export interface HandleDef {
   block: Vec3 // 把手所在的静态结构积木
   face: Face
+  uses?: number // T6.6：限次把手的可用次数，省略为不限
 }
 
 export interface LinkDef {
-  // 新增
-  target: string // 被联动的转盘或平移台
+  // T6.2
+  target: string // 被联动的转盘、平移台或切换门（T6.6）
   reverse?: boolean // 只对转盘有效：逆时针
 }
 
@@ -117,8 +124,8 @@ export interface RotatorDef {
   pivot: Vec3
   blocks: MechBlockDef[]
   initialStep?: 0 | 1 | 2 | 3
-  handle?: HandleDef // 改为可选：没有把手时只能被联动或压板触发
-  links?: LinkDef[] // 新增
+  handle?: HandleDef // T6.2：可选，没有把手时只能被联动或压板触发
+  links?: LinkDef[] // T6.2
 }
 
 export interface MoverDef {
@@ -129,8 +136,8 @@ export interface MoverDef {
   stops: number[]
   initialStop?: number
   blocks: MechBlockDef[]
-  handle?: HandleDef // 改为可选
-  links?: LinkDef[] // 新增
+  handle?: HandleDef // T6.2：可选
+  links?: LinkDef[] // T6.2
 }
 
 export interface PlateDef {
@@ -138,29 +145,55 @@ export interface PlateDef {
   id: string
   tile: Vec3
   target: string
-  once?: boolean
+  once?: boolean // 只对触发压板有效
+  mode?: 'trigger' | 'hold' // T6.6：默认 trigger
 }
 
-export type MechanismDef = RotatorDef | MoverDef | PlateDef
+export interface GateDef {
+  // T6.6
+  type: 'gate'
+  id: string
+  tile: Vec3 // 门所在的静态路面
+  mode: 'toggle' | 'hold' // toggle 由把手、触发压板、联动切换；hold 只受按住压板控制
+  initiallyOpen?: boolean // 只对 toggle 有效
+  handle?: HandleDef // 只对 toggle 有效
+}
 
-export type OrbDef = // 新增
-  ({ tile: Vec3 } | { mechanism: string; block: number }) & { optional?: boolean }
+export type MechanismDef = RotatorDef | MoverDef | PlateDef | GateDef
 
-export type SolutionStep = { type: 'walk'; to: Vec3 } | { type: 'operate'; mechanism: string }
+export type TileRef = { tile: Vec3 } | { mechanism: string; block: number } // 静态路面或机关积木
+
+export type OrbDef = TileRef & { optional?: boolean } // T6.2
+
+export type CrateDef = TileRef // T6.6
+
+export interface PatrolDef {
+  // T6.16
+  route: TileRef[] // 开局时相邻两格屏幕相邻
+  mode: 'pingpong' | 'loop'
+}
+
+export type SolutionStep =
+  | { type: 'walk'; to: Vec3 }
+  | { type: 'operate'; mechanism: string }
+  | { type: 'push'; crate: string } // T6.6
 
 export interface LevelDef {
-  id: string // 'level-01' … 'level-14'
+  id: string // 'level-01' … 'level-15'，'challenge-1' … 'challenge-5'
   title: string
-  chapter: 1 | 2 | 3 | 4 // 新增
+  chapter: 1 | 2 | 3 | 4 | 5 // T6.2 为 1～4，T6.6 扩展到 5
+  challenge?: boolean // T6.6
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
-  orbs: OrbDef[] // 新增，可为空数组
+  orbs: OrbDef[] // T6.2
+  crates?: CrateDef[] // T6.6
+  patrols?: PatrolDef[] // T6.16
   start: Vec3
   goal: Vec3
   decor: DecorDef
   hints?: string[]
   solution: SolutionStep[]
-  ending?: EndingDef // 最终关：14 盏灯笼与塔
+  ending?: EndingDef // 最终关：15 盏灯笼与塔
 }
 ```
 
@@ -168,7 +201,8 @@ export interface LevelDef {
 
 - 静态路面的格子编号是 `"x,y,z"`，机关积木的编号是 `"机关id#下标"`。机关积木的编号与位置无关，所以小人乘坐时编号不变。
 - 光点编号：`orb-0`、`orb-1`……按 `orbs` 数组顺序；光点所在格子编号按上一条规则。光点不能放在起点。
-- `builders.ts` 新增 `orb(def)`，`defineLevel` 新增 `chapter` 参数。
+- 积木箱编号 `crate-0`……，巡逻者编号 `patrol-0`……，按数组顺序。
+- `builders.ts` 已有 `orb(def)` 与 `chapter`；T6.6 新增 `crate`、`gate`、`oneWay` 选项和 `challenge` 参数，T6.16 新增 `patrol`。
 
 `src/game/levels/targets.ts`：
 
@@ -199,17 +233,28 @@ export interface GameState {
   orbs: string[] // 已收集的光点编号，升序
   spentPlates: string[] // 已用掉的一次性压板编号，升序
   won: boolean
+  // 以下由 T6.6 / T6.16 新增
+  gates: Record<string, boolean> // 切换门是否打开（按住门不存，由按住压板实时算出）
+  handleUses: Record<string, number> // 限次把手已用次数
+  crates: Record<string, string> // 积木箱编号 → 所在格子编号
+  patrols: Record<string, { index: number; direction: 1 | -1 }> // 巡逻者在路线上的位置
 }
 
-export type Action = { type: 'walk'; tileId: string } | { type: 'operate'; mechanism: string }
+export type Action =
+  | { type: 'walk'; tileId: string }
+  | { type: 'operate'; mechanism: string }
+  | { type: 'push'; crate: string } // T6.6
 
 export interface Transition {
   state: GameState
-  route: string[] // walk：经过的格子（不含起点）；operate：空
+  route: string[] // walk：经过的格子（不含起点）；push：[积木箱原来的格子]；operate：空
   collected: string[] // 本次收集的光点
-  moved: string[] // 本次运动的机关（含联动、压板触发）
-  plate: string | null // 本次触发的压板
+  moved: string[] // 本次运动的机关（含联动、压板触发、按住压板引起的变化）
+  plate: string | null // 本次触发的触发压板
   goalLocked: number // 走到灯笼但必需光点不足时，缺少的数量；否则为 0
+  pushed: { crate: string; from: string; to: string } | null // T6.6
+  gatesChanged: string[] // T6.6：开关状态发生变化的门
+  patrolMoves: { patrol: string; from: string; to: string }[] // T6.16
 }
 
 export function initialState(level: LevelDef): GameState
@@ -227,29 +272,64 @@ export function stateKey(state: GameState): string
   - 是终点且必需光点已齐：`won = true`；
   - 是终点但必需光点不齐：`goalLocked = 缺少数量`；
   - 是压板：按压板规则触发目标机关（等同 operate，含联动）。
-- **operate**：机关必须有把手。触发集合 = 该机关 + 其 `links` 中的机关（只展开一层）。转盘档位 +1（`reverse` 时 −1，取模 4）；平移台按往返规则前进一站。
-- **乘坐**无需特殊处理：小人的格子编号不变，位置随机关状态重新计算。
+- **operate**：机关必须有把手，且限次把手还有剩余次数。触发集合 = 该机关 + 其 `links` 中的机关（只展开一层）。转盘档位 +1（`reverse` 时 −1，取模 4）；平移台按往返规则前进一站；切换门开关取反。限次把手的已用次数 +1。
+- **乘坐**无需特殊处理：小人、积木箱、巡逻者的格子编号不变，位置随机关状态重新计算。
 - `won` 为真后不再有合法动作。
+
+T6.6 新增：
+
+- **不可进入的格子**：有积木箱、关着的门（含此刻未被按住的按住门）、巡逻者的格子，不能作为路线中的任何一格，也不能作为行走目标。
+- **单向格**：只能从箭头的反方向那一格、沿箭头方向进入；从其他方向进入的边在寻路时视为不存在。离开不受限制。积木箱同样受约束。
+- **push**：小人与积木箱屏幕相邻（积木箱所在格的屏幕坐标 = 小人屏幕坐标 + 方向 `d`）。目标格 = 积木箱格的屏幕坐标再加 `d` 处的路面；目标格必须存在、可行走（顶上无积木），且不是不可进入的格子；若目标格是单向格，`d` 必须与箭头一致。成立时积木箱移到目标格，小人移到积木箱原来的格子（这一格的光点照常收集）。
+- **按住压板**：在静止状态下被小人、积木箱或巡逻者占着即为「按下」。按住门在按下时打开；绑定的两站平移台在按下时位于第 2 站，松开时位于第 1 站。
+- 按住压板驱动的平移台移动时，站在上面的小人、积木箱、巡逻者按乘坐规则一起移动。
+
+T6.15 新增：
+
+- **遮挡断路**：路面顶面中心沿 `(1, 1, 1)` 的射线碰到任何积木（静态积木与机关积木，不含积木箱、门、巡逻者）时，这一格不能进入、不能作为目标。小人所在格不受此限，仍可离开。
+
+T6.16 新增：
+
+- **巡逻者**：沿 `route` 移动。下一格 = `route[index + direction]`（环形路线首尾相接；往返路线到端点时先反向再取下一格）。下一格与当前格此刻屏幕相邻且相连、可进入（不被小人、积木箱、其他巡逻者、关着的门占据，未被遮挡）时移动过去，否则原地等待。
+
+**每个动作的求值顺序**（必须严格遵守，求解器与模拟器一致）：
+
+1. 执行动作本身（walk 的路线与光点收集、push、operate 及其联动）。
+2. walk 的终点若是触发压板，触发它（等同 operate 其目标，含联动）。
+3. 重新计算所有按住压板的状态，更新按住门和按住平移台。
+4. 每个巡逻者按编号顺序走一格（T6.16）。
+5. 再次重新计算按住压板（巡逻者可能压上或离开了压板）。
+6. 判断通关：小人在终点、必需光点已齐、本次动作是 walk 且终点为灯笼。
 
 ## 模拟器
 
 `src/game/core/sim.ts` 在规则层之上负责动画、事件和撤销。
 
 ```ts
-export type Command = { type: 'walk'; tileId: string } | { type: 'operate'; mechanism: string }
+export type Command = Action // 与规则层的 Action 相同（walk、operate、push）
 
-export type CommandResult = 'ok' | 'busy' | 'unreachable' | 'no-handle' | 'unknown-target'
+export type CommandResult =
+  | 'ok'
+  | 'busy'
+  | 'unreachable'
+  | 'no-handle'
+  | 'unknown-target'
+  | 'handle-used-up' // T6.6
+  | 'cannot-push' // T6.6：不相邻或前方过不去
 
 export type SimEvent =
   | { type: 'walk-start'; route: string[] }
   | { type: 'step'; tileId: string }
-  | { type: 'orb'; id: string } // 新增：动画走到光点格时发出
-  | { type: 'goal-locked'; missing: number } // 新增
+  | { type: 'orb'; id: string } // 动画走到光点格时发出
+  | { type: 'goal-locked'; missing: number }
   | { type: 'mechanism-start'; id: string }
   | { type: 'mechanism-tick'; id: string }
   | { type: 'mechanism-end'; id: string }
   | { type: 'plate'; id: string; triggered: boolean }
-  | { type: 'undo' } // 新增
+  | { type: 'push'; crate: string } // T6.6
+  | { type: 'gate'; id: string; open: boolean } // T6.6
+  | { type: 'patrol-move'; patrol: string } // T6.16
+  | { type: 'undo' }
   | { type: 'won' }
 
 export class LevelSim {
@@ -272,6 +352,9 @@ export class LevelSim {
   characterPose(): { position: Vec3; heading: number; walking: boolean }
   mechanismPose(id: string): { rotationY: number } | { offset: Vec3 }
   orbPose(id: string): { position: Vec3; collected: boolean }
+  cratePose(id: string): { position: Vec3 } // T6.6
+  gatePose(id: string): { open: number } // T6.6：0 关闭，1 完全打开
+  patrolPose(id: string): { position: Vec3; heading: number } // T6.16
 }
 ```
 
@@ -283,6 +366,9 @@ export class LevelSim {
 - 多个机关同时运动（联动），全部结束后才发出最后一个 `mechanism-end` 并接受新指令。
 - **乘坐**：小人所在格属于正在运动的机关时，`characterPose` 按该机关当前动画姿态计算小人位置；转盘还要把转过的角度加到朝向上。
 - 撤销立即恢复状态，不播放动画，发出 `undo` 事件。
+- 一个动作的动画按规则层求值顺序依次播放：行走或推动 → 触发压板引起的机关运动 → 按住压板引起的门和平移台变化 → 巡逻者移动。前一段结束再播下一段，全部结束后才接受新指令。
+- 推动：积木箱滑动 0.35 秒，小人同步跟进；跨越错觉连接时积木箱同样用 `segmentPoint` 插值。
+- 开关门 0.4 秒；巡逻者每格 0.3 秒。
 - 所有时长常量定义在 `sim.ts` 顶部，和设计稿一致。
 
 ## 求解器
@@ -307,7 +393,8 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 - 广度优先搜索全部可达状态；每个状态的行走动作用 `reachableFrom` 一次算出，不要对每个目标单独寻路。
 - 死局：建出状态图后，从所有通关状态反向搜索，搜不到的可达状态即死局。
 - 随机通关率用固定种子的伪随机数（如 mulberry32），不用 `Math.random`。
-- 「取舍」：一次操作前后，从小人当前位置可达的路面集合，既有新增又有减少。
+- 「取舍」：一次操作或推动前后，从小人当前位置可达的路面集合，既有新增又有减少。
+- 状态键必须包含 `GameState` 的全部字段；新增字段时同步更新 `stateKey`，否则求解器会把不同状态当成同一个。
 - 「错觉连接」：路线上相邻两格的三维坐标差不是水平单位向量。
 - 性能要求：每关 `analyze` 在测试中不超过 2 秒；提示在浏览器中不超过 100 毫秒。
 
@@ -337,33 +424,36 @@ interface SaveData {
 
 interface AppState {
   screen: 'title' | 'select' | 'play' | 'ending'
-  levelIndex: number
+  current: { list: 'main' | 'challenge'; index: number } // 替代原来的 levelIndex
   save: SaveData
   quality: 'high' | 'low'
   goTitle(): void
   goSelect(): void
-  play(levelIndex: number): void
+  play(list: 'main' | 'challenge', index: number): void
   completeLevel(id: string, result: { steps: number; allOrbs: boolean; usedHint: boolean }): void
   toggleMute(): void
 }
+
+function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): boolean
 ```
 
 - `completeLevel`：`done = true`；`allOrbs ||= result.allOrbs`；`bestSteps` 取较小值；`parMet ||= !usedHint && steps <= targets[id].minActions`。
+- `isUnlocked`：主线第 1 关始终解锁，第 N+1 关在第 N 关 `done` 后解锁；挑战关 N 的规则见[设计稿](design.md#挑战章)——第 1 章挑战在第 1 章全部 `done` 后解锁，第 2～5 章挑战在该章所有关卡 `allOrbs` 后解锁。挑战关的解锁只看存档记录，不依赖当前会话。
 - 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。
 
 ## 音频
 
 - `engine.ts`：唯一的 `AudioContext`，首次真实交互时解锁。信号链：音乐总线（0.18）和音效总线（0.5）→ 主音量（0.28）→ 压缩器 → 输出；混响作为发送效果，两条总线都有发送量。静音时主音量归零并停止音乐调度。
-- `theory.ts`：纯函数与数据，可单元测试。MIDI 编号与频率换算；四章的和弦进行与音阶，见[设计稿](design.md#音乐)；给定章节和时间返回当前和弦。
+- `theory.ts`：纯函数与数据，可单元测试。MIDI 编号与频率换算；五章的和弦进行与音阶，见[设计稿](design.md#音乐)；给定章节和时间返回当前和弦。
 - `reverb.ts`：用双声道指数衰减噪声生成 2.5 秒脉冲响应，交给 `ConvolverNode`。
 - `music.ts`：`MusicPlayer`，提供 `start(chapter)`、`setChapter(chapter)`（3 秒交叉淡化）、`stop()`、`currentChord()`、`currentScale()`。用前瞻调度：每 100 毫秒安排接下来 0.3 秒内的音符。同一时刻最多 12 个发声音源。
-- `sfx.ts`：`step`、`mechanism`、`orb`、`lantern`、`unreachable`、`undo`、`goalLocked`，音高取自 `music.currentChord()` 和 `currentScale()`；音乐未启动时使用第 1 章的和弦。
-- `app/sounds.ts`：把模拟器事件映射到音效：`step`→脚步，`mechanism-tick`→机关，`orb`→光点，`goal-locked`→提醒音，`undo`→撤销，`won`→灯笼。
+- `sfx.ts`：`step`、`mechanism`、`orb`、`lantern`、`unreachable`、`undo`、`goalLocked`、`push`、`gate`、`patrol`，音高取自 `music.currentChord()` 和 `currentScale()`；音乐未启动时使用第 1 章的和弦。
+- `app/sounds.ts`：把模拟器事件映射到音效：`step`→脚步，`mechanism-tick`→机关，`orb`→光点，`goal-locked`→提醒音，`undo`→撤销，`push`→推动，`gate`→开关门，`patrol-move`→巡逻者，`won`→灯笼。
 - 删除首版的 `ambient.ts`。
 
 ## 结尾
 
-最终关在 `ending` 中列出 14 盏灯笼与塔的静态积木位置，其余时序沿用首版：终点灯笼先亮，其余每隔 0.45 秒点亮；全部亮后 0.6 秒照亮塔，再过 0.9 秒显示「谢谢游玩」和「回到标题」。
+最终关（第 15 关）在 `ending` 中列出 15 盏灯笼与塔的静态积木位置，其余时序沿用首版：终点灯笼先亮，其余每隔 0.45 秒点亮；全部亮后 0.6 秒照亮塔，再过 0.9 秒显示「谢谢游玩」和「回到标题」。阶段一版本没有第 15 关，第 12 关通关后按设计稿显示「第五章即将开放」。
 
 ## 画质档位
 
@@ -401,7 +491,7 @@ interface AppState {
 - 单关绘制调用不超过 400 次；超出时，同色静态积木改用 `InstancedMesh`。
 - 所有积木共用一份几何体，材质按颜色缓存。
 
-首版九关的[性能检查记录](performance.md)：终章最高 360 次调用，首屏约 326 KB。改版后重新测量（T6.17）。
+首版九关的[性能检查记录](performance.md)：终章最高 360 次调用，首屏约 326 KB。改版后在 T6.14（阶段一）和 T6.19（阶段二）重新测量。
 
 ## 部署
 
