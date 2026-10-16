@@ -21,13 +21,19 @@ export interface HandleDef {
   face: Face
 }
 
+export interface LinkDef {
+  target: string
+  reverse?: boolean // 只对转盘有效
+}
+
 export interface RotatorDef {
   type: 'rotator'
   id: string
   pivot: Vec3 // 必须是一块静态积木，本身不转
   blocks: MechBlockDef[]
   initialStep?: 0 | 1 | 2 | 3
-  handle: HandleDef
+  handle?: HandleDef
+  links?: LinkDef[]
 }
 
 export interface MoverDef {
@@ -38,7 +44,8 @@ export interface MoverDef {
   stops: number[] // 沿 axis 的整数偏移，升序，如 [0, 2, 3]
   initialStop?: number // stops 的下标，默认 0
   blocks: MechBlockDef[]
-  handle: HandleDef
+  handle?: HandleDef
+  links?: LinkDef[]
 }
 
 export interface PlateDef {
@@ -50,6 +57,8 @@ export interface PlateDef {
 }
 
 export type MechanismDef = RotatorDef | MoverDef | PlateDef
+
+export type OrbDef = ({ tile: Vec3 } | { mechanism: string; block: number }) & { optional?: boolean }
 
 export interface IslandDef {
   x: [number, number]
@@ -73,10 +82,12 @@ export interface EndingDef {
 }
 
 export interface LevelDef {
-  id: string // 'level-00' … 'level-08'
+  id: string
   title: string // 中文关名
+  chapter: 1 | 2 | 3 | 4
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
+  orbs: OrbDef[]
   start: Vec3
   goal: Vec3
   decor: DecorDef

@@ -7,6 +7,7 @@ import type {
   LevelDef,
   MechanismDef,
   MoverDef,
+  OrbDef,
   PlateDef,
   RotatorDef,
   SolutionStep,
@@ -23,6 +24,7 @@ export interface LevelBuilder {
   rotator(spec: Omit<RotatorDef, 'type'>): void
   mover(spec: Omit<MoverDef, 'type'>): void
   plate(spec: Omit<PlateDef, 'type'>): void
+  orb(def: OrbDef): void
   start(pos: Vec3): void
   goal(pos: Vec3): void
   tree(pos: Vec3): void
@@ -33,6 +35,7 @@ export interface LevelBuilder {
 export function defineLevel(spec: {
   id: string
   title: string
+  chapter: LevelDef['chapter']
   hints?: string[]
   solution: SolutionStep[]
   ending?: EndingDef
@@ -40,6 +43,7 @@ export function defineLevel(spec: {
 }): LevelDef {
   const blocks: BlockDef[] = []
   const mechanisms: MechanismDef[] = []
+  const orbs: OrbDef[] = []
   const decor: DecorDef = { islands: [], trees: [], flowers: [], windows: [] }
   let start: Vec3 | undefined
   let goal: Vec3 | undefined
@@ -71,6 +75,9 @@ export function defineLevel(spec: {
     plate(def) {
       mechanisms.push({ type: 'plate', ...def })
     },
+    orb(def) {
+      orbs.push(def)
+    },
     start(pos) {
       start = pos
     },
@@ -94,8 +101,10 @@ export function defineLevel(spec: {
   return {
     id: spec.id,
     title: spec.title,
+    chapter: spec.chapter,
     blocks,
     mechanisms,
+    orbs,
     start,
     goal,
     decor,

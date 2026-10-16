@@ -5,6 +5,7 @@ import { defineLevel } from './builders'
 export default defineLevel({
   id: 'level-08',
   title: '归来',
+  chapter: 1,
   ending: {
     lanterns: [
       [1, 0, 0],

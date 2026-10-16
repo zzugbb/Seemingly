@@ -206,6 +206,7 @@ const checkHandles = (level: LevelDef, layouts: Vec3[][], issues: LevelIssue[], 
   const handles = level.mechanisms.filter((mechanism): mechanism is RotatorDef | MoverDef => mechanism.type !== 'plate')
   for (const blocks of layouts) {
     for (const mechanism of handles) {
+      if (!mechanism.handle) continue
       const point = handlePoint(mechanism.handle.block, mechanism.handle.face)
       if (rayHitsAny(point, blocks)) {
         push(issues, seen, { check: '把手可见', cell: cellId(mechanism.handle.block), detail: '把手被其他积木挡住' })

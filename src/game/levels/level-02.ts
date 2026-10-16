@@ -4,6 +4,7 @@ import { defineLevel } from './builders'
 export default defineLevel({
   id: 'level-02',
   title: '转动',
+  chapter: 1,
   hints: ['点击路面，小人会走过去', '点击金色转轮，旋转桥梁'],
   build: (b) => {
     b.island({ x: [0, 2], z: [1, 3], y: -1 })

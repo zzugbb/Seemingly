@@ -5,6 +5,7 @@ import { defineLevel } from './builders'
 export default defineLevel({
   id: 'level-05',
   title: '先后',
+  chapter: 1,
   build: (b) => {
     b.island({ x: [-1, 2], z: [1, 4], y: -1 })
     for (const z of [2, 3, 4]) b.path([1, 0, z], 'terracotta')

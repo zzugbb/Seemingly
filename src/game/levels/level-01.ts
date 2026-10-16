@@ -4,6 +4,7 @@ import { defineLevel } from './builders'
 export default defineLevel({
   id: 'level-01',
   title: '看似',
+  chapter: 1,
   hints: ['点击路面，小人会走过去', '看起来连着，就能走过去'],
   build: (b) => {
     b.island({ x: [-1, 2], z: [-1, 3], y: -1 })

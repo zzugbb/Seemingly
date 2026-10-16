@@ -4,6 +4,7 @@ import { defineLevel } from './builders'
 export default defineLevel({
   id: 'level-04',
   title: '回望',
+  chapter: 1,
   build: (b) => {
     b.island({ x: [5, 7], z: [3, 4], y: -1 })
     b.column({ x: 6, z: 4, from: 0, to: 2 }, 'terracotta')

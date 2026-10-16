@@ -6,6 +6,7 @@ import { LevelSim, type SimEvent } from './sim'
 const level = defineLevel({
   id: 'sim-fixture',
   title: '模拟',
+  chapter: 1,
   build: (b) => {
     b.path([0, 0, 0], 'terracotta')
     b.path([1, 0, 0], 'terracotta')

@@ -1,0 +1,354 @@
+import { describe, expect, it } from 'vitest'
+import { defineLevel, type LevelBuilder } from '../levels/builders'
+import { levels } from '../levels'
+import { buildGraph, cellId, findPath } from './iso'
+import {
+  applyAction,
+  initialState,
+  legalActions,
+  occupiedOf,
+  reachableFrom,
+  stateKey,
+  tilesOf,
+  type GameState,
+  type Transition,
+} from './rules'
+
+const fixture = (build: (b: LevelBuilder) => void = () => {}) =>
+  defineLevel({
+    id: 'rules-fixture',
+    title: '规则测试',
+    chapter: 1,
+    solution: [],
+    build: (b) => {
+      for (let x = 0; x <= 3; x++) b.path([x, 0, 0], 'sand')
+      for (let x = 0; x <= 2; x++) b.path([x, 0, 1], 'sand')
+      b.path([0, 0, 2], 'sand')
+      b.solid([0, 1, 2], 'rose')
+      b.path([6, 2, 2], 'rose')
+      b.orb({ tile: [1, 0, 0] })
+      b.orb({ tile: [0, 0, 1], optional: true })
+      b.start([0, 0, 0])
+      b.goal([3, 0, 0])
+      build(b)
+    },
+  })
+
+const withGears = () =>
+  fixture((b) => {
+    b.rotator({
+      id: 'drive',
+      pivot: [10, 0, 0],
+      blocks: [{ offset: [1, 0, 0] }],
+      initialStep: 3,
+      handle: { block: [0, 1, 2], face: 'z' },
+      links: [
+        { target: 'reverse', reverse: true },
+        { target: 'lift', reverse: true },
+      ],
+    })
+    b.rotator({
+      id: 'reverse',
+      pivot: [15, 0, 0],
+      blocks: [{ offset: [1, 0, 0] }],
+      links: [{ target: 'indirect' }],
+    })
+    b.rotator({ id: 'indirect', pivot: [20, 0, 0], blocks: [{ offset: [1, 0, 0] }] })
+    b.mover({ id: 'lift', origin: [25, 0, 0], axis: 'y', stops: [0, 2, 3], blocks: [{ offset: [0, 0, 0] }] })
+  })
+
+const transitioned = (transition: Transition | null): Transition => {
+  expect(transition).not.toBeNull()
+  if (!transition) throw new Error('预期合法动作')
+  return transition
+}
+
+describe('关卡数据与初始状态', () => {
+  it('旧九关补齐兼容数据，未放置光点时 builder 生成空数组', () => {
+    expect(levels).toHaveLength(9)
+    for (const level of levels) {
+      expect(level.chapter).toBe(1)
+      expect(level.orbs).toEqual([])
+    }
+  })
+
+  it('保留光点定义顺序、章节和初始机关状态', () => {
+    const level = withGears()
+    expect(level.orbs).toEqual([{ tile: [1, 0, 0] }, { tile: [0, 0, 1], optional: true }])
+    expect(initialState(level)).toEqual({
+      at: '0,0,0',
+      rotator: { drive: 3, reverse: 0, indirect: 0 },
+      mover: { lift: { stopIndex: 0, direction: 1 } },
+      orbs: [],
+      spentPlates: [],
+      won: false,
+    })
+    const mechanisms = level.mechanisms.map((item) => (item.type === 'mover' ? { ...item, initialStop: 2 } : item))
+    expect(initialState({ ...level, mechanisms }).mover.lift).toEqual({ stopIndex: 2, direction: 1 })
+  })
+
+  it('路面图只包含路面，占用集合包含结构和机关全部积木', () => {
+    const level = withGears()
+    const state = initialState(level)
+    const tiles = tilesOf(level, state)
+    expect(tiles.get('drive#0')?.pos).toEqual([10, 0, 1])
+    expect(tiles.has('0,1,2')).toBe(false)
+    expect(tiles.has('0,0,2')).toBe(true)
+    expect(occupiedOf(level, state)).toEqual(
+      new Set([...level.blocks.map((block) => cellId(block.pos)), '10,0,1', '16,0,0', '21,0,0', '25,0,0']),
+    )
+    expect(reachableFrom(level, state).has('0,0,2')).toBe(false)
+  })
+})
+
+describe('行走与光点', () => {
+  it('路过即收集必需光点，抵达终点可通关，选做光点不阻止通关', () => {
+    const level = fixture()
+    const result = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: '3,0,0' }))
+    expect(result).toEqual({
+      state: { ...initialState(level), at: '3,0,0', orbs: ['orb-0'], won: true },
+      route: ['1,0,0', '2,0,0', '3,0,0'],
+      collected: ['orb-0'],
+      moved: [],
+      plate: null,
+      goalLocked: 0,
+    })
+  })
+
+  it('必需光点不齐时返回缺少数量，之后仍可继续行走', () => {
+    const level = fixture((b) => {
+      b.orb({ tile: [1, 0, 1] })
+      b.orb({ tile: [2, 0, 1] })
+    })
+    const locked = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: '3,0,0' }))
+    expect(locked.goalLocked).toBe(2)
+    expect(locked.state.won).toBe(false)
+    const collect = transitioned(applyAction(level, locked.state, { type: 'walk', tileId: '1,0,1' }))
+    const rest = transitioned(applyAction(level, collect.state, { type: 'walk', tileId: '2,0,1' }))
+    const finish = transitioned(applyAction(level, rest.state, { type: 'walk', tileId: '3,0,0' }))
+    expect(finish.state.won).toBe(true)
+    expect(finish.goalLocked).toBe(0)
+  })
+
+  it('选做光点也收集，重复进入不重复收集', () => {
+    const level = fixture()
+    const first = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: '0,0,1' }))
+    expect(first.collected).toEqual(['orb-1'])
+    const back = transitioned(applyAction(level, first.state, { type: 'walk', tileId: '0,0,0' }))
+    const again = transitioned(applyAction(level, back.state, { type: 'walk', tileId: '0,0,1' }))
+    expect(again.collected).toEqual([])
+    expect(again.state.orbs).toEqual(['orb-1'])
+  })
+
+  it('只在路线终点判定通关，允许经过灯笼继续行走', () => {
+    const level = fixture()
+    const result = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: '6,2,2' }))
+    expect(result.route).toContain('3,0,0')
+    expect(result.state.at).toBe('6,2,2')
+    expect(result.state.won).toBe(false)
+  })
+
+  it('当前格、未知格、被压住的路面和断开的路面都不可行走', () => {
+    const level = fixture((b) => b.path([99, 0, 99], 'sand'))
+    const state = initialState(level)
+    for (const tileId of ['0,0,0', 'missing', '0,0,2', '99,0,99']) {
+      expect(applyAction(level, state, { type: 'walk', tileId })).toBeNull()
+      expect(legalActions(level, state)).not.toContainEqual({ type: 'walk', tileId })
+    }
+  })
+})
+
+describe('机关、压板与乘坐', () => {
+  it('直接操作只展开一层联动，逆转只影响转盘，输入状态不变', () => {
+    const level = withGears()
+    const state = initialState(level)
+    const before = structuredClone(state)
+    const result = transitioned(applyAction(level, state, { type: 'operate', mechanism: 'drive' }))
+    expect(result.moved).toEqual(['drive', 'reverse', 'lift'])
+    expect(result.route).toEqual([])
+    expect(result.plate).toBeNull()
+    expect(result.state.rotator).toEqual({ drive: 0, reverse: 3, indirect: 0 })
+    expect(result.state.mover.lift).toEqual({ stopIndex: 1, direction: 1 })
+    expect(state).toEqual(before)
+  })
+
+  it('平移台联动也只展开一层，并按停靠位往返', () => {
+    const level = withGears()
+    const lift = level.mechanisms.find((mechanism) => mechanism.type === 'mover')!
+    if (lift.type !== 'mover') throw new Error('缺少平移台')
+    lift.handle = { block: [0, 1, 2], face: 'x' }
+    lift.links = [{ target: 'reverse' }]
+    let state = initialState(level)
+    const cursors = []
+    for (let index = 0; index < 5; index++) {
+      const result = transitioned(applyAction(level, state, { type: 'operate', mechanism: 'lift' }))
+      expect(result.moved).toEqual(['lift', 'reverse'])
+      state = result.state
+      cursors.push(state.mover.lift)
+    }
+    expect(cursors).toEqual([
+      { stopIndex: 1, direction: 1 },
+      { stopIndex: 2, direction: 1 },
+      { stopIndex: 1, direction: -1 },
+      { stopIndex: 0, direction: -1 },
+      { stopIndex: 1, direction: 1 },
+    ])
+    expect(state.rotator.indirect).toBe(0)
+  })
+
+  it('无把手机关、压板和未知机关不能直接操作', () => {
+    const level = withGears()
+    level.mechanisms.push({ type: 'plate', id: 'pad', tile: [2, 0, 1], target: 'reverse' })
+    const state = initialState(level)
+    const operations = legalActions(level, state).filter((action) => action.type === 'operate')
+    expect(operations).toEqual([{ type: 'operate', mechanism: 'drive' }])
+    for (const mechanism of ['reverse', 'lift', 'pad', 'missing']) {
+      expect(applyAction(level, state, { type: 'operate', mechanism })).toBeNull()
+    }
+  })
+
+  it.each([false, true])('压板可驱动无把手机关并联动，once=%s', (once) => {
+    const level = withGears()
+    level.mechanisms.push({ type: 'plate', id: 'pad', tile: [2, 0, 1], target: 'reverse', once })
+    let state = initialState(level)
+    const first = transitioned(applyAction(level, state, { type: 'walk', tileId: '2,0,1' }))
+    expect(first.plate).toBe('pad')
+    expect(first.moved).toEqual(['reverse', 'indirect'])
+    expect(first.state.rotator.reverse).toBe(1)
+    expect(first.state.spentPlates).toEqual(once ? ['pad'] : [])
+    state = transitioned(applyAction(level, first.state, { type: 'walk', tileId: '2,0,0' })).state
+    const second = transitioned(applyAction(level, state, { type: 'walk', tileId: '2,0,1' }))
+    expect(second.moved).toEqual(once ? [] : ['reverse', 'indirect'])
+    expect(second.state.rotator.reverse).toBe(once ? 1 : 2)
+  })
+
+  it('经过压板不停下不会触发', () => {
+    const level = withGears()
+    level.mechanisms.push({ type: 'plate', id: 'pad', tile: [1, 0, 0], target: 'drive', once: true })
+    const result = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: '2,0,0' }))
+    expect(result.plate).toBeNull()
+    expect(result.moved).toEqual([])
+    expect(result.state.spentPlates).toEqual([])
+  })
+
+  it.each(['rotator', 'mover'] as const)('乘坐 %s 时格子编号不变，位置随机关变化并收集机关上的光点', (type) => {
+    const level = defineLevel({
+      id: `ride-${type}`,
+      title: '乘坐测试',
+      chapter: 2,
+      solution: [],
+      build: (b) => {
+        b.path([0, 0, 0], 'sand')
+        b.path([9, 0, 0], 'sand')
+        const handle = { block: [0, 0, 0] as [number, number, number], face: 'z' as const }
+        if (type === 'rotator') b.rotator({ id: 'ride', pivot: [2, 0, 0], blocks: [{ offset: [-1, 0, 0] }], handle })
+        else
+          b.mover({ id: 'ride', origin: [1, 0, 0], axis: 'y', stops: [0, 2], blocks: [{ offset: [0, 0, 0] }], handle })
+        b.orb({ mechanism: 'ride', block: 0 })
+        b.start([0, 0, 0])
+        b.goal([9, 0, 0])
+      },
+    })
+    const walk = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: 'ride#0' }))
+    expect(walk.collected).toEqual(['orb-0'])
+    const ride = transitioned(applyAction(level, walk.state, { type: 'operate', mechanism: 'ride' }))
+    expect(ride.state.at).toBe('ride#0')
+    expect(tilesOf(level, ride.state).get(ride.state.at)?.pos).toEqual(type === 'rotator' ? [2, 0, 1] : [1, 2, 0])
+    expect(ride.collected).toEqual([])
+    expect(ride.state.orbs).toEqual(['orb-0'])
+    expect(initialState({ ...level, start: [1, 0, 0] }).at).toBe('ride#0')
+  })
+
+  it('被联动的机关也能带着小人移动', () => {
+    const level = withGears()
+    const state = { ...initialState(level), at: 'reverse#0' }
+    const result = transitioned(applyAction(level, state, { type: 'operate', mechanism: 'drive' }))
+    expect(result.state.at).toBe('reverse#0')
+    expect(tilesOf(level, result.state).get('reverse#0')?.pos).toEqual([15, 0, 1])
+  })
+})
+
+describe('可达路线、合法动作与状态键', () => {
+  it('所有目标路线与 findPath 完全一致，包括等长分岔、错觉连接和不可达路面', () => {
+    const level = fixture((b) => b.path([99, 0, 99], 'sand'))
+    const initial = initialState(level)
+    const tiles = tilesOf(level, initial)
+    const graph = buildGraph([...tiles.values()], occupiedOf(level, initial))
+    for (const at of tiles.keys()) {
+      const state = { ...initial, at }
+      const routes = reachableFrom(level, state)
+      for (const target of tiles.keys()) {
+        expect(routes.get(target) ?? null).toEqual(findPath(graph, at, target))
+      }
+    }
+  })
+
+  it('每个列出的动作都合法，不包含当前位置', () => {
+    const level = withGears()
+    const state = initialState(level)
+    const actions = legalActions(level, state)
+    expect(actions).not.toContainEqual({ type: 'walk', tileId: state.at })
+    expect(actions).toContainEqual({ type: 'walk', tileId: '6,2,2' })
+    for (const action of actions) expect(applyAction(level, state, action)).not.toBeNull()
+  })
+
+  it.each(levels)('旧关卡 $id 的标准解法在规则层也能完成，路线与现有寻路一致', (level) => {
+    let state = initialState(level)
+    for (const step of level.solution) {
+      const before = structuredClone(state)
+      if (step.type === 'walk') {
+        const tiles = tilesOf(level, state)
+        const target = [...tiles.values()].find((tile) => cellId(tile.pos) === cellId(step.to))
+        expect(target).toBeDefined()
+        if (!target) throw new Error('解法目标不是路面')
+        const graph = buildGraph([...tiles.values()], occupiedOf(level, state))
+        const result = transitioned(applyAction(level, state, { type: 'walk', tileId: target.id }))
+        expect(result.route).toEqual(findPath(graph, state.at, target.id))
+        expect(state).toEqual(before)
+        state = result.state
+      } else {
+        const result = transitioned(applyAction(level, state, step))
+        expect(state).toEqual(before)
+        state = result.state
+      }
+    }
+    expect(state.won).toBe(true)
+  })
+
+  it('通关后没有合法动作，直接调用状态转移也被拒绝', () => {
+    const level = withGears()
+    const state = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: '3,0,0' })).state
+    expect(legalActions(level, state)).toEqual([])
+    expect(applyAction(level, state, { type: 'walk', tileId: '2,0,0' })).toBeNull()
+    expect(applyAction(level, state, { type: 'operate', mechanism: 'drive' })).toBeNull()
+  })
+
+  it('状态键与对象或集合插入顺序无关，但包含全部规则状态', () => {
+    const state: GameState = {
+      at: '0,0,0',
+      rotator: { b: 1, a: 2 },
+      mover: { d: { stopIndex: 1, direction: -1 }, c: { stopIndex: 0, direction: 1 } },
+      orbs: ['orb-2', 'orb-1'],
+      spentPlates: ['z', 'a'],
+      won: false,
+    }
+    const reordered: GameState = {
+      ...state,
+      rotator: { a: 2, b: 1 },
+      mover: { c: state.mover.c, d: state.mover.d },
+      orbs: ['orb-1', 'orb-2'],
+      spentPlates: ['a', 'z'],
+    }
+    expect(stateKey(state)).toBe(stateKey(reordered))
+    const changes: Partial<GameState>[] = [
+      { at: '1,0,0' },
+      { rotator: { ...state.rotator, a: 3 } },
+      { mover: { ...state.mover, d: { stopIndex: 0, direction: -1 } } },
+      { mover: { ...state.mover, d: { stopIndex: 1, direction: 1 } } },
+      { orbs: ['orb-1'] },
+      { spentPlates: ['a'] },
+      { won: true },
+    ]
+    for (const change of changes) expect(stateKey({ ...state, ...change })).not.toBe(stateKey(state))
+  })
+})

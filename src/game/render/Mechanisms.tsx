@@ -163,12 +163,14 @@ function RotatorView({
           onSelect={onSelect}
         />
       </group>
-      <Handle
-        position={handlePosition(rotator.handle.block, rotator.handle.face)}
-        rotationY={rotator.handle.face === 'x' ? Math.PI / 2 : 0}
-        onClick={onCrank}
-        crankRef={crankRef}
-      />
+      {rotator.handle && (
+        <Handle
+          position={handlePosition(rotator.handle.block, rotator.handle.face)}
+          rotationY={rotator.handle.face === 'x' ? Math.PI / 2 : 0}
+          onClick={onCrank}
+          crankRef={crankRef}
+        />
+      )}
     </>
   )
 }
@@ -379,14 +381,16 @@ function MoverView({
           onSelect={onSelect}
         />
       </group>
-      <Lever
-        position={handlePosition(mover.handle.block, mover.handle.face)}
-        rotationY={mover.handle.face === 'x' ? Math.PI / 2 : 0}
-        sim={sim}
-        mechanismId={mover.id}
-        interactive={interactive}
-        onBlocked={onBlocked}
-      />
+      {mover.handle && (
+        <Lever
+          position={handlePosition(mover.handle.block, mover.handle.face)}
+          rotationY={mover.handle.face === 'x' ? Math.PI / 2 : 0}
+          sim={sim}
+          mechanismId={mover.id}
+          interactive={interactive}
+          onBlocked={onBlocked}
+        />
+      )}
     </>
   )
 }
