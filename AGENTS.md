@@ -15,11 +15,12 @@ Seemingly（中文名：积木错位）是一款浏览器里的等距视角解�
 | 3 | [docs/architecture.md](docs/architecture.md) | 写代码前读。目标架构、接口定义、目录规则 |
 | 4 | [docs/design.md](docs/design.md) | 涉及玩法、机关、界面流程时读 |
 | 5 | [docs/level-design.md](docs/level-design.md) | 制作或修改关卡时必读 |
-| 6 | [docs/art-direction.md](docs/art-direction.md) | 涉及画面、角色、配色、界面样式时读 |
+| 6 | `docs/levels/level-XX.md` | 实现某一关时必读，这是该关的唯一依据 |
+| 7 | [docs/art-direction.md](docs/art-direction.md) | 涉及画面、角色、配色、界面样式时读 |
 
 ## 工作方式
 
-1. **一次只做一个任务**。从 `docs/roadmap.md` 里按顺序取第一个未完成的任务，不要跳着做，也不要顺手做别的任务。
+1. **一次只做一个任务**。从 `docs/roadmap.md` 里按顺序取第一个未完成的任务，不要跳着做，也不要顺手做别的任务。如果这个任务标着「设计者任务」，而用户没有明确指定由你来做，停下来告诉用户。
 2. **先读后写**。动手前先读任务涉及的现有文件，沿用其中的写法。
 3. **按验收标准自检**。任务完成的标准写在 roadmap 里，全部满足才算完成。
 4. **更新文档**。完成后在 roadmap 里勾选该任务；如果实现和文档描述不一致，同步修改文档。
@@ -51,8 +52,10 @@ npm run typecheck && npm run format:check && npm test && npm run build
 
 - **连通规则不可改**：两块路面的屏幕坐标 `(x - y, z - y)` 上下左右相邻即相连。不要加入「三维距离」「高度差」之类的额外判断。
 - **相机固定**：等距正交视角，方向 `(1, 1, 1)`，玩家不能旋转或缩放相机。所有「换个角度」的效果都通过机关旋转积木实现。
-- **机关运动期间**不接受行走指令；**小人站在机关积木上时**，该机关不能操作。
-- 关卡必须满足 [docs/level-design.md](docs/level-design.md) 里的全部校验，并附带可自动验证的解法。
+- **机关运动期间**不接受行走指令；**小人站在机关积木上时，机关照常运动并带着小人一起移动**（乘坐，D14）。
+- **游戏规则只写在 `src/game/core/rules.ts`**。模拟器、求解器、提示都调用它，不要在别处重复实现规则。
+- 关卡必须满足 [docs/level-design.md](docs/level-design.md) 里的全部校验和难度指标，并附带可自动验证的标准解法。
+- **不得自行设计或修改谜题**，不得为了让测试通过而修改 `src/game/levels/targets.ts`。关卡布局以 `docs/levels/` 中的设计稿为准；校验或指标不通过时，停下来反馈给用户。
 
 ### 代码
 
@@ -83,6 +86,9 @@ npm run typecheck && npm run format:check && npm test && npm run build
 
 - **错觉连接的遮挡**：屏幕上相邻的两块路面，靠下的那块必须离相机更近，否则会被另一块的侧面挡住一角。详见 [docs/level-design.md](docs/level-design.md#遮挡规则)。
 - **`-0`**：旋转计算可能得到 `-0`，测试比较坐标时先做 `v + 0` 归一化。
+- **路线必须一致**：规则层、求解器算出的行走路线必须和 `findPath` 完全相同，否则光点收集结果会不一致。用测试保证。
+- **求解器性能**：每个状态只做一次可达搜索，不要对每个目标格单独寻路；随机数用固定种子，不用 `Math.random`。
+- **测试环境没有 Web Audio**：音频只对 `theory.ts` 这类纯函数写单元测试，声音效果由用户试听确认。
 - **React Three Fiber 的点击**：只有绑定了事件的物体（或其父级绑定了事件）参与点击检测，没绑定事件的物体不会挡住点击。需要扩大点击范围时，统一用 `transparent`、`opacity={0}`、`depthWrite={false}` 的可见网格，不依赖 `visible={false}` 的行为。
 - **Three.js 版本变化**：`PCFSoftShadowMap` 已被移除，阴影直接用默认的 `shadows`。
 - **GitHub Pages 子路径**：站点部署在 `/Seemingly/` 下，资源路径一律用相对路径（`./`），不要写以 `/` 开头的绝对路径。

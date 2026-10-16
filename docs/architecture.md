@@ -1,6 +1,6 @@
 # 架构说明
 
-> M4 已完成：正式九关流程、合成音效与环境和弦均已接入。后续按路线图进行 M5 打磨与发布。
+> M0～M5 已完成首版九关。2026-10-16 起进行可玩性改版（[路线图 M6](roadmap.md#m6-可玩性改版)），本文的接口定义是改版的目标；与现有代码不一致时，以本文为准逐步改造。
 
 ## 技术栈
 
@@ -9,78 +9,83 @@
 | 构建 | Vite 8，开发端口 5180，`base: './'` |
 | 界面 | React 19 + TypeScript（严格模式） |
 | 3D | Three.js + React Three Fiber 9 + drei 10 |
-| 页面状态 | zustand（M1 引入） |
+| 页面状态 | zustand |
 | 测试 | Vitest |
 | 格式化 | Prettier（无分号、单引号、行宽 120） |
 | 部署 | GitHub Actions + GitHub Pages |
 
-## 目标架构
-
-### 目录
+## 目录
 
 ```text
+docs/levels/                   关卡设计稿 level-01.md … level-14.md（设计者编写）
 src/
 ├── main.tsx
 ├── app/                       页面与界面（React DOM）
 │   ├── App.tsx                按 store.screen 切换页面
 │   ├── store.ts               zustand：页面、当前关卡、存档、静音、画质
-│   ├── save.ts                本地存储读写，键名 seemingly:save:v1
+│   ├── save.ts                本地存储读写，键名 seemingly:save:v2
+│   ├── sounds.ts              模拟器事件 → 音效
 │   ├── screens/
-│   │   ├── TitleScreen.tsx
-│   │   ├── LevelSelect.tsx
+│   │   ├── TitleScreen.tsx    含评价总数
+│   │   ├── LevelSelect.tsx    按章分行，卡片含三项评价
 │   │   ├── PlayScreen.tsx     创建模拟器，挂载画布与 HUD
-│   │   └── Ending.tsx         同一游戏场景上的结尾文字与按钮
+│   │   └── Ending.tsx
 │   ├── hud/
-│   │   ├── Hud.tsx            关名、重新开始、选关、静音
+│   │   ├── Hud.tsx            关名、步数、光点、撤销、提示、重新开始、选关、静音
 │   │   ├── Toast.tsx
-│   │   └── CompleteBanner.tsx
+│   │   └── CompleteBanner.tsx 三项评价与步数
 │   └── styles.css
 ├── audio/                     Web Audio 合成，不依赖 React
-│   ├── engine.ts              AudioContext、主音量、静音
-│   ├── sfx.ts                 脚步、机关、走不通、点亮灯笼
-│   └── ambient.ts             环境和弦
+│   ├── engine.ts              AudioContext、主音量、压缩器、音乐与音效总线、静音
+│   ├── theory.ts              纯函数：音名、频率、各章和弦与音阶
+│   ├── reverb.ts              生成混响脉冲响应
+│   ├── music.ts               生成式环境音乐（调度器、铺底、低音、八音盒、换章）
+│   └── sfx.ts                 带音高的操作音
 └── game/
     ├── core/                  纯 TypeScript，禁止导入 three / react
     │   ├── iso.ts             屏幕坐标、连通、寻路、移动插值
-    │   ├── mechanisms.ts      转盘、平移台、压板的状态与积木位置计算
-    │   ├── sim.ts             LevelSim 模拟器
+    │   ├── mechanisms.ts      机关积木位置、平移台往返、联动展开
+    │   ├── rules.ts           规则层：游戏状态与瞬时状态转移
+    │   ├── sim.ts             LevelSim：在规则层上做动画、撤销
+    │   ├── solver.ts          求解器：最优解、难度指标、提示
     │   ├── visibility.ts      顶面可见性射线检测
     │   ├── validate.ts        关卡校验
-    │   ├── solve.ts           按解法运行模拟器
+    │   ├── solve.ts           按标准解法运行模拟器
     │   └── *.test.ts
     ├── levels/
-    │   ├── types.ts           关卡数据类型
-    │   ├── builders.ts        defineLevel 与搭建辅助函数
-    │   ├── index.ts           按顺序导出 9 个关卡
-    │   ├── level-00.ts … level-08.ts
-    │   └── levels.test.ts     对全部关卡运行校验
-    └── render/                Three.js / React Three Fiber
+    │   ├── types.ts
+    │   ├── builders.ts
+    │   ├── targets.ts         每关难度目标（设计者给出）
+    │   ├── index.ts           按顺序导出 14 关
+    │   ├── level-01.ts … level-14.ts
+    │   └── levels.test.ts     校验加难度指标
+    └── render/
         ├── Scene.tsx          一关的完整场景，每帧驱动模拟器
         ├── CameraRig.tsx
         ├── Lights.tsx
-        ├── Blocks.tsx         静态积木
-        ├── Mechanisms.tsx     转盘、平移台、压板、把手的显示
+        ├── Blocks.tsx
+        ├── Mechanisms.tsx     转盘、平移台、压板、把手；提示高亮
+        ├── Orbs.tsx           光点与收集动画
         ├── Character.tsx
-        ├── Lantern.tsx        终点灯笼
-        ├── Finale.tsx         最终关灯笼与塔的点亮
-        ├── ending.ts          结尾时序
-        ├── Decor.tsx          岛屿岩层、树、花、窗、云、光点
-        ├── quality.ts         画质档位
+        ├── Lantern.tsx        亮度随光点递增
+        ├── Finale.tsx
+        ├── ending.ts
+        ├── Decor.tsx
+        ├── quality.ts
         ├── materials.ts
         └── palette.ts
 ```
 
 依赖方向只能是：`app → render → core`、`app → audio`、`render → levels → core`。`core` 和 `levels` 不能导入 `render`、`app`、`audio`。
 
-### 关卡数据
+## 关卡数据
 
-`src/game/levels/types.ts` 的目标定义：
+`src/game/levels/types.ts`（在现有定义上的改动用注释标出）：
 
 ```ts
 export type Vec3 = [number, number, number]
 export type Axis = 'x' | 'y' | 'z'
-export type Face = 'x' | 'z' // 只允许可见的 +x、+z 两个侧面
-
+export type Face = 'x' | 'z'
 export type ColorName = 'sand' | 'terracotta' | 'rose' | 'teal' | 'tealLight' | 'plum' | 'cream'
 
 export interface BlockDef {
@@ -90,7 +95,7 @@ export interface BlockDef {
 }
 
 export interface MechBlockDef {
-  offset: Vec3 // 相对于转盘中心或平移台原点
+  offset: Vec3
   color?: ColorName // 默认 tealLight
   kind?: 'path' | 'solid' // 默认 path
 }
@@ -100,13 +105,20 @@ export interface HandleDef {
   face: Face
 }
 
+export interface LinkDef {
+  // 新增
+  target: string // 被联动的转盘或平移台
+  reverse?: boolean // 只对转盘有效：逆时针
+}
+
 export interface RotatorDef {
   type: 'rotator'
   id: string
-  pivot: Vec3 // 必须是一块静态积木，本身不转
+  pivot: Vec3
   blocks: MechBlockDef[]
   initialStep?: 0 | 1 | 2 | 3
-  handle: HandleDef
+  handle?: HandleDef // 改为可选：没有把手时只能被联动或压板触发
+  links?: LinkDef[] // 新增
 }
 
 export interface MoverDef {
@@ -114,75 +126,130 @@ export interface MoverDef {
   id: string
   origin: Vec3
   axis: Axis
-  stops: number[] // 沿 axis 的整数偏移，升序，如 [0, 2, 3]
-  initialStop?: number // stops 的下标，默认 0
+  stops: number[]
+  initialStop?: number
   blocks: MechBlockDef[]
-  handle: HandleDef
+  handle?: HandleDef // 改为可选
+  links?: LinkDef[] // 新增
 }
 
 export interface PlateDef {
   type: 'plate'
   id: string
-  tile: Vec3 // 必须是一块静态路面
-  target: string // 被触发的转盘或平移台的 id
+  tile: Vec3
+  target: string
   once?: boolean
 }
 
 export type MechanismDef = RotatorDef | MoverDef | PlateDef
 
-export interface IslandDef {
-  x: [number, number]
-  z: [number, number]
-  y: number
-  depth: number
-}
-
-export interface DecorDef {
-  islands: IslandDef[]
-  trees: Vec3[]
-  flowers: Vec3[]
-  windows: { pos: Vec3; face: Face }[]
-}
+export type OrbDef = // 新增
+  ({ tile: Vec3 } | { mechanism: string; block: number }) & { optional?: boolean }
 
 export type SolutionStep = { type: 'walk'; to: Vec3 } | { type: 'operate'; mechanism: string }
 
 export interface LevelDef {
-  id: string // 'level-00' … 'level-08'
-  title: string // 中文关名
+  id: string // 'level-01' … 'level-14'
+  title: string
+  chapter: 1 | 2 | 3 | 4 // 新增
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
+  orbs: OrbDef[] // 新增，可为空数组
   start: Vec3
   goal: Vec3
   decor: DecorDef
-  hints?: string[] // 底部操作提示，只在教学关使用
+  hints?: string[]
   solution: SolutionStep[]
-  ending?: { lanterns: Vec3[]; tower: Vec3[] } // 最终关布景，第一盏灯笼为终点
+  ending?: EndingDef // 最终关：14 盏灯笼与塔
 }
 ```
 
 约定：
 
-- 静态路面的格子编号是 `"x,y,z"`，机关积木的编号是 `"机关id#下标"`。
-- 转盘积木的世界坐标 = `pivot + rotateOffset(offset, step)`。
-- 平移台积木的世界坐标 = `origin + offset + 轴方向单位向量 × stops[stopIndex]`。
-- `palette.ts` 必须为每个 `ColorName` 提供颜色。
+- 静态路面的格子编号是 `"x,y,z"`，机关积木的编号是 `"机关id#下标"`。机关积木的编号与位置无关，所以小人乘坐时编号不变。
+- 光点编号：`orb-0`、`orb-1`……按 `orbs` 数组顺序；光点所在格子编号按上一条规则。光点不能放在起点。
+- `builders.ts` 新增 `orb(def)`，`defineLevel` 新增 `chapter` 参数。
 
-### 模拟器
+`src/game/levels/targets.ts`：
 
-`src/game/core/sim.ts` 是唯一的游戏逻辑来源。渲染层、界面和测试都只通过它读写游戏状态。
+```ts
+export interface LevelTarget {
+  minActions: number // 精确值，同时作为「步数」评价的标准
+  minActionsAll: number // 精确值
+  reachableStatesMin?: number
+  randomWin?: { steps: number; maxRate: number }
+  illusionsMin: number
+  tradeoffsMin?: number
+}
+
+export const targets: Record<string, LevelTarget>
+```
+
+`targets.ts` 由设计者根据关卡设计稿填写，实现者不得为通过测试而修改。
+
+## 规则层
+
+`src/game/core/rules.ts` 定义游戏状态和**瞬时**的状态转移，不涉及时间和动画。模拟器、求解器、提示、标准解法验证都调用它，保证规则只有一份。
+
+```ts
+export interface GameState {
+  at: string // 小人所在格子编号
+  rotator: Record<string, number> // 档位，0～3
+  mover: Record<string, { stopIndex: number; direction: 1 | -1 }>
+  orbs: string[] // 已收集的光点编号，升序
+  spentPlates: string[] // 已用掉的一次性压板编号，升序
+  won: boolean
+}
+
+export type Action = { type: 'walk'; tileId: string } | { type: 'operate'; mechanism: string }
+
+export interface Transition {
+  state: GameState
+  route: string[] // walk：经过的格子（不含起点）；operate：空
+  collected: string[] // 本次收集的光点
+  moved: string[] // 本次运动的机关（含联动、压板触发）
+  plate: string | null // 本次触发的压板
+  goalLocked: number // 走到灯笼但必需光点不足时，缺少的数量；否则为 0
+}
+
+export function initialState(level: LevelDef): GameState
+export function tilesOf(level: LevelDef, state: GameState): Map<string, Tile>
+export function occupiedOf(level: LevelDef, state: GameState): Set<string>
+export function reachableFrom(level: LevelDef, state: GameState): Map<string, string[]> // 目标格 → 路线
+export function legalActions(level: LevelDef, state: GameState): Action[]
+export function applyAction(level: LevelDef, state: GameState, action: Action): Transition | null // 非法动作返回 null
+export function stateKey(state: GameState): string
+```
+
+规则：
+
+- **walk**：目标必须可达且不是当前格。路线与 `findPath` 完全一致（`reachableFrom` 必须给出相同路线，用测试保证）。沿路线进入的每一格，若有未收集的光点则收集。路线终点：
+  - 是终点且必需光点已齐：`won = true`；
+  - 是终点但必需光点不齐：`goalLocked = 缺少数量`；
+  - 是压板：按压板规则触发目标机关（等同 operate，含联动）。
+- **operate**：机关必须有把手。触发集合 = 该机关 + 其 `links` 中的机关（只展开一层）。转盘档位 +1（`reverse` 时 −1，取模 4）；平移台按往返规则前进一站。
+- **乘坐**无需特殊处理：小人的格子编号不变，位置随机关状态重新计算。
+- `won` 为真后不再有合法动作。
+
+## 模拟器
+
+`src/game/core/sim.ts` 在规则层之上负责动画、事件和撤销。
 
 ```ts
 export type Command = { type: 'walk'; tileId: string } | { type: 'operate'; mechanism: string }
 
-export type CommandResult = 'ok' | 'busy' | 'unreachable' | 'standing-on-mechanism' | 'unknown-target'
+export type CommandResult = 'ok' | 'busy' | 'unreachable' | 'no-handle' | 'unknown-target'
 
 export type SimEvent =
   | { type: 'walk-start'; route: string[] }
-  | { type: 'step'; tileId: string } // 每到达一格
+  | { type: 'step'; tileId: string }
+  | { type: 'orb'; id: string } // 新增：动画走到光点格时发出
+  | { type: 'goal-locked'; missing: number } // 新增
   | { type: 'mechanism-start'; id: string }
-  | { type: 'mechanism-tick'; id: string } // 转盘每 90 度、平移台每 1 格
+  | { type: 'mechanism-tick'; id: string }
   | { type: 'mechanism-end'; id: string }
   | { type: 'plate'; id: string; triggered: boolean }
+  | { type: 'undo' } // 新增
   | { type: 'won' }
 
 export class LevelSim {
@@ -191,45 +258,80 @@ export class LevelSim {
   readonly status: 'playing' | 'won'
 
   command(cmd: Command): CommandResult
-  update(dt: number): SimEvent[] // dt 单位秒，内部上限 1/30
-  isIdle(): boolean // 没有行走、没有机关在动
+  update(dt: number): SimEvent[]
+  isIdle(): boolean
 
-  tiles(): Map<string, Tile> // 当前静止状态下的全部路面
+  undo(): boolean // 机关运动中或没有记录时返回 false
+  canUndo(): boolean
+  steps(): number // = 撤销记录长度
+  state(): Readonly<GameState> // 当前已提交的规则状态
+  orbProgress(): { required: number; requiredCollected: number; total: number; collected: number }
+
+  tiles(): Map<string, Tile>
   tileAt(pos: Vec3): Tile | undefined
   characterPose(): { position: Vec3; heading: number; walking: boolean }
   mechanismPose(id: string): { rotationY: number } | { offset: Vec3 }
+  orbPose(id: string): { position: Vec3; collected: boolean }
 }
 ```
 
 行为要求：
 
-- `command` 立即返回结果，不推进时间；动作在后续的 `update` 中进行。
-- 机关运动中或小人行走中，`operate` 返回 `busy`；机关运动中，`walk` 返回 `busy`；小人行走中发出新的 `walk`，在当前这一格走完后改走新路线。
-- 小人所在格子属于目标机关时，`operate` 返回 `standing-on-mechanism`。
-- 压板在小人停在其上、路线走完时触发，规则见[设计稿](design.md#压板)。
-- 抵达终点且路线走完时，产生 `won` 事件，此后拒绝所有指令。
-- 所有时长常量（行走速度、动画时长）定义在 `sim.ts` 顶部，和设计稿一致。
+- `command` 在空闲时调用 `applyAction` 得到转移结果，把动作前的状态压入撤销记录，然后按结果播放动画；动画结束时提交新状态。
+- 小人行走中发出新的 `walk`：当前这一格走完后改走新路线，替换撤销记录中的最后一项（不增加步数）。
+- 行走中或机关运动中，`operate` 返回 `busy`；机关运动中，`walk` 返回 `busy`。
+- 多个机关同时运动（联动），全部结束后才发出最后一个 `mechanism-end` 并接受新指令。
+- **乘坐**：小人所在格属于正在运动的机关时，`characterPose` 按该机关当前动画姿态计算小人位置；转盘还要把转过的角度加到朝向上。
+- 撤销立即恢复状态，不播放动画，发出 `undo` 事件。
+- 所有时长常量定义在 `sim.ts` 顶部，和设计稿一致。
 
-### 渲染与驱动
+## 求解器
 
-- `PlayScreen` 用 `useMemo` 按关卡和重开次数创建 `LevelSim`，传给 `Scene`。
-- `Scene` 的 `useFrame` 是**唯一**调用 `sim.update(dt)` 的地方。返回的事件交给 `PlayScreen` 传入的回调，回调负责播放音效和更新界面。
-- 渲染组件每帧从 `characterPose()`、`mechanismPose()` 读取位置，写到 `ref` 上，不经过 React 状态。
-- 机关积木作为一个组渲染：转盘组放在 `pivot`，设置 `rotation.y`；平移台组放在 `origin`，设置 `position` 偏移。
-- 点击路面调用 `sim.command({ type: 'walk', tileId })`；点击把手调用 `sim.command({ type: 'operate', mechanism })`；返回值不是 `ok` 时显示对应提示。
-
-### 结尾
-
-最终关在 `ending` 数据中列出九盏灯笼与序章塔的静态积木位置。通关时切换到 `ending` 页面状态，但 `App` 对 `play` 和 `ending` 共用同一个 `PlayScreen` 挂载分支，保留 Canvas、模拟器和相机。场景停止漂浮，终点灯笼先亮，其余每隔 0.45 秒点亮；全部亮后 0.6 秒照亮塔，再过 0.9 秒显示「谢谢游玩」和「回到标题」。`Finale` 每帧只累计 ref，在点亮阈值变化时更新 React 状态。发光材质由 `materials.ts` 缓存。
-
-### 页面状态
-
-`src/app/store.ts`：
+`src/game/core/solver.ts` 只依赖规则层。
 
 ```ts
+export interface LevelMetrics {
+  minActions: number | null // 无解为 null
+  minActionsAll: number | null
+  reachableStates: number
+  deadEndStates: number
+  illusions: number // 标准解法中的错觉连接次数
+  tradeoffs: number // 标准解法中的取舍次数
+}
+
+export function analyze(level: LevelDef): LevelMetrics
+export function randomWinRate(level: LevelDef, opts: { runs: number; maxActions: number; seed: number }): number
+export function nextHint(level: LevelDef, state: GameState): Action | null // 无法通关时返回 null
+```
+
+- 广度优先搜索全部可达状态；每个状态的行走动作用 `reachableFrom` 一次算出，不要对每个目标单独寻路。
+- 死局：建出状态图后，从所有通关状态反向搜索，搜不到的可达状态即死局。
+- 随机通关率用固定种子的伪随机数（如 mulberry32），不用 `Math.random`。
+- 「取舍」：一次操作前后，从小人当前位置可达的路面集合，既有新增又有减少。
+- 「错觉连接」：路线上相邻两格的三维坐标差不是水平单位向量。
+- 性能要求：每关 `analyze` 在测试中不超过 2 秒；提示在浏览器中不超过 100 毫秒。
+
+## 渲染与驱动
+
+- `PlayScreen` 用 `useMemo` 按关卡和重开次数创建 `LevelSim`，传给 `Scene`。
+- `Scene` 的 `useFrame` 是唯一调用 `sim.update(dt)` 的地方，事件交给 `PlayScreen` 的回调（音效、提示、横幅、HUD 数字）。
+- 渲染组件每帧从 `characterPose()`、`mechanismPose()`、`orbPose()` 读取位置，写到 `ref` 上。
+- HUD 的步数和光点数在 `step`、`orb`、`undo`、`mechanism-end` 事件后更新 React 状态，不每帧更新。
+- 撤销按钮调用 `sim.undo()`；提示按钮调用 `nextHint(level, sim.state())`，把结果交给 `Mechanisms` 或 `Blocks` 做 2 秒高亮，并在本局标记「用过提示」。
+
+## 页面状态与存档
+
+```ts
+interface LevelRecord {
+  done: boolean
+  allOrbs: boolean
+  bestSteps: number | null
+  parMet: boolean
+}
+
 interface SaveData {
-  version: 1
-  completed: string[] // 已通关的关卡 id
+  version: 2
+  levels: Record<string, LevelRecord>
   muted: boolean
 }
 
@@ -241,34 +343,29 @@ interface AppState {
   goTitle(): void
   goSelect(): void
   play(levelIndex: number): void
-  completeLevel(id: string): void // 写入存档
-  toggleMute(): void // 写入存档
+  completeLevel(id: string, result: { steps: number; allOrbs: boolean; usedHint: boolean }): void
+  toggleMute(): void
 }
 ```
 
-- 存档读写集中在 `save.ts`；读取失败或版本不符时使用空存档，不报错。
-- 画质初始值见 `render/quality.ts`：网址参数 `quality` 优先，其次粗指针设备为 `low`，其余为 `high`。
+- `completeLevel`：`done = true`；`allOrbs ||= result.allOrbs`；`bestSteps` 取较小值；`parMet ||= !usedHint && steps <= targets[id].minActions`。
+- 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。
 
-### 音频引擎
+## 音频
 
-`audio/engine.ts` 不依赖 React。模块加载只创建管理对象；`App` 在首次真实点击或键盘交互中调用 `unlock()` 创建并恢复唯一的 `AudioContext`。所有声音经过同一 master Gain（音量 0.28），存档静音值在解锁前应用。静音立即将 master 设为 0，取消静音用 0.015 秒时间常数恢复音量，避免突变；静音或上下文尚未运行时，`getBus()` 不提供输出，不排队补播声音。后续交互重试恢复挂起的上下文，音频能力缺失或恢复失败不阻断游戏。
+- `engine.ts`：唯一的 `AudioContext`，首次真实交互时解锁。信号链：音乐总线（0.18）和音效总线（0.5）→ 主音量（0.28）→ 压缩器 → 输出；混响作为发送效果，两条总线都有发送量。静音时主音量归零并停止音乐调度。
+- `theory.ts`：纯函数与数据，可单元测试。MIDI 编号与频率换算；四章的和弦进行与音阶，见[设计稿](design.md#音乐)；给定章节和时间返回当前和弦。
+- `reverb.ts`：用双声道指数衰减噪声生成 2.5 秒脉冲响应，交给 `ConvolverNode`。
+- `music.ts`：`MusicPlayer`，提供 `start(chapter)`、`setChapter(chapter)`（3 秒交叉淡化）、`stop()`、`currentChord()`、`currentScale()`。用前瞻调度：每 100 毫秒安排接下来 0.3 秒内的音符。同一时刻最多 12 个发声音源。
+- `sfx.ts`：`step`、`mechanism`、`orb`、`lantern`、`unreachable`、`undo`、`goalLocked`，音高取自 `music.currentChord()` 和 `currentScale()`；音乐未启动时使用第 1 章的和弦。
+- `app/sounds.ts`：把模拟器事件映射到音效：`step`→脚步，`mechanism-tick`→机关，`orb`→光点，`goal-locked`→提醒音，`undo`→撤销，`won`→灯笼。
+- 删除首版的 `ambient.ts`。
 
-音效由页面层的 `app/sounds.ts` 将模拟器 `step`、`mechanism-tick`、`won` 事件分别映射到脚步、机关和灯笼声。`Scene` 只上报事件、不可达结果与结尾点灯，不导入音频模块；通关负责第一盏灯，其余八盏由 `Finale` 的点亮阈值各触发一次。
+## 结尾
 
-`audio/sfx.ts` 的合成参数（均经过 master）：
+最终关在 `ending` 中列出 14 盏灯笼与塔的静态积木位置，其余时序沿用首版：终点灯笼先亮，其余每隔 0.45 秒点亮；全部亮后 0.6 秒照亮塔，再过 0.9 秒显示「谢谢游玩」和「回到标题」。
 
-| 声音 | 合成 | 时长与音量 |
-| --- | --- | --- |
-| 脚步 | 850 Hz 低通噪声 | 35 ms，峰值增益 0.065 |
-| 机关 | 160→65 Hz 三角波，叠加 600 Hz 低通噪声 | 140 ms，三角波 0.075、噪声 0.045 |
-| 走不通 | 440→220 Hz 下行正弦音 | 300 ms，峰值增益 0.09 |
-| 灯笼 | 523.25、659.25、783.99 Hz 正弦琶音 | 每音 360 ms，间隔 120 ms，峰值增益 0.12 |
-
-每个短音都有起落包络并预定停止，结束后断开音源、滤波器和增益节点；噪声缓存在对应上下文中。静音时不创建新音源。
-
-`audio/ambient.ts` 只维持一份和弦：130.81、164.81、196 Hz 三个正弦波等量混合，0.8 秒淡入；0.12 Hz 正弦 LFO 将环境增益在 0.07～0.1 之间缓慢起伏，再经过 master。`App` 在真实交互解锁完成后同步环境音，重复手势和切换页面不会叠加音源。静音先将 master 归零，再同步停止、断开三音和 LFO 的全部节点；取消静音重新淡入，卸载时释放，异步解锁完成后也不会重启已卸载的音源。
-
-### 画质档位
+## 画质档位
 
 | 项目 | 高 | 低 |
 | --- | --- | --- |
@@ -277,48 +374,41 @@ interface AppState {
 | 光点粒子 | 全量 | 减半 |
 | 云 | 3 朵 | 1 朵 |
 
-开启「减少动态效果」时，额外关闭场景漂浮、云朵移动和光点粒子。
+开启「减少动态效果」时，额外关闭场景漂浮、云朵移动和光点粒子；收集光点的飞行动画改为直接消失。
 
 ## 核心算法
 
 ### 屏幕坐标与连通
 
-积木 `(x, y, z)` 的屏幕坐标为 `(x - y, z - y)`，见 `screenKey`。`buildGraph`：
-
-1. 收集当前所有路面（静态路面加机关路面的当前位置）。
-2. 过滤掉顶上压着积木的格子。
-3. 屏幕坐标上下左右相邻的格子互相连通。
-
-`findPath` 做广度优先搜索，返回最少步数的路线。
+积木 `(x, y, z)` 的屏幕坐标为 `(x - y, z - y)`。`buildGraph` 收集当前所有路面，过滤顶上压着积木的格子，屏幕坐标上下左右相邻的格子互相连通；`findPath` 做广度优先搜索。
 
 ### 跨越错觉连接的移动
 
-两格的三维差可以分解为水平单位方向 `d` 加 `k × (1, 1, 1)`。`segmentPoint` 前半程沿 `d` 走到中点，过中点后切到目标一侧的等价位置继续走。两点只差 `k × (1, 1, 1)`，正交视角下投影相同，看不出跳变。
+两格的三维差分解为水平单位方向 `d` 加 `k × (1, 1, 1)`。`segmentPoint` 前半程沿 `d` 走到中点，过中点后切到目标一侧的等价位置继续走，正交视角下看不出跳变。
 
 ### 可见性检测
 
-`visibility.ts` 判断一个点沿 `(1, 1, 1)` 方向的射线是否碰到任何积木（射线与立方体的分轴相交测试），供关卡校验使用，规则见 [level-design.md](level-design.md#校验)。
+`visibility.ts` 判断一个点沿 `(1, 1, 1)` 方向的射线是否碰到任何积木，供关卡校验使用。
 
 ### 相机取景
 
-把所有积木（含机关所有状态下的位置和岛屿底部）投影到相机的右方向 `(1, 0, -1)/√2` 和上方向 `(-1, 2, -1)/√6`，求包围范围，设置中心和缩放；窗口尺寸变化时重新计算。
+把所有积木（含机关所有可达状态下的位置和岛屿底部）投影到相机的右方向 `(1, 0, -1)/√2` 和上方向 `(-1, 2, -1)/√6`，求包围范围，设置中心和缩放。
 
 ## 性能预算
 
-- 首次加载传输量（压缩后）不超过 1 MB。小样为 320 KB。
+- 首次加载传输量（压缩后）不超过 1 MB。
 - 集成显卡笔记本、中端手机保持 60 帧。
 - 单关绘制调用不超过 400 次；超出时，同色静态积木改用 `InstancedMesh`。
-- 所有积木共用一份几何体，材质按颜色缓存；不在渲染或每帧中新建几何体和材质。
+- 所有积木共用一份几何体，材质按颜色缓存。
 
-T5.1 的[性能检查记录](performance.md)包含九关两档画质的开局数据、实际解法全过程峰值及首屏 gzip 体积。终章最高 360 次调用，首屏约 326 KB，未触发实例化或拆包；软件渲染环境不能代替目标设备的 60 FPS 实机验证。
+首版九关的[性能检查记录](performance.md)：终章最高 360 次调用，首屏约 326 KB。改版后重新测量（T6.17）。
 
 ## 部署
 
-- `.github/workflows/pages.yml`：推送到 `main` 或提交 PR 时，执行类型检查、格式检查、测试和构建；只有推送到 `main` 时才发布到 GitHub Pages。
-- 仓库的 Pages 来源已设为 GitHub Actions。
-- 地址：`https://zzugbb.github.io/Seemingly/`（已上线）。
+- `.github/workflows/pages.yml`：推送到 `main` 或提交 PR 时，执行类型检查、格式检查、测试和构建；只有推送到 `main` 时才发布。
+- 地址：`https://zzugbb.github.io/Seemingly/`。
 
 ## 提交约定
 
 - 提交信息用中文，前缀沿用 `feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`chore:`。
-- 一个任务一个提交，提交信息里写上任务编号，例如 `feat: 实现转盘机关的模拟逻辑（T1.3）`。
+- 一个任务一个提交，提交信息里写上任务编号，例如 `feat: 规则层支持联动（T6.2）`。
