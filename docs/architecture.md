@@ -466,10 +466,12 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - `engine.ts`：唯一的 `AudioContext`，首次真实交互时解锁。信号链：音乐总线（0.18）和音效总线（0.5）→ 主音量（0.28）→ 压缩器 → 输出；混响作为发送效果，两条总线都有发送量。静音时主音量归零并停止音乐调度。
 - `theory.ts`：纯函数与数据，可单元测试。MIDI 编号与频率换算；五章的和弦进行与音阶，见[设计稿](design.md#音乐)；给定章节和时间返回当前和弦。
 - `reverb.ts`：用双声道指数衰减噪声生成 2.5 秒脉冲响应，交给 `ConvolverNode`。
+- 和弦铺底将每个音的双三角波合成到可循环的缓冲波形，低通与包络仍实时处理；每个上下文最多缓存 8 组波形。无需外部音频文件，换和弦及换章时仍可叠加淡化。引擎统一登记、释放音乐与音效音源，含预调度音源在内最多 12 个，超过时略过新音符。
 - `music.ts`：`MusicPlayer`，提供 `start(chapter)`、`setChapter(chapter)`（3 秒交叉淡化）、`stop()`、`currentChord()`、`currentScale()`。用前瞻调度：每 100 毫秒安排接下来 0.3 秒内的音符。同一时刻最多 12 个发声音源。
 - `sfx.ts`：`step`、`mechanism`、`orb`、`lantern`、`unreachable`、`undo`、`goalLocked`、`push`、`gate`、`patrol`，音高取自 `music.currentChord()` 和 `currentScale()`；音乐未启动时使用第 1 章的和弦。
 - `app/sounds.ts`：把模拟器事件映射到音效：`step`→脚步，`mechanism-tick`→机关，`orb`→光点，`goal-locked`→提醒音，`undo`→撤销，`push`→推动，`gate`→开关门，`patrol-move`→巡逻者，`won`→灯笼。
-- 删除首版的 `ambient.ts`。
+- 静音时立即停止全部音源并清理调度器，混响位于主音量之前，尾音也归零；取消静音时从暂停的和弦位置淡入。章内八音盒间隔随章节略作变化，均在 1.5～4 秒内，挑战关再按 90% 速度延长间隔。
+- 删除首版的 `ambient.ts`；旧的音频节点模拟测试随之移除，纯函数由 `theory.test.ts` 验证，音频生命周期及静音输出在真实浏览器中验证。巡逻者事件接线留到 T6.16。
 
 ## 结尾
 

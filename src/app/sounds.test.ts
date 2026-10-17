@@ -27,6 +27,27 @@ describe('模拟器音效接入', () => {
     expect(solveWithSound(2)).toEqual(['mechanism', 'step', 'step', 'step', 'step', 'step', 'step', 'lantern'])
   })
 
+  it('新增音效事件保留门的开关方向，非音效事件不发声', () => {
+    const events: Parameters<typeof playSimEvent>[0][] = [
+      { type: 'orb', id: 'orb-0' },
+      { type: 'goal-locked', missing: 1 },
+      { type: 'undo' },
+      { type: 'push', crate: 'crate-0' },
+      { type: 'gate', id: 'gate', open: true },
+      { type: 'gate', id: 'gate', open: false },
+      { type: 'mechanism-start', id: 'turn' },
+    ]
+    events.forEach(playSimEvent)
+    expect(vi.mocked(playSound).mock.calls).toEqual([
+      ['orb'],
+      ['goalLocked'],
+      ['undo'],
+      ['push'],
+      ['gate', { open: true }],
+      ['gate', { open: false }],
+    ])
+  })
+
   it('升降台跨两格发出两声机关，分段行走不多播起步或到位事件', () => {
     expect(solveWithSound(3)).toEqual(['step', 'step', 'mechanism', 'mechanism', 'step', 'step', 'step', 'lantern'])
   })

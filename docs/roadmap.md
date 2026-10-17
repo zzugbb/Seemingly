@@ -145,7 +145,7 @@ T3.4～T3.12 每关的验收：
 - [x] **T6.8 界面与存档**
   - HUD 增加步数、光点、撤销、提示（`app/hint.worker.ts` 与 `app/hints.ts`，见 [architecture.md](architecture.md#求解器)）；快捷键 `Z`、`Ctrl/⌘+Z`、`H`；通关横幅显示三项评价与「步数 / 最少」；选关页按章分行、显示评价，挑战行按 `isUnlocked` 显示（挑战列表为空时隐藏整行）；标题页显示评价总数；存档升级到 v2；新增提示文字（推不动、把手用完、单向格）。
   - 验收：`save.test.ts` 与 `store.test.ts` 覆盖 v1 读取只保留静音、v2 读写、`completeLevel` 的评价规则、主线与挑战关的解锁规则；375×667 截图中 HUD 不重叠。
-- [ ] **T6.9 生成式音乐与音效**
+- [x] **T6.9 生成式音乐与音效**
   - 按[设计稿](design.md#音乐)和 [architecture.md](architecture.md#音频) 重写音频：`theory.ts`、`reverb.ts`、`music.ts`、`sfx.ts`，`engine.ts` 增加总线、压缩器与混响发送，删除 `ambient.ts`。
   - 验收：`theory.test.ts` 覆盖五章和弦音与频率、按时间取和弦、脚步音循环；在浏览器中确认没有报错、静音后完全无声；**由用户试听确认**后再勾选。
 

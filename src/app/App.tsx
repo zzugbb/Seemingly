@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { ambient } from '../audio/ambient'
+import { music } from '../audio/music'
 import { audioEngine } from '../audio/engine'
 import { LevelSelect } from './screens/LevelSelect'
 import { PlayScreen } from './screens/PlayScreen'
 import { TitleScreen } from './screens/TitleScreen'
-import { useApp } from './store'
+import { levelLists, useApp } from './store'
 
 function hasWebGL2() {
   try {
@@ -20,17 +20,28 @@ export function App() {
   const screen = useApp((state) => state.screen)
   useEffect(() => {
     let active = true
-    audioEngine.setMuted(useApp.getState().save.muted)
+    const sync = () => {
+      const state = useApp.getState()
+      const level = levelLists[state.current.list][state.current.index]
+      const chapter = state.screen === 'title' ? 1 : (level?.chapter ?? 1)
+      const challenge = (state.screen === 'play' || state.screen === 'ending') && state.current.list === 'challenge'
+      audioEngine.setMuted(state.save.muted)
+      if (state.save.muted) music.stop()
+      else music.start(chapter, challenge)
+    }
+    sync()
     const unsubscribe = useApp.subscribe((state, previous) => {
-      if (state.save.muted !== previous.save.muted) {
-        audioEngine.setMuted(state.save.muted)
-        ambient.sync(audioEngine.getBus())
-      }
+      if (
+        state.save.muted !== previous.save.muted ||
+        state.current !== previous.current ||
+        state.screen !== previous.screen
+      )
+        sync()
     })
     const unlock = (event: Event) => {
       if (event.isTrusted) {
         void audioEngine.unlock().then(() => {
-          if (active) ambient.sync(audioEngine.getBus())
+          if (active) sync()
         })
       }
     }
@@ -38,7 +49,7 @@ export function App() {
     window.addEventListener('keydown', unlock, true)
     return () => {
       active = false
-      ambient.stop()
+      music.stop()
       unsubscribe()
       window.removeEventListener('click', unlock, true)
       window.removeEventListener('keydown', unlock, true)
