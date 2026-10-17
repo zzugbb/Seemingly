@@ -208,3 +208,100 @@ describe('登记难度目标与标准解法最优', () => {
     )
   })
 })
+
+describe('T6.6 结构、安全与规模', () => {
+  it('箱子引用机关路面通过，乘坐后头顶被挡也会定位箱子', () => {
+    const level = fixture((b) => {
+      b.mover({
+        id: 'lift',
+        origin: [5, 0, 0],
+        axis: 'y',
+        stops: [0, 2],
+        blocks: [{ offset: [0, 0, 0] }],
+        handle: { block: [0, 0, 1], face: 'z' },
+      })
+      b.crate({ mechanism: 'lift', block: 0 })
+    })
+    expect(validateLevel(level)).toEqual([])
+    level.blocks.push({ pos: [5, 3, 0], color: 'rose', kind: 'solid' })
+    expect(validateLevel(level)).toContainEqual(
+      expect.objectContaining({ check: '乘坐安全', cell: '5,2,0', detail: expect.stringContaining('crate-0') }),
+    )
+  })
+
+  it.each([
+    { tile: [99, 0, 0] as [number, number, number] },
+    { mechanism: 'missing', block: 0 },
+    { mechanism: 'drive', block: -1 },
+    { mechanism: 'drive', block: 1 },
+    { mechanism: 'drive', block: 0.5 },
+  ])('箱子引用必须有效：%j', (ref) => {
+    const level = withGear()
+    level.crates = [ref]
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '基本结构', cell: 'crate-0' }))
+  })
+
+  it.each(['起点', '终点', '门和箱子', '单向格和箱子', '箱子和箱子', '结构单向格'] as const)(
+    '拒绝元素在禁止的位置或互相重叠：%s',
+    (mode) => {
+      const level = fixture()
+      if (mode === '起点') level.mechanisms.push({ type: 'gate', id: 'gate', tile: level.start, mode: 'toggle' })
+      if (mode === '终点') level.mechanisms.push({ type: 'gate', id: 'gate', tile: level.goal, mode: 'toggle' })
+      if (mode === '门和箱子') {
+        level.mechanisms.push({ type: 'gate', id: 'gate', tile: [1, 0, 0], mode: 'toggle' })
+        level.crates = [{ tile: [1, 0, 0] }]
+      }
+      if (mode === '单向格和箱子') {
+        level.blocks.find((b) => b.pos[0] === 1)!.oneWay = '+a'
+        level.crates = [{ tile: [1, 0, 0] }]
+      }
+      if (mode === '箱子和箱子') level.crates = [{ tile: [1, 0, 0] }, { tile: [1, 0, 0] }]
+      if (mode === '结构单向格') level.blocks.push({ pos: [8, 0, 0], kind: 'solid', color: 'sand', oneWay: '+a' })
+      expect(validateLevel(level).some((issue) => issue.check === '基本结构')).toBe(true)
+    },
+  )
+
+  it.each(['按住控制转盘', '触发控制按住门', '联动按住门', '按住门带把手', '按住门设初始开关'] as const)(
+    '拒绝不匹配的门与压板配置：%s',
+    (mode) => {
+      const level = withGear()
+      level.mechanisms.push({ type: 'gate', id: 'gate', tile: [1, 0, 0], mode: 'hold' })
+      const pad = level.mechanisms.find((item) => item.type === 'plate')!
+      const drive = level.mechanisms.find((item) => item.type === 'rotator')!
+      const gate = level.mechanisms.find((item) => item.type === 'gate')!
+      if (pad.type !== 'plate' || drive.type !== 'rotator' || gate.type !== 'gate') throw new Error('缺少机关')
+      if (mode === '按住控制转盘') pad.mode = 'hold'
+      if (mode === '触发控制按住门') pad.target = 'gate'
+      if (mode === '联动按住门') drive.links = [{ target: 'gate' }]
+      if (mode === '按住门带把手') gate.handle = { block: [0, 0, 1], face: 'z' }
+      if (mode === '按住门设初始开关') gate.initiallyOpen = true
+      expect(validateLevel(level).some((issue) => issue.check === '基本结构')).toBe(true)
+    },
+  )
+
+  it.each([-1, 0.5, Infinity])('把手次数必须是非负整数：%s', (uses) => {
+    const level = withGear()
+    const drive = level.mechanisms.find((item) => item.type === 'rotator')!
+    if (drive.type !== 'rotator') throw new Error('缺少转盘')
+    drive.handle!.uses = uses
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '基本结构', cell: 'drive' }))
+  })
+
+  it.each(['箱子', '光点', '主线机关', '挑战机关'] as const)('限制元素数量：%s', (mode) => {
+    const level = fixture()
+    if (mode === '箱子') level.crates = Array.from({ length: 3 }, () => ({ tile: [1, 0, 0] }))
+    if (mode === '光点') level.orbs = Array.from({ length: 5 }, () => ({ tile: [1, 0, 0] }))
+    if (mode === '主线机关' || mode === '挑战机关') {
+      level.challenge = mode === '挑战机关'
+      level.mechanisms = Array.from({ length: level.challenge ? 6 : 5 }, (_, index) => ({
+        type: 'mover',
+        id: `lift-${index}`,
+        origin: [5, 0, 0],
+        axis: 'y',
+        stops: [0, 1],
+        blocks: [],
+      }))
+    }
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '规模上限', cell: level.id }))
+  })
+})

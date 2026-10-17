@@ -420,6 +420,7 @@ export function Mechanisms({
             />
           )
         }
+        if (mechanism.type !== 'plate') return null
         return (
           <PlateView
             key={mechanism.id}

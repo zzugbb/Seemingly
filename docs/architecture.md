@@ -87,7 +87,7 @@ src/
 
 ## 关卡数据
 
-`src/game/levels/types.ts`。注释中「T6.2」表示已实现，「T6.6」「T6.16」表示对应任务中新增：
+`src/game/levels/types.ts`。注释中「T6.2」「T6.6」表示已实现，「T6.16」表示后续任务中新增：
 
 ```ts
 export type Vec3 = [number, number, number]
@@ -206,6 +206,7 @@ export interface LevelDef {
 - 光点编号：`orb-0`、`orb-1`……按 `orbs` 数组顺序；光点所在格子编号按上一条规则。光点不能放在起点。
 - 积木箱编号 `crate-0`……，巡逻者编号 `patrol-0`……，按数组顺序。
 - `builders.ts` 已有 `orb(def)` 与 `chapter`；T6.6 新增 `crate`、`gate`、`oneWay` 选项和 `challenge` 参数，T6.16 新增 `patrol`。
+- 单向路面的 builder 写法为 `b.path(pos, color, { oneWay: '+a' })`；未放箱子时 builder 生成空的 `crates` 数组。
 
 `src/game/levels/targets.ts`：
 
@@ -263,6 +264,9 @@ export interface Transition {
 export function initialState(level: LevelDef): GameState
 export function tilesOf(level: LevelDef, state: GameState): Map<string, Tile>
 export function occupiedOf(level: LevelDef, state: GameState): Set<string>
+export function tileRefId(ref: TileRef): string
+export function gatesOf(level: LevelDef, state: GameState, departing?: boolean): Record<string, boolean>
+export function walkGraph(level: LevelDef, state: GameState): Graph
 export function reachableFrom(level: LevelDef, state: GameState): Map<string, string[]> // 目标格 → 路线
 export function legalActions(level: LevelDef, state: GameState): Action[]
 export function applyAction(level: LevelDef, state: GameState, action: Action): Transition | null // 非法动作返回 null
@@ -278,6 +282,7 @@ export function stateKey(state: GameState): string
 - **operate**：机关必须有把手，且限次把手还有剩余次数。触发集合 = 该机关 + 其 `links` 中的机关（只展开一层）。转盘档位 +1（`reverse` 时 −1，取模 4）；平移台按往返规则前进一站；切换门开关取反。限次把手的已用次数 +1。
 - **乘坐**无需特殊处理：小人、积木箱、巡逻者的格子编号不变，位置随机关状态重新计算。
 - `won` 为真后不再有合法动作。
+- `gatesOf` 派生所有门的开关状态；`departing = true` 时忽略小人对按住压板的压力，供寻路与离开压板的动画使用。`walkGraph` 在 `buildGraph` 的邻居顺序上过滤不可进入的边，`findPath` 与 `reachableFrom` 使用同一张图。只有限次把手记录 `handleUses`，不限次把手不累加计数，以保持状态空间有限。
 
 T6.6 新增：
 
@@ -401,6 +406,7 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 - 状态键必须包含 `GameState` 的全部字段；新增字段时同步更新 `stateKey`，否则求解器会把不同状态当成同一个。
 - 「错觉连接」：路线上相邻两格的三维坐标差不是水平单位向量。
 - 性能要求：每关 `analyze` 在测试中不超过 2 秒；规模上限见 [level-design.md](level-design.md#规模上限)。
+- 所有状态搜索在发现第 30001 个主线状态或第 100001 个挑战状态前抛出 `StateLimitError`，校验器将其报告为「规模上限」，避免先穷举超大状态图再检查。元素数量限制在搜索前检查；巡逻者的数量与安全检查随 T6.16 接入。
 - `npm run metrics` 通过根目录 `metrics.mjs` 复用 Vite 加载 TypeScript 模块，输出全部关卡的指标表；随机模拟统一使用种子 `20261016`、500 次，步数预算采用目标表的 `randomWin.steps`，缺省为 30。`core/metrics.ts` 共享这些参数，供指标命令与难度校验使用。
 - `validateLevels(levels, targets)` 只对目标表登记的关卡强制检查难度指标和标准解法最优步数；首版九关不登记目标，仍接受结构、安全与可见性等校验。组合数超过 64 时，无重叠检查覆盖全部可达布局；乘坐安全始终检查全部可达状态；光点检查开局路面顶面中心的可见性。引用错误在模拟和求解前返回，避免无效引用导致异常。
 - **游戏内提示**：`src/app/hint.worker.ts` 是一个 Web Worker（Vite 原生支持，不需要依赖）。进入关卡时把关卡编号发给它，它调用 `buildPolicy` 算出整关的最优策略并保存；点击提示时把当前状态键发过去，立即得到下一步。策略还没算完时，提示按钮显示「思考中…」，算完后自动给出结果。`src/app/hints.ts` 封装与 Worker 的通信。
@@ -485,7 +491,7 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 
 ### 可见性检测
 
-`visibility.ts` 判断一个点沿 `(1, 1, 1)` 方向的射线是否碰到任何积木，供关卡校验使用。
+`visibility.ts` 判断一个点沿 `(1, 1, 1)` 方向的射线是否碰到任何积木，供关卡校验与规则层的遮挡断路判断使用。遮挡断路采样路面顶面中心，解法可见性校验仍采样顶面 5 点；积木箱、门不参与遮挡射线。
 
 ### 相机取景
 

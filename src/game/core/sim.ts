@@ -1,12 +1,14 @@
 import type { Axis, LevelDef, Vec3 } from '../levels/types'
 import { cellId, segmentHeading, segmentPoint, surfaceY, type Tile } from './iso'
-import { applyAction, initialState, tilesOf, type Action, type GameState, type Transition } from './rules'
+import { applyAction, gatesOf, initialState, tilesOf, type Action, type GameState, type Transition } from './rules'
 
 const WALK_SPEED = 2.6
 const ROTATOR_DURATION = 0.9
 const MOVER_CELL_DURATION = 0.45
 const MAX_DT = 1 / 30
 const ORB_HEIGHT = 0.35
+const PUSH_DURATION = 0.35
+const GATE_DURATION = 0.4
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
@@ -14,7 +16,8 @@ const axisOffset = (axis: Axis, amount: number): Vec3 =>
   axis === 'x' ? [amount + 0, 0, 0] : axis === 'y' ? [0, amount + 0, 0] : [0, 0, amount + 0]
 
 export type Command = Action
-export type CommandResult = 'ok' | 'busy' | 'unreachable' | 'no-handle' | 'unknown-target'
+export type CommandResult =
+  'ok' | 'busy' | 'unreachable' | 'no-handle' | 'unknown-target' | 'handle-used-up' | 'cannot-push'
 
 export type SimEvent =
   | { type: 'walk-start'; route: string[] }
@@ -25,6 +28,8 @@ export type SimEvent =
   | { type: 'mechanism-tick'; id: string }
   | { type: 'mechanism-end'; id: string }
   | { type: 'plate'; id: string; triggered: boolean }
+  | { type: 'push'; crate: string }
+  | { type: 'gate'; id: string; open: boolean }
   | { type: 'undo' }
   | { type: 'won' }
 
@@ -54,6 +59,20 @@ interface Snapshot {
   heading: number
 }
 
+interface GateMotion {
+  from: number
+  to: number
+  elapsed: number
+}
+interface PushMotion {
+  crate: string
+  from: Vec3
+  to: Vec3
+  playerFrom: Vec3
+  elapsed: number
+  started: boolean
+}
+
 export class LevelSim {
   readonly level: LevelDef
   private current: GameState
@@ -70,10 +89,15 @@ export class LevelSim {
   private heading = 0
   private shownOrbs: Set<string>
   private readonly orbTiles: Map<string, string>
+  private phase: 'action' | 'mechanisms' | 'held-gates' = 'action'
+  private pushMotion: PushMotion | null = null
+  private shownGates: Record<string, boolean>
+  private gateMotions = new Map<string, GateMotion>()
 
   constructor(level: LevelDef) {
     this.level = level
     this.current = initialState(level)
+    this.shownGates = gatesOf(level, this.current)
     this.displayAt = this.current.at
     this.shownOrbs = new Set(this.current.orbs)
     this.orbTiles = new Map(
@@ -118,6 +142,9 @@ export class LevelSim {
     this.segment = null
     this.announceRoute = false
     this.motions.clear()
+    this.pushMotion = null
+    this.gateMotions.clear()
+    this.shownGates = gatesOf(this.level, this.current)
     this.queuedEvents = [{ type: 'undo' }]
     return true
   }
@@ -131,16 +158,31 @@ export class LevelSim {
     const transition = applyAction(this.level, this.current, cmd)
     if (!transition) {
       if (cmd.type === 'walk') return 'unreachable'
+      if (cmd.type === 'push') return this.current.crates[cmd.crate] === undefined ? 'unknown-target' : 'cannot-push'
       const mechanism = this.level.mechanisms.find((item) => item.id === cmd.mechanism)
-      return !mechanism || mechanism.type === 'plate' ? 'unknown-target' : 'no-handle'
+      if (!mechanism || mechanism.type === 'plate') return 'unknown-target'
+      if (!mechanism.handle || (mechanism.type === 'gate' && mechanism.mode === 'hold')) return 'no-handle'
+      return 'handle-used-up'
     }
     this.history.push({ state: this.current, heading: this.heading })
     this.pending = transition
+    this.phase = 'action'
     if (cmd.type === 'walk') {
       this.walkState = this.current
       this.previousWalkState = null
       this.route = [...transition.route]
       this.announceRoute = true
+    } else if (transition.pushed) {
+      const tiles = this.tiles()
+      this.pushMotion = {
+        crate: transition.pushed.crate,
+        from: tiles.get(transition.pushed.from)!.pos,
+        to: tiles.get(transition.pushed.to)!.pos,
+        playerFrom: tiles.get(this.current.at)!.pos,
+        elapsed: 0,
+        started: false,
+      }
+      this.heading = segmentHeading(this.pushMotion.playerFrom, this.pushMotion.from)
     }
     return 'ok'
   }
@@ -151,10 +193,13 @@ export class LevelSim {
     if (!this.pending) return events
     const capped = Math.min(Math.max(dt, 0), MAX_DT)
     if (this.walkState) this.stepWalk(capped, events)
+    else if (this.pushMotion) this.stepPush(capped, events)
     else {
-      if (this.motions.size === 0) this.startMotions(events)
+      if (this.phase === 'action') this.startMotions(events)
       this.stepMotions(capped, events)
+      this.stepGates(capped)
     }
+    this.advancePhase(events)
     return events
   }
 
@@ -167,6 +212,16 @@ export class LevelSim {
   }
 
   characterPose(): { position: Vec3; heading: number; walking: boolean } {
+    if (this.pushMotion)
+      return {
+        position: segmentPoint(
+          this.pushMotion.playerFrom,
+          this.pushMotion.from,
+          Math.min(1, this.pushMotion.elapsed / PUSH_DURATION),
+        ),
+        heading: this.heading,
+        walking: true,
+      }
     if (this.segment)
       return {
         position: segmentPoint(this.segment.from, this.segment.to, this.segment.t),
@@ -220,11 +275,34 @@ export class LevelSim {
     return { position: [x, surfaceY(y) + ORB_HEIGHT, z], collected: this.shownOrbs.has(id) }
   }
 
+  cratePose(id: string): { position: Vec3 } {
+    if (this.pushMotion?.crate === id)
+      return {
+        position: segmentPoint(
+          this.pushMotion.from,
+          this.pushMotion.to,
+          Math.min(1, this.pushMotion.elapsed / PUSH_DURATION),
+        ),
+      }
+    const at = this.pending && this.phase !== 'action' ? this.pending.state.crates[id] : this.current.crates[id]
+    if (!at) throw new Error(`未知积木箱 ${id}`)
+    const [x, y, z] = this.tilePosition(at)
+    return { position: [x, surfaceY(y), z] }
+  }
+
+  gatePose(id: string): { open: number } {
+    const motion = this.gateMotions.get(id)
+    if (motion)
+      return { open: motion.from + (motion.to - motion.from) * easeInOut(Math.min(1, motion.elapsed / GATE_DURATION)) }
+    if (!(id in this.shownGates)) throw new Error(`未知开关门 ${id}`)
+    return { open: this.shownGates[id] ? 1 : 0 }
+  }
+
   private tilePosition(id: string): Vec3 {
     const motion = [...this.motions.values()].find((item) => id.startsWith(`${item.id}#`))
     if (motion) {
       const mechanism = this.level.mechanisms.find((item) => item.id === motion.id)!
-      if (mechanism.type !== 'plate') {
+      if (mechanism.type === 'rotator' || mechanism.type === 'mover') {
         const block = mechanism.blocks[Number(id.slice(motion.id.length + 1))]
         const pose = this.mechanismPose(motion.id)
         if ('rotationY' in pose && mechanism.type === 'rotator') {
@@ -279,12 +357,14 @@ export class LevelSim {
         this.announceRoute = false
       }
       const next = this.route.shift()!
+      this.animateGates(gatesOf(this.level, { ...this.walkState!, at: next }, true), events)
       const from = this.tiles().get(this.displayAt)!.pos
       const to = this.tiles().get(next)!.pos
       this.segment = { from, to, toId: next, t: 0 }
       this.heading = segmentHeading(from, to)
     }
     const segment = this.segment
+    this.stepGates(dt)
     if (!segment) {
       this.finishWalk(events)
       return
@@ -309,11 +389,31 @@ export class LevelSim {
     if (transition.plate) events.push({ type: 'plate', id: transition.plate, triggered: true })
     this.walkState = null
     this.previousWalkState = null
-    if (transition.moved.length > 0) this.startMotions(events)
-    else this.commit(events)
+    this.startMotions(events)
+  }
+
+  private stepPush(dt: number, events: SimEvent[]) {
+    const motion = this.pushMotion!
+    if (!motion.started) {
+      motion.started = true
+      events.push({ type: 'push', crate: motion.crate })
+      this.animateGates(gatesOf(this.level, { ...this.current, at: this.pending!.pushed!.from }, true), events)
+    }
+    this.stepGates(dt)
+    motion.elapsed += dt
+    if (motion.elapsed + 1e-8 < PUSH_DURATION) return
+    this.displayAt = this.pending!.state.at
+    events.push({ type: 'step', tileId: this.displayAt })
+    for (const id of this.pending!.collected) {
+      this.shownOrbs.add(id)
+      events.push({ type: 'orb', id })
+    }
+    this.pushMotion = null
+    this.startMotions(events)
   }
 
   private startMotions(events: SimEvent[]) {
+    this.phase = 'mechanisms'
     const next = this.pending!.state
     for (const id of this.pending!.moved) {
       const mechanism = this.level.mechanisms.find((item) => item.id === id)!
@@ -334,6 +434,9 @@ export class LevelSim {
           cells,
           duration: cells * MOVER_CELL_DURATION,
         })
+      } else if (mechanism.type === 'gate') {
+        if (mechanism.mode === 'toggle') this.animateGates({ [id]: next.gates[id] }, events)
+        continue
       }
       events.push({ type: 'mechanism-start', id })
     }
@@ -355,7 +458,50 @@ export class LevelSim {
         events.push({ type: 'mechanism-end', id: motion.id })
       }
     }
-    if ([...this.motions.values()].every((motion) => motion.done)) this.commit(events)
+  }
+
+  private animateGates(targets: Record<string, boolean>, events: SimEvent[]) {
+    for (const [id, open] of Object.entries(targets)) {
+      const to = open ? 1 : 0
+      const from = this.gatePose(id).open
+      const active = this.gateMotions.get(id)
+      if (active?.to === to) continue
+      if (from === to) {
+        if (active) {
+          this.gateMotions.delete(id)
+          this.shownGates[id] = open
+          events.push({ type: 'gate', id, open })
+        }
+        continue
+      }
+      this.gateMotions.set(id, { from, to, elapsed: 0 })
+      events.push({ type: 'gate', id, open })
+    }
+  }
+
+  private stepGates(dt: number) {
+    for (const [id, motion] of this.gateMotions) {
+      motion.elapsed += dt
+      if (motion.elapsed + 1e-8 < GATE_DURATION) continue
+      this.shownGates[id] = motion.to === 1
+      this.gateMotions.delete(id)
+    }
+  }
+
+  private advancePhase(events: SimEvent[]) {
+    if (
+      !this.pending ||
+      this.phase === 'action' ||
+      this.gateMotions.size > 0 ||
+      [...this.motions.values()].some((motion) => !motion.done)
+    )
+      return
+    if (this.phase === 'mechanisms') {
+      this.phase = 'held-gates'
+      this.animateGates(gatesOf(this.level, this.pending.state), events)
+      if (this.gateMotions.size > 0) return
+    }
+    this.commit(events)
   }
 
   private commit(events: SimEvent[]) {
@@ -365,6 +511,7 @@ export class LevelSim {
     this.current = result.state
     this.displayAt = this.current.at
     this.shownOrbs = new Set(this.current.orbs)
+    this.shownGates = gatesOf(this.level, this.current)
     this.pending = null
     this.motions.clear()
     if (result.goalLocked > 0) events.push({ type: 'goal-locked', missing: result.goalLocked })

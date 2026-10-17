@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { defineLevel } from '../levels/builders'
 import { levels } from '../levels'
 import { applyAction, initialState, legalActions, stateKey, type Action, type GameState } from './rules'
-import { analyze, buildPolicy, nextHint, randomWinRate } from './solver'
+import { analyze, buildPolicy, nextHint, randomWinRate, StateLimitError } from './solver'
+import { runSolution } from './solve'
+import { validateLevel } from './validate'
 
 const straight = defineLevel({
   id: 'solver-straight',
@@ -107,6 +109,50 @@ const followPolicy = (level: typeof straight, state: GameState, policy: Map<stri
 }
 
 describe('求解器指标与提示', () => {
+  it('推箱子压住按住压板后绕行过门，最优解需要推动且解法校验一致', () => {
+    const level = defineLevel({
+      id: 'solver-crate',
+      title: '推箱子测试',
+      chapter: 4,
+      solution: [
+        { type: 'push', crate: 'crate-0' },
+        { type: 'walk', to: [4, 0, 0] },
+      ],
+      build: (b) => {
+        for (let x = 0; x <= 4; x++) b.path([x, 0, 0], 'sand')
+        for (let x = 1; x <= 3; x++) b.path([x, 0, 1], 'sand')
+        b.crate({ tile: [1, 0, 0] })
+        b.plate({ id: 'pad', tile: [2, 0, 0], mode: 'hold', target: 'gate' })
+        b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'hold' })
+        b.start([0, 0, 0])
+        b.goal([4, 0, 0])
+      },
+    })
+    expect(analyze(level)).toMatchObject({ minActions: 2, minActionsAll: 2 })
+    expect(nextHint(level, initialState(level))).toEqual({ type: 'push', crate: 'crate-0' })
+    expect(followPolicy(level, initialState(level), buildPolicy(level))).toBe(2)
+    expect(runSolution(level).ok).toBe(true)
+    expect(validateLevel(level)).toEqual([])
+  })
+
+  it('主线搜索超过状态上限时停止，同一规模在挑战关允许的范围内', () => {
+    const level = defineLevel({
+      id: 'solver-limit',
+      title: '规模测试',
+      chapter: 5,
+      solution: [],
+      build: (b) => {
+        b.path([0, 0, 0], 'sand')
+        b.path([9, 0, 0], 'sand')
+        b.rotator({ id: 'drive', pivot: [8, 0, 0], blocks: [], handle: { block: [0, 0, 0], face: 'z', uses: 30000 } })
+        b.start([0, 0, 0])
+        b.goal([9, 0, 0])
+      },
+    })
+    expect(() => analyze(level)).toThrow(StateLimitError)
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '规模上限', cell: level.id }))
+    expect(analyze({ ...level, challenge: true })).toMatchObject({ reachableStates: 30001, minActions: null })
+  })
   it.each(fixtures)('$level.title：精确指标、第一步提示与两秒性能预算', (fixture) => {
     const start = performance.now()
     const metrics = analyze(fixture.level)

@@ -1,7 +1,7 @@
 import type { LevelDef, Vec3 } from '../levels/types'
 import { cellId } from './iso'
 import { moverBlocks, rotatorBlocks, type MoverCursor } from './mechanisms'
-import type { GameState } from './rules'
+import { applyAction, type GameState, type Action } from './rules'
 import { LevelSim, type CommandResult } from './sim'
 
 const MAX_FRAMES = 800
@@ -58,25 +58,28 @@ export function runSolution(level: LevelDef): SolutionRun {
   for (let index = 0; index < level.solution.length; index++) {
     const step = level.solution[index]
     if (!step) continue
-    if (step.type === 'operate') {
-      const result = sim.command({ type: 'operate', mechanism: step.mechanism })
-      if (result !== 'ok') return { ok: false, failedStep: index, result, cell: step.mechanism, walks, layouts }
-      if (!settle(sim)) return { ok: false, failedStep: index, result: 'stuck', cell: step.mechanism, walks, layouts }
-      layouts.push(placedBlocks(level, gearOf(sim.state())))
-      continue
+    const tile = step.type === 'walk' ? sim.tileAt(step.to) : undefined
+    const cell = step.type === 'walk' ? cellId(step.to) : step.type === 'push' ? step.crate : step.mechanism
+    if (step.type === 'walk' && !tile) return { ok: false, failedStep: index, result: 'no-tile', cell, walks, layouts }
+    const command: Action = step.type === 'walk' ? { type: 'walk', tileId: tile!.id } : step
+    const state = sim.state()
+    const transition = applyAction(level, state, command)
+    const result = sim.command(command)
+    if (result !== 'ok') return { ok: false, failedStep: index, result, cell, walks, layouts }
+    if (transition!.route.length > 0) {
+      const tiles = sim.tiles()
+      const blocks = placedBlocks(level, gearOf(state))
+      walks.push({
+        positions: [tiles.get(state.at)!.pos, ...transition!.route.map((id) => tiles.get(id)!.pos)],
+        blocks,
+      })
+      if (transition!.pushed)
+        walks.push({
+          positions: [tiles.get(transition!.pushed.from)!.pos, tiles.get(transition!.pushed.to)!.pos],
+          blocks,
+        })
     }
-
-    const tile = sim.tileAt(step.to)
-    if (!tile) return { ok: false, failedStep: index, result: 'no-tile', cell: cellId(step.to), walks, layouts }
-    const result = sim.command({ type: 'walk', tileId: tile.id })
-    if (result !== 'ok') return { ok: false, failedStep: index, result, cell: cellId(step.to), walks, layouts }
-    const at = sim.tiles().get(sim.state().at)!.pos
-    const preview = sim.update(0)
-    const started = preview.find((event) => event.type === 'walk-start')
-    const route = started?.type === 'walk-start' ? started.route : []
-    const positions = [at, ...route.map((id) => sim.tiles().get(id)?.pos ?? step.to)]
-    walks.push({ positions, blocks: placedBlocks(level, gearOf(sim.state())) })
-    if (!settle(sim)) return { ok: false, failedStep: index, result: 'stuck', cell: cellId(step.to), walks, layouts }
+    if (!settle(sim)) return { ok: false, failedStep: index, result: 'stuck', cell, walks, layouts }
     layouts.push(placedBlocks(level, gearOf(sim.state())))
   }
 

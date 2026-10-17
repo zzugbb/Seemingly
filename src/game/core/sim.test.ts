@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineLevel } from '../levels/builders'
+import { defineLevel, type LevelBuilder } from '../levels/builders'
 import { cellId, surfaceY } from './iso'
 import { applyAction, initialState } from './rules'
 import { levels } from '../levels'
@@ -380,5 +380,171 @@ describe('规则与动画状态一致', () => {
     }
     expect(sim.status).toBe('won')
     expect(sim.steps()).toBe(fixture.solution.length)
+  })
+})
+
+const newSimLevel = (build: (b: LevelBuilder) => void) =>
+  defineLevel({
+    id: 'sim-new',
+    title: '新机制动画',
+    chapter: 4,
+    solution: [],
+    build: (b) => {
+      for (let x = 0; x <= 4; x++) b.path([x, 0, 0], 'sand')
+      b.path([0, 0, 1], 'sand')
+      b.start([0, 0, 0])
+      b.goal([4, 0, 0])
+      build(b)
+    },
+  })
+
+describe('T6.6 推动、门与撤销', () => {
+  it('触发压板的门动画在行走结束后才开始计时', () => {
+    const level = newSimLevel((b) => {
+      b.plate({ id: 'pad', tile: [1, 0, 0], target: 'gate' })
+      b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'toggle' })
+    })
+    const sim = new LevelSim(level)
+    expect(sim.command({ type: 'walk', tileId: '1,0,0' })).toBe('ok')
+    for (let frame = 0; frame < 12; frame++) sim.update(1 / 30)
+    expect(sim.characterPose().position).toEqual([1, surfaceY(0), 0])
+    expect(sim.gatePose('gate').open).toBe(0)
+    for (let frame = 0; frame < 6; frame++) sim.update(1 / 30)
+    expect(sim.gatePose('gate').open).toBeCloseTo(0.5)
+    settle(sim)
+    expect(sim.state().gates.gate).toBe(true)
+  })
+  it('推动到按住压板后再播放开门，全部动画完成才提交状态，撤销恢复完整状态', () => {
+    const level = newSimLevel((b) => {
+      b.crate({ tile: [1, 0, 0] })
+      b.orb({ tile: [1, 0, 0] })
+      b.plate({ id: 'pad', tile: [2, 0, 0], target: 'gate', mode: 'hold' })
+      b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'hold' })
+    })
+    const sim = new LevelSim(level),
+      before = structuredClone(sim.state())
+    const expected = applyAction(level, sim.state(), { type: 'push', crate: 'crate-0' })!
+    expect(sim.command({ type: 'push', crate: 'crate-0' })).toBe('ok')
+    expect(sim.undo()).toBe(false)
+    expect(sim.command({ type: 'walk', tileId: '0,0,1' })).toBe('busy')
+    const events: SimEvent[] = []
+    for (let frame = 0; frame < 10; frame++) events.push(...sim.update(1 / 30))
+    expect(events[0]).toEqual({ type: 'push', crate: 'crate-0' })
+    expect(sim.gatePose('gate').open).toBe(0)
+    expect(sim.cratePose('crate-0').position[0]).toBeCloseTo(1 + 10 / 30 / 0.35)
+    expect(sim.state()).toEqual(before)
+    events.push(...sim.update(1 / 30))
+    expect(sim.cratePose('crate-0').position).toEqual([2, surfaceY(0), 0])
+    expect(events).toContainEqual({ type: 'orb', id: 'orb-0' })
+    expect(events).toContainEqual({ type: 'gate', id: 'gate', open: true })
+    for (let frame = 0; frame < 6; frame++) events.push(...sim.update(1 / 30))
+    expect(sim.gatePose('gate').open).toBeCloseTo(0.5)
+    expect(sim.undo()).toBe(false)
+    events.push(...settle(sim))
+    expect(sim.state()).toEqual(expected.state)
+    expect(sim.gatePose('gate').open).toBe(1)
+    expect(sim.steps()).toBe(1)
+    expect(sim.undo()).toBe(true)
+    expect(sim.state()).toEqual(before)
+    expect(sim.gatePose('gate').open).toBe(0)
+    expect(sim.cratePose('crate-0').position).toEqual([1, surfaceY(0), 0])
+    expect(sim.update(0)).toEqual([{ type: 'undo' }])
+  })
+
+  it('离开自己压住的压板时第一步开始关门，行走中撤销恢复开门', () => {
+    const level = newSimLevel((b) => {
+      b.plate({ id: 'pad', tile: [1, 0, 0], target: 'gate', mode: 'hold' })
+      b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'hold' })
+    })
+    const sim = new LevelSim(level)
+    expect(sim.command({ type: 'walk', tileId: '1,0,0' })).toBe('ok')
+    settle(sim)
+    expect(sim.gatePose('gate').open).toBe(1)
+    expect(sim.command({ type: 'walk', tileId: '4,0,0' })).toBe('unreachable')
+    expect(sim.command({ type: 'walk', tileId: '2,0,0' })).toBe('ok')
+    expect(sim.update(1 / 30)).toContainEqual({ type: 'gate', id: 'gate', open: false })
+    expect(sim.gatePose('gate').open).toBeLessThan(1)
+    expect(sim.state().at).toBe('1,0,0')
+    expect(sim.undo()).toBe(true)
+    expect(sim.gatePose('gate').open).toBe(1)
+    expect(sim.command({ type: 'walk', tileId: '2,0,0' })).toBe('ok')
+    settle(sim)
+    expect(sim.gatePose('gate').open).toBe(0)
+  })
+
+  it('切换门动画耗时0.4秒，限次耗尽返回原因，撤销恢复把手次数', () => {
+    const level = newSimLevel((b) =>
+      b.gate({ id: 'gate', tile: [2, 0, 0], mode: 'toggle', handle: { block: [0, 0, 0], face: 'z', uses: 1 } }),
+    )
+    const sim = new LevelSim(level)
+    expect(sim.command({ type: 'operate', mechanism: 'gate' })).toBe('ok')
+    const events: SimEvent[] = []
+    for (let frame = 0; frame < 6; frame++) events.push(...sim.update(1 / 30))
+    expect(events).toContainEqual({ type: 'gate', id: 'gate', open: true })
+    expect(sim.gatePose('gate').open).toBeCloseTo(0.5)
+    expect(sim.isIdle()).toBe(false)
+    expect(sim.command({ type: 'operate', mechanism: 'gate' })).toBe('busy')
+    expect(sim.undo()).toBe(false)
+    for (let frame = 0; frame < 6; frame++) sim.update(1 / 30)
+    expect(sim.isIdle()).toBe(true)
+    expect(sim.state().handleUses.gate).toBe(1)
+    expect(sim.command({ type: 'operate', mechanism: 'gate' })).toBe('handle-used-up')
+    expect(sim.steps()).toBe(1)
+    expect(sim.undo()).toBe(true)
+    expect(sim.state().handleUses.gate).toBe(0)
+    expect(sim.gatePose('gate').open).toBe(0)
+  })
+
+  it('推过错觉连接时屏幕位置连续，箱子推上机关后姿态随机关动画移动', () => {
+    const level = defineLevel({
+      id: 'sim-push-illusion',
+      title: '错觉推动动画',
+      chapter: 4,
+      solution: [],
+      build: (b) => {
+        b.path([0, 0, 0], 'sand')
+        b.path([1, 0, 0], 'sand')
+        b.path([0, 0, 1], 'sand')
+        b.mover({
+          id: 'lift',
+          origin: [4, 2, 2],
+          axis: 'y',
+          stops: [0, 2],
+          blocks: [{ offset: [0, 0, 0] }],
+          handle: { block: [0, 0, 0], face: 'z' },
+        })
+        b.crate({ tile: [1, 0, 0] })
+        b.start([0, 0, 0])
+        b.goal([0, 0, 1])
+      },
+    })
+    const sim = new LevelSim(level)
+    expect(sim.command({ type: 'push', crate: 'crate-0' })).toBe('ok')
+    for (let frame = 1; frame <= 10; frame++) {
+      sim.update(1 / 30)
+      const [x, y, z] = sim.cratePose('crate-0').position
+      expect(x - y + surfaceY(0)).toBeCloseTo(1 + frame / 30 / 0.35)
+      expect(z - y + surfaceY(0)).toBeCloseTo(0)
+    }
+    settle(sim)
+    expect(sim.cratePose('crate-0').position).toEqual([4, surfaceY(2), 2])
+    expect(sim.command({ type: 'operate', mechanism: 'lift' })).toBe('ok')
+    for (let frame = 0; frame < 10; frame++) sim.update(1 / 30)
+    expect(sim.cratePose('crate-0').position[1]).toBeGreaterThan(surfaceY(2))
+    expect(sim.cratePose('crate-0').position[1]).toBeLessThan(surfaceY(4))
+    settle(sim)
+    expect(sim.state().crates['crate-0']).toBe('lift#0')
+    expect(sim.cratePose('crate-0').position).toEqual([4, surfaceY(4), 2])
+    expect(sim.undo()).toBe(true)
+    expect(sim.cratePose('crate-0').position).toEqual([4, surfaceY(2), 2])
+    expect(sim.undo()).toBe(true)
+    expect(sim.cratePose('crate-0').position).toEqual([1, surfaceY(0), 0])
+  })
+
+  it('未知箱子与推不动的箱子返回原因，非法推动不计步', () => {
+    const sim = new LevelSim(newSimLevel((b) => b.crate({ tile: [2, 0, 0] })))
+    expect(sim.command({ type: 'push', crate: 'unknown' })).toBe('unknown-target')
+    expect(sim.command({ type: 'push', crate: 'crate-0' })).toBe('cannot-push')
+    expect(sim.steps()).toBe(0)
   })
 })

@@ -1,6 +1,7 @@
 export type Vec3 = [number, number, number]
 export type Axis = 'x' | 'y' | 'z'
 export type Face = 'x' | 'z' // 只允许可见的 +x、+z 两个侧面
+export type ScreenDir = '+a' | '-a' | '+b' | '-b'
 
 export type ColorName = 'sand' | 'terracotta' | 'rose' | 'teal' | 'tealLight' | 'plum' | 'cream'
 
@@ -8,6 +9,7 @@ export interface BlockDef {
   pos: Vec3
   color: ColorName
   kind: 'path' | 'solid'
+  oneWay?: ScreenDir
 }
 
 export interface MechBlockDef {
@@ -19,6 +21,7 @@ export interface MechBlockDef {
 export interface HandleDef {
   block: Vec3 // 把手所在的静态结构积木
   face: Face
+  uses?: number
 }
 
 export interface LinkDef {
@@ -52,13 +55,25 @@ export interface PlateDef {
   type: 'plate'
   id: string
   tile: Vec3 // 必须是一块静态路面
-  target: string // 被触发的转盘或平移台的 id
+  target: string
   once?: boolean
+  mode?: 'trigger' | 'hold'
 }
 
-export type MechanismDef = RotatorDef | MoverDef | PlateDef
+export interface GateDef {
+  type: 'gate'
+  id: string
+  tile: Vec3
+  mode: 'toggle' | 'hold'
+  initiallyOpen?: boolean
+  handle?: HandleDef
+}
 
-export type OrbDef = ({ tile: Vec3 } | { mechanism: string; block: number }) & { optional?: boolean }
+export type MechanismDef = RotatorDef | MoverDef | PlateDef | GateDef
+
+export type TileRef = { tile: Vec3 } | { mechanism: string; block: number }
+export type OrbDef = TileRef & { optional?: boolean }
+export type CrateDef = TileRef
 
 export interface IslandDef {
   x: [number, number]
@@ -74,7 +89,8 @@ export interface DecorDef {
   windows: { pos: Vec3; face: Face }[]
 }
 
-export type SolutionStep = { type: 'walk'; to: Vec3 } | { type: 'operate'; mechanism: string }
+export type SolutionStep =
+  { type: 'walk'; to: Vec3 } | { type: 'operate'; mechanism: string } | { type: 'push'; crate: string }
 
 export interface EndingDef {
   lanterns: Vec3[] // 第一盏为终点，其余按点亮顺序排列
@@ -84,10 +100,12 @@ export interface EndingDef {
 export interface LevelDef {
   id: string
   title: string // 中文关名
-  chapter: 1 | 2 | 3 | 4
+  chapter: 1 | 2 | 3 | 4 | 5
+  challenge?: boolean
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
   orbs: OrbDef[]
+  crates?: CrateDef[]
   start: Vec3
   goal: Vec3
   decor: DecorDef

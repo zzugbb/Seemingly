@@ -2,15 +2,18 @@ import { describe, expect, it, vi } from 'vitest'
 import * as iso from './iso'
 import { defineLevel, type LevelBuilder } from '../levels/builders'
 import { levels } from '../levels'
-import { buildGraph, cellId, findPath } from './iso'
+import { cellId, findPath } from './iso'
 import {
   applyAction,
+  gatesOf,
+  type Action,
   initialState,
   legalActions,
   occupiedOf,
   reachableFrom,
   stateKey,
   tilesOf,
+  walkGraph,
   type GameState,
   type Transition,
 } from './rules'
@@ -83,6 +86,9 @@ describe('关卡数据与初始状态', () => {
       orbs: [],
       spentPlates: [],
       won: false,
+      gates: {},
+      handleUses: {},
+      crates: {},
     })
     const mechanisms = level.mechanisms.map((item) => (item.type === 'mover' ? { ...item, initialStop: 2 } : item))
     expect(initialState({ ...level, mechanisms }).mover.lift).toEqual({ stopIndex: 2, direction: 1 })
@@ -113,6 +119,8 @@ describe('行走与光点', () => {
       moved: [],
       plate: null,
       goalLocked: 0,
+      pushed: null,
+      gatesChanged: [],
     })
   })
 
@@ -133,6 +141,7 @@ describe('行走与光点', () => {
 
   it('选做光点也收集，重复进入不重复收集', () => {
     const level = fixture()
+    level.blocks = level.blocks.filter((block) => cellId(block.pos) !== '0,1,2')
     const first = transitioned(applyAction(level, initialState(level), { type: 'walk', tileId: '0,0,1' }))
     expect(first.collected).toEqual(['orb-1'])
     const back = transitioned(applyAction(level, first.state, { type: 'walk', tileId: '0,0,0' }))
@@ -305,9 +314,9 @@ describe('可达路线、合法动作与状态键', () => {
     const level = fixture((b) => b.path([99, 0, 99], 'sand'))
     const initial = initialState(level)
     const tiles = tilesOf(level, initial)
-    const graph = buildGraph([...tiles.values()], occupiedOf(level, initial))
     for (const at of tiles.keys()) {
       const state = { ...initial, at }
+      const graph = walkGraph(level, state)
       const routes = reachableFrom(level, state)
       for (const target of tiles.keys()) {
         expect(routes.get(target) ?? null).toEqual(findPath(graph, at, target))
@@ -333,7 +342,7 @@ describe('可达路线、合法动作与状态键', () => {
         const target = [...tiles.values()].find((tile) => cellId(tile.pos) === cellId(step.to))
         expect(target).toBeDefined()
         if (!target) throw new Error('解法目标不是路面')
-        const graph = buildGraph([...tiles.values()], occupiedOf(level, state))
+        const graph = walkGraph(level, state)
         const result = transitioned(applyAction(level, state, { type: 'walk', tileId: target.id }))
         expect(result.route).toEqual(findPath(graph, state.at, target.id))
         expect(state).toEqual(before)
@@ -363,6 +372,9 @@ describe('可达路线、合法动作与状态键', () => {
       orbs: ['orb-2', 'orb-1'],
       spentPlates: ['z', 'a'],
       won: false,
+      gates: {},
+      handleUses: {},
+      crates: {},
     }
     const reordered: GameState = {
       ...state,
@@ -380,7 +392,232 @@ describe('可达路线、合法动作与状态键', () => {
       { orbs: ['orb-1'] },
       { spentPlates: ['a'] },
       { won: true },
+      { gates: { gate: true } },
+      { crates: { 'crate-0': '1,0,0' } },
+      { handleUses: { drive: 1 } },
     ]
     for (const change of changes) expect(stateKey({ ...state, ...change })).not.toBe(stateKey(state))
+  })
+})
+
+const newFixture = (build: (b: LevelBuilder) => void = () => {}) =>
+  defineLevel({
+    id: 'new-rules',
+    title: '新机制测试',
+    chapter: 4,
+    solution: [],
+    build: (b) => {
+      for (let x = 0; x <= 4; x++) b.path([x, 0, 0], 'sand')
+      b.path([0, 0, 1], 'sand')
+      b.start([0, 0, 0])
+      b.goal([4, 0, 0])
+      build(b)
+    },
+  })
+const newAct = (level: ReturnType<typeof newFixture>, state: ReturnType<typeof initialState>, action: Action) => {
+  const result = applyAction(level, state, action)
+  expect(result).not.toBeNull()
+  return result!
+}
+
+describe('T6.6 新机制规则', () => {
+  it('行走到灯笼时先触发终点压板，再判断通关', () => {
+    const level = newFixture((b) => {
+      b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'toggle', initiallyOpen: true })
+      b.plate({ id: 'pad', tile: [4, 0, 0], target: 'gate' })
+    })
+    const result = newAct(level, initialState(level), { type: 'walk', tileId: '4,0,0' })
+    expect(result.plate).toBe('pad')
+    expect(result.state.gates.gate).toBe(false)
+    expect(result.state.won).toBe(true)
+  })
+  it('箱子挡住行走，推动跟进并收集原箱子格的光点，不收集箱子目标光点', () => {
+    const level = newFixture((b) => {
+      b.crate({ tile: [1, 0, 0] })
+      b.orb({ tile: [1, 0, 0] })
+      b.orb({ tile: [2, 0, 0] })
+    })
+    const state = initialState(level)
+    expect(reachableFrom(level, state).has('2,0,0')).toBe(false)
+    const result = newAct(level, state, { type: 'push', crate: 'crate-0' })
+    expect(result.state.at).toBe('1,0,0')
+    expect(result.state.crates['crate-0']).toBe('2,0,0')
+    expect(result.collected).toEqual(['orb-0'])
+    expect(result.route).toEqual(['1,0,0'])
+    expect(result.pushed).toEqual({ crate: 'crate-0', from: '1,0,0', to: '2,0,0' })
+    expect(state.crates['crate-0']).toBe('1,0,0')
+  })
+  it('箱子压住按住压板时开门，小人自己压着时寻路按关门处理', () => {
+    const level = newFixture((b) => {
+      b.plate({ id: 'pad', tile: [1, 0, 0], mode: 'hold', target: 'gate' })
+      b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'hold' })
+    })
+    const state = newAct(level, initialState(level), { type: 'walk', tileId: '1,0,0' }).state
+    expect(reachableFrom(level, state).has('4,0,0')).toBe(false)
+    const withCrate = { ...state, at: '2,0,0', crates: { 'crate-0': '1,0,0' } }
+    expect(reachableFrom(level, withCrate).has('4,0,0')).toBe(true)
+  })
+  it('切换门可联动，门里有小人或箱子时关门无效，其他机关照常运动', () => {
+    const level = newFixture((b) => {
+      b.gate({ id: 'gate', tile: [2, 0, 0], mode: 'toggle', initiallyOpen: true })
+      b.rotator({
+        id: 'drive',
+        pivot: [9, 0, 0],
+        blocks: [],
+        handle: { block: [0, 0, 0], face: 'z' },
+        links: [{ target: 'gate' }],
+      })
+    })
+    for (const state of [
+      { ...initialState(level), at: '2,0,0' },
+      { ...initialState(level), crates: { 'crate-0': '2,0,0' } },
+    ]) {
+      const result = newAct(level, state, { type: 'operate', mechanism: 'drive' })
+      expect(result.state.gates.gate).toBe(true)
+      expect(result.state.rotator.drive).toBe(1)
+      expect(result.gatesChanged).toEqual([])
+    }
+    expect(newAct(level, initialState(level), { type: 'operate', mechanism: 'drive' }).state.gates.gate).toBe(false)
+  })
+  it('限次把手只消耗直接操作次数，压板触发不消耗次数', () => {
+    const level = newFixture((b) => {
+      b.mover({
+        id: 'lift',
+        origin: [8, 0, 0],
+        axis: 'y',
+        stops: [0, 1],
+        blocks: [],
+        handle: { block: [0, 0, 0], face: 'z', uses: 1 },
+      })
+      b.plate({ id: 'pad', tile: [1, 0, 0], target: 'lift' })
+    })
+    const state = newAct(level, initialState(level), { type: 'operate', mechanism: 'lift' }).state
+    expect(state.handleUses.lift).toBe(1)
+    expect(applyAction(level, state, { type: 'operate', mechanism: 'lift' })).toBeNull()
+    expect(legalActions(level, state)).not.toContainEqual({ type: 'operate', mechanism: 'lift' })
+    expect(newAct(level, state, { type: 'walk', tileId: '1,0,0' }).state.mover.lift.stopIndex).toBe(0)
+  })
+  it('单向格限制小人与箱子的进入方向，离开自由', () => {
+    const level = newFixture((b) => {
+      b.path([1, 0, 1], 'sand', { oneWay: '+b' })
+      b.path([2, 0, 1], 'sand')
+      b.crate({ tile: [1, 0, 0] })
+    })
+    expect(applyAction(level, initialState(level), { type: 'walk', tileId: '1,0,1' })).toBeNull()
+    const state = { ...initialState(level), at: '2,0,1', crates: { 'crate-0': '1,0,1' } }
+    expect(applyAction(level, state, { type: 'push', crate: 'crate-0' })).toBeNull()
+    expect(reachableFrom(level, { ...initialState(level), at: '1,0,1', crates: {} }).has('0,0,1')).toBe(true)
+    expect(reachableFrom(level, { ...initialState(level), at: '1,0,0', crates: {} }).get('1,0,1')).toEqual(['1,0,1'])
+  })
+  it('遮挡阻止进入但允许离开，机关转动可改变遮挡', () => {
+    const level = newFixture((b) => {
+      b.path([-1, 0, 0], 'sand')
+      b.rotator({
+        id: 'tower',
+        pivot: [1, 1, 2],
+        blocks: [{ offset: [1, 0, 0], kind: 'solid' }],
+        handle: { block: [0, 0, 0], face: 'z' },
+      })
+    })
+    const state = initialState(level)
+    // (2,1,2) 不挡本行，转后 (1,1,1) 遮住起点。
+    const after = newAct(level, state, { type: 'operate', mechanism: 'tower' }).state
+    const hidden = { ...after, at: '1,0,0' }
+    expect(reachableFrom(level, hidden).has('0,0,0')).toBe(false)
+    expect(reachableFrom(level, after).has('-1,0,0')).toBe(true)
+    const restored = newAct(level, after, { type: 'operate', mechanism: 'tower' }).state
+    expect(reachableFrom(level, { ...restored, at: '1,0,0' }).has('0,0,0')).toBe(true)
+  })
+  it('推动可跨错觉连接并推上机关，箱子随后随机关移动', () => {
+    const level = defineLevel({
+      id: 'push-illusion',
+      title: '错觉推动',
+      chapter: 4,
+      solution: [],
+      build: (b) => {
+        b.path([0, 0, 0], 'sand')
+        b.path([1, 0, 0], 'sand')
+        b.path([0, 0, 1], 'sand')
+        b.mover({
+          id: 'lift',
+          origin: [4, 2, 2],
+          axis: 'y',
+          stops: [0, 1],
+          blocks: [{ offset: [0, 0, 0] }],
+          handle: { block: [0, 0, 0], face: 'z' },
+        })
+        b.crate({ tile: [1, 0, 0] })
+        b.start([0, 0, 0])
+        b.goal([0, 0, 1])
+      },
+    })
+    const pushed = newAct(level, initialState(level), { type: 'push', crate: 'crate-0' }).state
+    expect(pushed.crates['crate-0']).toBe('lift#0')
+    const carried = newAct(level, pushed, { type: 'operate', mechanism: 'lift' }).state
+    expect(tilesOf(level, carried).get(carried.crates['crate-0'])?.pos).toEqual([4, 3, 2])
+  })
+
+  it.each(['没有路面', '箱子', '头顶积木', '关门', '遮挡', '单向目标', '单向跟进'] as const)(
+    '前方受阻不能推动：%s',
+    (obstacle) => {
+      const level = newFixture((b) => b.crate({ tile: [1, 0, 0] }))
+      if (obstacle === '没有路面') level.blocks = level.blocks.filter((block) => block.pos[0] !== 2)
+      if (obstacle === '箱子') level.crates!.push({ tile: [2, 0, 0] })
+      if (obstacle === '头顶积木') level.blocks.push({ pos: [2, 1, 0], kind: 'solid', color: 'sand' })
+      if (obstacle === '遮挡') level.blocks.push({ pos: [3, 1, 1], kind: 'solid', color: 'sand' })
+      if (obstacle === '关门') level.mechanisms.push({ type: 'gate', id: 'gate', tile: [2, 0, 0], mode: 'toggle' })
+      if (obstacle.startsWith('单向'))
+        level.blocks.find((block) => block.pos[0] === (obstacle === '单向目标' ? 2 : 1) && block.pos[2] === 0)!.oneWay =
+          '-a'
+      const state = initialState(level)
+      expect(applyAction(level, state, { type: 'push', crate: 'crate-0' })).toBeNull()
+      expect(legalActions(level, state)).not.toContainEqual({ type: 'push', crate: 'crate-0' })
+    },
+  )
+
+  it('按住门在箱子或小人离开门格后才关闭', () => {
+    const level = newFixture((b) => {
+      b.crate({ tile: [1, 0, 0] })
+      b.plate({ id: 'pad', tile: [1, 0, 0], mode: 'hold', target: 'gate' })
+      b.gate({ id: 'gate', tile: [2, 0, 0], mode: 'hold' })
+    })
+    let state = initialState(level)
+    expect(gatesOf(level, state).gate).toBe(true)
+    state = newAct(level, state, { type: 'push', crate: 'crate-0' }).state
+    expect(gatesOf(level, state).gate).toBe(true)
+    state = newAct(level, state, { type: 'push', crate: 'crate-0' }).state
+    expect(gatesOf(level, state).gate).toBe(true)
+    const left = newAct(level, state, { type: 'walk', tileId: '1,0,0' })
+    expect(gatesOf(level, left.state).gate).toBe(true)
+    const closed = newAct(level, left.state, { type: 'walk', tileId: '0,0,0' })
+    expect(gatesOf(level, closed.state).gate).toBe(false)
+    expect(closed.gatesChanged).toEqual(['gate'])
+  })
+
+  it('自己压着按住压板时，也不能把箱子推进对应的门', () => {
+    const level = newFixture((b) => {
+      b.crate({ tile: [2, 0, 0] })
+      b.plate({ id: 'pad', tile: [1, 0, 0], mode: 'hold', target: 'gate' })
+      b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'hold' })
+    })
+    const state = newAct(level, initialState(level), { type: 'walk', tileId: '1,0,0' }).state
+    expect(gatesOf(level, state).gate).toBe(true)
+    expect(applyAction(level, state, { type: 'push', crate: 'crate-0' })).toBeNull()
+  })
+
+  it('推动不触发触发压板，到灯笼也不判通关', () => {
+    const level = newFixture((b) => {
+      b.crate({ tile: [1, 0, 0] })
+      b.plate({ id: 'pad', tile: [1, 0, 0], target: 'gate' })
+      b.gate({ id: 'gate', tile: [3, 0, 0], mode: 'toggle' })
+    })
+    level.goal = [2, 0, 0]
+    let state = newAct(level, initialState(level), { type: 'push', crate: 'crate-0' }).state
+    expect(state.gates.gate).toBe(false)
+    state = { ...state, gates: { gate: true } }
+    const pushed = newAct(level, state, { type: 'push', crate: 'crate-0' })
+    expect(pushed.state.at).toBe('2,0,0')
+    expect(pushed.state.won).toBe(false)
+    expect(pushed.plate).toBeNull()
   })
 })

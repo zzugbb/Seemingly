@@ -1,9 +1,11 @@
 import type {
   BlockDef,
   ColorName,
+  CrateDef,
   DecorDef,
   EndingDef,
   Face,
+  GateDef,
   LevelDef,
   MechanismDef,
   MoverDef,
@@ -18,12 +20,14 @@ const DEFAULT_ISLAND_DEPTH = 3
 
 export interface LevelBuilder {
   island(spec: { x: [number, number]; z: [number, number]; y: number; depth?: number }): void
-  path(pos: Vec3, color: ColorName): void
+  path(pos: Vec3, color: ColorName, options?: { oneWay?: BlockDef['oneWay'] }): void
   solid(pos: Vec3, color: ColorName): void
   column(spec: { x: number; z: number; from: number; to: number }, color: ColorName): void
   rotator(spec: Omit<RotatorDef, 'type'>): void
   mover(spec: Omit<MoverDef, 'type'>): void
   plate(spec: Omit<PlateDef, 'type'>): void
+  gate(spec: Omit<GateDef, 'type'>): void
+  crate(def: CrateDef): void
   orb(def: OrbDef): void
   start(pos: Vec3): void
   goal(pos: Vec3): void
@@ -36,6 +40,7 @@ export function defineLevel(spec: {
   id: string
   title: string
   chapter: LevelDef['chapter']
+  challenge?: boolean
   hints?: string[]
   solution: SolutionStep[]
   ending?: EndingDef
@@ -44,6 +49,7 @@ export function defineLevel(spec: {
   const blocks: BlockDef[] = []
   const mechanisms: MechanismDef[] = []
   const orbs: OrbDef[] = []
+  const crates: CrateDef[] = []
   const decor: DecorDef = { islands: [], trees: [], flowers: [], windows: [] }
   let start: Vec3 | undefined
   let goal: Vec3 | undefined
@@ -59,8 +65,8 @@ export function defineLevel(spec: {
       }
       decor.islands.push({ x, z, y, depth })
     },
-    path(pos, color) {
-      blocks.push({ pos, color, kind: 'path' })
+    path(pos, color, options = {}) {
+      blocks.push({ pos, color, kind: 'path', ...options })
     },
     solid,
     column({ x, z, from, to }, color) {
@@ -74,6 +80,12 @@ export function defineLevel(spec: {
     },
     plate(def) {
       mechanisms.push({ type: 'plate', ...def })
+    },
+    gate(def) {
+      mechanisms.push({ type: 'gate', ...def })
+    },
+    crate(def) {
+      crates.push(def)
     },
     orb(def) {
       orbs.push(def)
@@ -102,9 +114,11 @@ export function defineLevel(spec: {
     id: spec.id,
     title: spec.title,
     chapter: spec.chapter,
+    challenge: spec.challenge,
     blocks,
     mechanisms,
     orbs,
+    crates,
     start,
     goal,
     decor,

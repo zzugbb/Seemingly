@@ -26,6 +26,12 @@ interface StateNode {
   incoming: number[]
 }
 
+export class StateLimitError extends Error {
+  constructor(readonly limit: number) {
+    super(`可达状态数超过 ${limit}`)
+  }
+}
+
 function stateGraph(level: LevelDef, start: GameState): StateNode[] {
   const nodes: StateNode[] = [{ state: start, depth: 0, edges: [], incoming: [] }]
   const indices = new Map([[stateKey(start), 0]])
@@ -36,6 +42,8 @@ function stateGraph(level: LevelDef, start: GameState): StateNode[] {
       const key = stateKey(transition.state)
       let to = indices.get(key)
       if (to === undefined) {
+        if (nodes.length >= (level.challenge ? 100000 : 30000))
+          throw new StateLimitError(level.challenge ? 100000 : 30000)
         to = nodes.length
         indices.set(key, to)
         nodes.push({ state: transition.state, depth: node.depth + 1, edges: [], incoming: [] })

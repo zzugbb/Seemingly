@@ -1,11 +1,11 @@
-import type { LevelDef, MoverDef, RotatorDef, Vec3 } from '../levels/types'
+import type { GateDef, LevelDef, MoverDef, RotatorDef, TileRef, Vec3 } from '../levels/types'
 import type { LevelTarget } from '../levels/targets'
 import { cellId } from './iso'
 import { moverBlocks, moverCursor, rotatorBlocks, type MoverCursor } from './mechanisms'
 import { measureLevel } from './metrics'
-import { initialState, occupiedOf, tilesOf } from './rules'
+import { initialState, occupiedOf, tileRefId, tilesOf } from './rules'
 import { placedBlocks, runSolution } from './solve'
-import { reachableStates } from './solver'
+import { reachableStates, StateLimitError } from './solver'
 import { rayHitsAny, topVisible } from './visibility'
 
 export type LevelCheck =
@@ -19,6 +19,7 @@ export type LevelCheck =
   | '光点可见'
   | '构图范围'
   | '难度指标'
+  | '规模上限'
 
 export interface LevelIssue {
   check: LevelCheck
@@ -157,39 +158,92 @@ const checkStructure = (level: LevelDef, ids: Set<string>, issues: LevelIssue[],
         push(issues, seen, { check: '基本结构', cell: cellId(mechanism.tile), detail: '压板不在静态路面上' })
       }
       const target = level.mechanisms.find((item) => item.id === mechanism.target)
-      if (!target || target.type === 'plate') {
+      const hold = mechanism.mode === 'hold'
+      if (
+        !target ||
+        target.type === 'plate' ||
+        (hold ? target.type !== 'gate' || target.mode !== 'hold' : target.type === 'gate' && target.mode !== 'toggle')
+      ) {
         push(issues, seen, { check: '基本结构', cell: cellId(mechanism.tile), detail: '压板目标不是可触发的机关' })
       }
-    } else {
+      if (hold && mechanism.once)
+        push(issues, seen, { check: '基本结构', cell: mechanism.id, detail: '按住压板不能设为一次性' })
+    } else if (mechanism.type !== 'gate') {
       for (const link of mechanism.links ?? []) {
         const target = level.mechanisms.find((item) => item.id === link.target)
-        if (!target || target.type === 'plate' || target === mechanism) {
+        if (
+          !target ||
+          target.type === 'plate' ||
+          target === mechanism ||
+          (target.type === 'gate' && target.mode !== 'toggle')
+        ) {
           push(issues, seen, { check: '基本结构', cell: mechanism.id, detail: `联动目标 ${link.target} 无效` })
         }
       }
     }
   }
   level.orbs.forEach((orb, index) => {
-    let tileId: string | undefined
-    if ('tile' in orb) {
-      if (level.blocks.some((block) => block.kind === 'path' && sameVec(block.pos, orb.tile))) tileId = cellId(orb.tile)
-    } else {
-      const mechanism = level.mechanisms.find((item) => item.id === orb.mechanism)
-      if (
-        mechanism &&
-        mechanism.type !== 'plate' &&
-        Number.isInteger(orb.block) &&
-        orb.block >= 0 &&
-        mechanism.blocks[orb.block] &&
-        (mechanism.blocks[orb.block].kind ?? 'path') === 'path'
-      ) {
-        tileId = `${mechanism.id}#${orb.block}`
-      }
-    }
-    if (!tileId || tileId === state.at) {
+    if (!validRef(level, orb) || tileRefId(orb) === state.at) {
       push(issues, seen, { check: '基本结构', cell: `orb-${index}`, detail: '光点必须引用起点以外的有效路面积木' })
     }
   })
+  const elements = new Set<string>()
+  const element = (id: string, tile: string) => {
+    if (
+      !paths.some((path) => path.id === tile) ||
+      elements.has(tile) ||
+      tile === state.at ||
+      tile === cellId(level.goal)
+    ) {
+      push(issues, seen, { check: '基本结构', cell: id, detail: '元素必须位于起终点之外的独立路面上' })
+    }
+    elements.add(tile)
+  }
+  for (const mechanism of level.mechanisms) {
+    if (
+      mechanism.type !== 'plate' &&
+      mechanism.handle?.uses !== undefined &&
+      (!Number.isInteger(mechanism.handle.uses) || mechanism.handle.uses < 0)
+    ) {
+      push(issues, seen, { check: '基本结构', cell: mechanism.id, detail: '把手次数必须为非负整数' })
+    }
+    if (mechanism.type === 'gate') {
+      element(mechanism.id, cellId(mechanism.tile))
+      if (mechanism.mode === 'hold' && (mechanism.handle || mechanism.initiallyOpen !== undefined))
+        push(issues, seen, { check: '基本结构', cell: mechanism.id, detail: '按住门不能设置把手或初始开关' })
+    }
+  }
+  for (const block of level.blocks) if (block.oneWay) element(cellId(block.pos), cellId(block.pos))
+  level.crates?.forEach((crate, index) => {
+    const id = `crate-${index}`
+    if (!validRef(level, crate)) push(issues, seen, { check: '基本结构', cell: id, detail: '积木箱引用的路面积木无效' })
+    element(id, tileRefId(crate))
+  })
+}
+
+const validRef = (level: LevelDef, ref: TileRef): boolean => {
+  if ('tile' in ref) return level.blocks.some((block) => block.kind === 'path' && sameVec(block.pos, ref.tile))
+  const mechanism = level.mechanisms.find((item) => item.id === ref.mechanism)
+  return (
+    !!mechanism &&
+    (mechanism.type === 'rotator' || mechanism.type === 'mover') &&
+    Number.isInteger(ref.block) &&
+    ref.block >= 0 &&
+    !!mechanism.blocks[ref.block] &&
+    (mechanism.blocks[ref.block].kind ?? 'path') === 'path'
+  )
+}
+
+const checkScale = (level: LevelDef, issues: LevelIssue[], seen: Set<string>) => {
+  const moving = level.mechanisms.filter((item) => item.type === 'rotator' || item.type === 'mover').length
+  for (const [name, count, max] of [
+    ['积木箱', level.crates?.length ?? 0, 2],
+    ['光点', level.orbs.length, 4],
+    ['转盘与平移台', moving, level.challenge ? 5 : 4],
+  ] as const) {
+    if (count > max)
+      push(issues, seen, { check: '规模上限', cell: level.id, detail: `${name} ${count} 个，最多 ${max} 个` })
+  }
 }
 
 const reachableLayouts = (level: LevelDef, issues: LevelIssue[], seen: Set<string>): Vec3[][] => {
@@ -208,9 +262,11 @@ const reachableLayouts = (level: LevelDef, issues: LevelIssue[], seen: Set<strin
       layout = { blocks: placedBlocks(level, gear), occupied: occupiedOf(level, state), tiles: tilesOf(level, state) }
       layouts.set(key, layout)
     }
-    const pos = layout.tiles.get(state.at)?.pos
-    if (pos && layout.occupied.has(cellId([pos[0], pos[1] + 1, pos[2]]))) {
-      push(issues, seen, { check: '乘坐安全', cell: cellId(pos), detail: '小人头顶有积木' })
+    for (const [id, at] of [['小人', state.at], ...Object.entries(state.crates)]) {
+      const pos = layout.tiles.get(at)?.pos
+      if (pos && layout.occupied.has(cellId([pos[0], pos[1] + 1, pos[2]]))) {
+        push(issues, seen, { check: '乘坐安全', cell: cellId(pos), detail: `${id}头顶有积木` })
+      }
     }
   }
   return [...layouts.values()].map((layout) => layout.blocks)
@@ -304,7 +360,9 @@ const checkSolution = (
 }
 
 const checkHandles = (level: LevelDef, layouts: Vec3[][], issues: LevelIssue[], seen: Set<string>) => {
-  const handles = level.mechanisms.filter((mechanism): mechanism is RotatorDef | MoverDef => mechanism.type !== 'plate')
+  const handles = level.mechanisms.filter(
+    (mechanism): mechanism is RotatorDef | MoverDef | GateDef => mechanism.type !== 'plate',
+  )
   for (const blocks of layouts) {
     for (const mechanism of handles) {
       if (!mechanism.handle) continue
@@ -358,9 +416,17 @@ export function validateLevel(level: LevelDef, ids: Set<string> = new Set(), tar
   const issues: LevelIssue[] = []
   const seen = new Set<string>()
   checkStructure(level, ids, issues, seen)
+  checkScale(level, issues, seen)
   checkOverlap([placedBlocks(level, createGear(level))], issues, seen)
   if (issues.length > 0) return issues
-  const reachable = reachableLayouts(level, issues, seen)
+  let reachable: Vec3[][]
+  try {
+    reachable = reachableLayouts(level, issues, seen)
+  } catch (error) {
+    if (!(error instanceof StateLimitError)) throw error
+    push(issues, seen, { check: '规模上限', cell: level.id, detail: error.message })
+    return issues
+  }
   const gears = enumerateGears(level)
   const layouts = gears.length > 0 ? gears.map((gear) => placedBlocks(level, gear)) : reachable
   const run = runSolution(level)
