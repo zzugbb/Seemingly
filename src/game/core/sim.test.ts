@@ -427,6 +427,7 @@ describe('T6.6 推动、门与撤销', () => {
     expect(sim.command({ type: 'push', crate: 'crate-0' })).toBe('ok')
     expect(sim.undo()).toBe(false)
     expect(sim.command({ type: 'walk', tileId: '0,0,1' })).toBe('busy')
+    expect(sim.characterPose().pushing).toBe(true)
     const events: SimEvent[] = []
     for (let frame = 0; frame < 10; frame++) events.push(...sim.update(1 / 30))
     expect(events[0]).toEqual({ type: 'push', crate: 'crate-0' })
@@ -435,6 +436,7 @@ describe('T6.6 推动、门与撤销', () => {
     expect(sim.state()).toEqual(before)
     events.push(...sim.update(1 / 30))
     expect(sim.cratePose('crate-0').position).toEqual([2, surfaceY(0), 0])
+    expect(sim.platePose('pad')).toEqual({ pressed: true, spent: false })
     expect(events).toContainEqual({ type: 'orb', id: 'orb-0' })
     expect(events).toContainEqual({ type: 'gate', id: 'gate', open: true })
     for (let frame = 0; frame < 6; frame++) events.push(...sim.update(1 / 30))
@@ -448,6 +450,7 @@ describe('T6.6 推动、门与撤销', () => {
     expect(sim.state()).toEqual(before)
     expect(sim.gatePose('gate').open).toBe(0)
     expect(sim.cratePose('crate-0').position).toEqual([1, surfaceY(0), 0])
+    expect(sim.platePose('pad')).toEqual({ pressed: false, spent: false })
     expect(sim.update(0)).toEqual([{ type: 'undo' }])
   })
 

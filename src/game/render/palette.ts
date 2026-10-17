@@ -1,5 +1,7 @@
 export const palette = {
   path: '#f7ecd6',
+  markerSuccess: '#ffffff',
+  markerError: '#e46d5f',
   sand: '#ecc795',
   terracotta: '#de8d64',
   rose: '#e9a7a1',

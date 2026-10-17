@@ -1,53 +1,139 @@
 import { useRef } from 'react'
-import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { BoxGeometry, type Group, type Mesh } from 'three'
-import { cellId, surfaceY } from '../core/iso'
+import { useFrame } from '@react-three/fiber'
+import type { Group, Mesh } from 'three'
+import { cellId } from '../core/iso'
 import type { LevelSim } from '../core/sim'
-import type { LevelDef, MoverDef, PlateDef, RotatorDef, Vec3 } from '../levels/types'
+import type { HandleDef, LevelDef, MechBlockDef, MoverDef, PlateDef, RotatorDef } from '../levels/types'
 import { WalkTile, pointer } from './Blocks'
-import { blockGeometry, material, slabGeometry } from './materials'
+import { hintStrength, type RenderFeedback, type RenderHint } from './feedback'
+import {
+  blockGeometry,
+  handleDotGeometry,
+  handleHitGeometry,
+  handleHubGeometry,
+  handleKnobGeometry,
+  handleRingGeometry,
+  handleSpokeGeometry,
+  hitMaterial,
+  leverBarGeometry,
+  leverBaseGeometry,
+  material,
+  plateBarGeometry,
+  plateInnerBarGeometry,
+  plateInnerGeometry,
+  rotatorBaseGeometry,
+  rotatorRimGeometry,
+  slabGeometry,
+  useAnimatedMaterial,
+} from './materials'
 import { palette } from './palette'
 
-const HANDLE_CLEARANCE = 0.56
+export type PlateFx = { spent: Set<string>; flashAt: Map<string, number> }
+type FeedbackRef = { current: RenderFeedback }
 
-const handlePosition = (block: Vec3, face: 'x' | 'z'): Vec3 => {
-  const [x, y, z] = block
-  return face === 'x' ? [x + HANDLE_CLEARANCE, y, z] : [x, y, z + HANDLE_CLEARANCE]
-}
-
-function Handle({
-  position,
-  rotationY,
-  onClick,
-  crankRef,
+export function HandleControl({
+  handle,
+  sim,
+  id,
+  feedback,
+  hint,
+  interactive = true,
 }: {
-  position: Vec3
-  rotationY: number
-  onClick: (event: ThreeEvent<MouseEvent>) => void
-  crankRef: { current: Group | null }
+  handle: HandleDef
+  sim: LevelSim
+  id: string
+  feedback: FeedbackRef
+  hint?: RenderHint | null
+  interactive?: boolean
 }) {
+  const root = useRef<Group>(null),
+    moving = useRef<Group>(null),
+    dots = useRef<Array<Mesh | null>>([])
+  const fill = useAnimatedMaterial(palette.glow, 0.999)
+  const mechanism = sim.level.mechanisms.find((item) => item.id === id)!
+  const lever = mechanism.type === 'mover'
+  const position = [...handle.block] as [number, number, number]
+  position[handle.face === 'x' ? 0 : 2] += 0.56
+  useFrame(() => {
+    const used = sim.state().handleUses[id] ?? 0
+    const exhausted = handle.uses !== undefined && used >= handle.uses
+    const pulse = hintStrength(hint, 'operate', id)
+    fill.color.set(exhausted ? palette.plum : palette.glow)
+    fill.opacity = pulse || 1
+    if (root.current) {
+      const age = (performance.now() - (feedback.current.blockedHandles.get(id) ?? -10000)) / 1000
+      root.current.position.x = age >= 0 && age < 0.5 ? Math.sin(age * Math.PI * 40) * 0.04 * (1 - age / 0.5) : 0
+      root.current.scale.setScalar(pulse ? 1.15 : 1)
+    }
+    dots.current.forEach((dot, index) => {
+      if (dot) dot.material = material(index < (handle.uses ?? 0) - used ? palette.glow : palette.plum)
+    })
+    if (!moving.current) return
+    if (mechanism.type === 'rotator') {
+      const pose = sim.mechanismPose(id)
+      if ('rotationY' in pose) moving.current.rotation.z = -pose.rotationY * 2
+    } else if (mechanism.type === 'mover') {
+      const pose = sim.mechanismPose(id)
+      if (!('offset' in pose)) return
+      const value = pose.offset[mechanism.axis === 'x' ? 0 : mechanism.axis === 'y' ? 1 : 2]
+      let station = 0
+      for (let index = 0; index < mechanism.stops.length - 1; index++) {
+        const lo = mechanism.stops[index],
+          hi = mechanism.stops[index + 1]
+        if (value >= lo) station = index + Math.min(1, Math.max(0, (value - lo) / (hi - lo)))
+      }
+      moving.current.rotation.x = 0.15 + 0.9 * (0.5 - 0.5 * Math.cos(station * Math.PI))
+    } else if (mechanism.type === 'gate') moving.current.rotation.z = (-sim.gatePose(id).open * Math.PI) / 2
+  })
   return (
-    <group position={position} rotation={[0, rotationY, 0]}>
-      <group ref={crankRef} onClick={onClick} onPointerOver={pointer(true)} onPointerOut={pointer(false)}>
-        <mesh material={material(palette.glow)} castShadow>
-          <torusGeometry args={[0.3, 0.055, 12, 32]} />
-        </mesh>
-        <mesh rotation={[0, 0, Math.PI / 4]} material={material(palette.glow)}>
-          <boxGeometry args={[0.6, 0.06, 0.05]} />
-        </mesh>
-        <mesh rotation={[0, 0, -Math.PI / 4]} material={material(palette.glow)}>
-          <boxGeometry args={[0.6, 0.06, 0.05]} />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} material={material(palette.terracotta)}>
-          <cylinderGeometry args={[0.09, 0.09, 0.12, 16]} />
-        </mesh>
-        <mesh position={[0.3, 0, 0.08]} material={material(palette.terracotta)}>
-          <sphereGeometry args={[0.07, 12, 10]} />
-        </mesh>
-        <mesh>
-          <circleGeometry args={[0.42, 20]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        </mesh>
+    <group position={position} rotation={[0, handle.face === 'x' ? Math.PI / 2 : 0, 0]}>
+      <group
+        ref={root}
+        name={`handle-${id}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          if (!interactive) return
+          if (sim.command({ type: 'operate', mechanism: id }) === 'handle-used-up')
+            feedback.current.blockedHandles.set(id, performance.now())
+        }}
+        onPointerOver={pointer(interactive)}
+        onPointerOut={pointer(false)}
+      >
+        {lever && (
+          <mesh position={[0, 0, -0.02]} geometry={leverBaseGeometry} material={material(palette.terracotta)} />
+        )}
+        <group ref={moving}>
+          {lever ? (
+            <>
+              <mesh position={[0, 0.2, 0]} geometry={leverBarGeometry} material={fill} castShadow />
+              <mesh position={[0, 0.42, 0]} geometry={handleKnobGeometry} material={fill} castShadow />
+            </>
+          ) : (
+            <>
+              <mesh geometry={handleRingGeometry} material={fill} castShadow />
+              <mesh rotation={[0, 0, Math.PI / 4]} geometry={handleSpokeGeometry} material={fill} />
+              <mesh rotation={[0, 0, -Math.PI / 4]} geometry={handleSpokeGeometry} material={fill} />
+              <mesh
+                rotation={[Math.PI / 2, 0, 0]}
+                geometry={handleHubGeometry}
+                material={material(palette.terracotta)}
+              />
+              <mesh position={[0.3, 0, 0.08]} geometry={handleKnobGeometry} material={material(palette.terracotta)} />
+            </>
+          )}
+        </group>
+        <mesh geometry={handleHitGeometry} material={hitMaterial} />
+        {Array.from({ length: handle.uses ?? 0 }, (_, index) => (
+          <mesh
+            key={index}
+            ref={(mesh) => {
+              dots.current[index] = mesh
+            }}
+            position={[(index - ((handle.uses ?? 0) - 1) / 2) * 0.09, -0.47, 0.03]}
+            geometry={handleDotGeometry}
+            material={material(palette.glow)}
+          />
+        ))}
       </group>
     </group>
   )
@@ -59,34 +145,35 @@ function MechBlocks({
   hovered,
   onHover,
   onSelect,
+  hint,
+  canSelect,
 }: {
   id: string
-  blocks: { offset: Vec3; color?: string; kind?: 'path' | 'solid' }[]
+  blocks: MechBlockDef[]
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
+  hint?: RenderHint | null
+  canSelect: (id: string) => boolean
 }) {
   return (
     <>
       {blocks.map((block, index) => {
-        const tileId = `${id}#${index}`
-        const color = block.color ?? palette.tealLight
-        if ((block.kind ?? 'path') === 'path') {
-          return (
-            <WalkTile
-              key={tileId}
-              position={block.offset}
-              color={color}
-              hovered={hovered === tileId}
-              onHover={(on) => onHover(on ? tileId : null)}
-              onSelect={(event) => {
-                event.stopPropagation()
-                onSelect(tileId)
-              }}
-            />
-          )
-        }
-        return (
+        const tileId = `${id}#${index}`,
+          color = block.color ? palette[block.color] : palette.tealLight
+        return (block.kind ?? 'path') === 'path' ? (
+          <WalkTile
+            key={tileId}
+            position={block.offset}
+            color={color}
+            hovered={hovered === tileId}
+            hint={hint}
+            tileId={tileId}
+            canSelect={() => canSelect(tileId)}
+            onHover={(on) => onHover(on ? tileId : null)}
+            onSelect={() => onSelect(tileId)}
+          />
+        ) : (
           <mesh
             key={tileId}
             position={block.offset}
@@ -101,84 +188,70 @@ function MechBlocks({
   )
 }
 
-function RotatorView({
-  rotator,
-  sim,
-  hovered,
-  onHover,
-  onSelect,
-  interactive,
-}: {
-  rotator: RotatorDef
+type MechProps = {
   sim: LevelSim
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
+  hint?: RenderHint | null
+  feedback: FeedbackRef
   interactive: boolean
-}) {
-  const groupRef = useRef<Group>(null)
-  const crankRef = useRef<Group>(null)
+  canSelect: (id: string) => boolean
+}
+function MovingView({ definition, ...props }: MechProps & { definition: RotatorDef | MoverDef }) {
+  const group = useRef<Group>(null)
   useFrame(() => {
-    const pose = sim.mechanismPose(rotator.id)
-    if (!('rotationY' in pose)) return
-    if (groupRef.current) groupRef.current.rotation.y = pose.rotationY
-    const crank = crankRef.current
-    if (!crank) return
-    crank.rotation.z = -pose.rotationY * 2
+    const pose = props.sim.mechanismPose(definition.id)
+    if (!group.current) return
+    if ('rotationY' in pose) group.current.rotation.y = pose.rotationY
+    else if (definition.type === 'mover')
+      group.current.position.set(
+        definition.origin[0] + pose.offset[0],
+        definition.origin[1] + pose.offset[1],
+        definition.origin[2] + pose.offset[2],
+      )
   })
-
-  const onCrank = (event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation()
-    if (!interactive) return
-    sim.command({ type: 'operate', mechanism: rotator.id })
-  }
-
   return (
     <>
-      <group ref={groupRef} position={rotator.pivot}>
-        <mesh position={[0, -0.55, 0]} receiveShadow material={material(palette.teal)}>
-          <cylinderGeometry args={[1.18, 1.18, 0.07, 48]} />
-        </mesh>
-        <mesh position={[0, -0.55, 0]} rotation={[Math.PI / 2, 0, 0]} material={material(palette.glow)}>
-          <torusGeometry args={[1.18, 0.035, 8, 64]} />
-        </mesh>
+      <group ref={group} position={definition.type === 'rotator' ? definition.pivot : definition.origin}>
+        {definition.type === 'rotator' && (
+          <>
+            <mesh
+              position={[0, -0.55, 0]}
+              geometry={rotatorBaseGeometry}
+              material={material(palette.teal)}
+              receiveShadow
+            />
+            <mesh
+              position={[0, -0.55, 0]}
+              rotation={[Math.PI / 2, 0, 0]}
+              geometry={rotatorRimGeometry}
+              material={material(palette.glow)}
+            />
+          </>
+        )}
         <MechBlocks
-          id={rotator.id}
-          blocks={rotator.blocks.map((block) => ({
-            offset: block.offset,
-            color: block.color ? palette[block.color] : undefined,
-            kind: block.kind,
-          }))}
-          hovered={hovered}
-          onHover={onHover}
-          onSelect={onSelect}
+          id={definition.id}
+          blocks={definition.blocks}
+          hovered={props.hovered}
+          onHover={props.onHover}
+          onSelect={props.onSelect}
+          hint={props.hint}
+          canSelect={props.canSelect}
         />
       </group>
-      {rotator.handle && (
-        <Handle
-          position={handlePosition(rotator.handle.block, rotator.handle.face)}
-          rotationY={rotator.handle.face === 'x' ? Math.PI / 2 : 0}
-          onClick={onCrank}
-          crankRef={crankRef}
+      {definition.handle && (
+        <HandleControl
+          handle={definition.handle}
+          id={definition.id}
+          sim={props.sim}
+          feedback={props.feedback}
+          hint={props.hint}
+          interactive={props.interactive}
         />
       )}
     </>
   )
-}
-
-const LEVER_REST = 0.15
-const LEVER_PULLED = 1.05
-
-const FRAME_SPAN = 0.72
-const FRAME_WIDTH = 0.05
-const FRAME_OFFSET = FRAME_SPAN / 2 - FRAME_WIDTH / 2
-const frameBar = new BoxGeometry(FRAME_SPAN, 0.02, FRAME_WIDTH)
-const SINK_TIME = 0.32
-const FLASH_TIME = 0.22
-
-export type PlateFx = {
-  spent: Set<string>
-  flashAt: Map<string, number>
 }
 
 function PlateView({
@@ -186,191 +259,81 @@ function PlateView({
   sim,
   hovered,
   plateFx,
+  hint,
 }: {
   plate: PlateDef
   sim: LevelSim
   hovered: boolean
   plateFx: { current: PlateFx }
+  hint?: RenderHint | null
 }) {
-  const topRef = useRef<Group>(null)
-  const frameRef = useRef<Group>(null)
-  const slabRef = useRef<Mesh>(null)
-  const bars = useRef<Array<Mesh | null>>([])
-  const sink = useRef(0)
-  const wasOn = useRef(false)
-  const [x, y, z] = plate.tile
+  const top = useRef<Group>(null),
+    inner = useRef<Group>(null),
+    bars = useRef<Array<Mesh | null>>([]),
+    slab = useRef<Mesh>(null)
+  const sink = useRef(0),
+    wasOn = useRef(false),
+    glow = useAnimatedMaterial(palette.glow, 0.8, true)
+  const hold = plate.mode === 'hold'
   useFrame(({ clock }, delta) => {
-    const pose = sim.characterPose()
-    const on =
-      !pose.walking &&
-      Math.abs(pose.position[0] - x) < 0.2 &&
-      Math.abs(pose.position[2] - z) < 0.2 &&
-      Math.abs(pose.position[1] - surfaceY(y)) < 0.25
-    if (on && !wasOn.current) sink.current = 1
-    wasOn.current = on
-    if (sink.current > 0) sink.current = Math.max(0, sink.current - delta / SINK_TIME)
-    if (topRef.current) topRef.current.position.y = (hovered ? 0.03 : 0) - Math.sin(sink.current * Math.PI) * 0.03
-    const flashAge = clock.elapsedTime - (plateFx.current.flashAt.get(plate.id) ?? -10)
-    const flashing = flashAge >= 0 && flashAge < FLASH_TIME
-    if (frameRef.current) {
-      const pulse = flashing ? 1 + Math.sin((flashAge / FLASH_TIME) * Math.PI) * 0.12 : 1
-      frameRef.current.scale.set(pulse, 1, pulse)
-    }
-    const spent = plate.once === true && plateFx.current.spent.has(plate.id)
-    const color = spent ? palette.plum : flashing ? palette.cream : palette.glow
-    const mat = material(color)
-    for (const bar of bars.current) {
-      if (bar) bar.material = mat
-    }
-    if (slabRef.current) slabRef.current.material = material(hovered ? palette.cream : palette.path)
+    const pose = sim.platePose(plate.id)
+    if (pose.pressed && !wasOn.current) sink.current = 1
+    wasOn.current = pose.pressed
+    sink.current = Math.max(0, sink.current - delta / 0.32)
+    if (top.current)
+      top.current.position.y = (hovered ? 0.03 : 0) - (hold ? 0 : Math.sin(sink.current * Math.PI) * 0.03)
+    if (inner.current) inner.current.position.y = hold && pose.pressed ? -0.04 : 0
+    const age = clock.elapsedTime - (plateFx.current.flashAt.get(plate.id) ?? -10)
+    const color = pose.spent ? palette.plum : age >= 0 && age < 0.22 ? palette.cream : palette.glow
+    for (const bar of bars.current) if (bar) bar.material = material(color)
+    const pulse = hintStrength(hint, 'walk', cellId(plate.tile))
+    glow.opacity = pulse
+    if (slab.current) slab.current.material = pulse ? glow : material(hovered ? palette.cream : palette.path)
   })
-  const bindBar = (index: number) => (mesh: Mesh | null) => {
-    bars.current[index] = mesh
-  }
-  return (
-    <group position={[x, 0, z]}>
-      <group ref={topRef}>
+  const frame = (span: number, small: boolean) => (
+    <group position={[0, 0.57, 0]}>
+      {[0, 1, 2, 3].map((index) => (
         <mesh
-          ref={slabRef}
-          geometry={slabGeometry}
+          key={index}
+          ref={(mesh) => {
+            bars.current[(small ? 4 : 0) + index] = mesh
+          }}
+          position={
+            index < 2
+              ? [0, 0, (index === 0 ? 1 : -1) * (span / 2 - 0.025)]
+              : [(index === 2 ? 1 : -1) * (span / 2 - 0.025), 0, 0]
+          }
+          rotation={[0, index < 2 ? 0 : Math.PI / 2, 0]}
+          geometry={small ? plateInnerBarGeometry : plateBarGeometry}
+          material={material(palette.glow)}
+        />
+      ))}
+    </group>
+  )
+  return (
+    <group position={plate.tile} name={`plate-${plate.id}`}>
+      <group ref={top}>
+        <mesh
+          ref={slab}
           position={[0, 0.5, 0]}
+          geometry={slabGeometry}
           material={material(palette.path)}
           receiveShadow
         />
-        <group ref={frameRef} position={[0, 0.57, 0]}>
-          <mesh
-            ref={bindBar(0)}
-            position={[0, 0, FRAME_OFFSET]}
-            geometry={frameBar}
-            material={material(palette.glow)}
-          />
-          <mesh
-            ref={bindBar(1)}
-            position={[0, 0, -FRAME_OFFSET]}
-            geometry={frameBar}
-            material={material(palette.glow)}
-          />
-          <mesh
-            ref={bindBar(2)}
-            position={[FRAME_OFFSET, 0, 0]}
-            rotation={[0, Math.PI / 2, 0]}
-            geometry={frameBar}
-            material={material(palette.glow)}
-          />
-          <mesh
-            ref={bindBar(3)}
-            position={[-FRAME_OFFSET, 0, 0]}
-            rotation={[0, Math.PI / 2, 0]}
-            geometry={frameBar}
-            material={material(palette.glow)}
-          />
-        </group>
+        {frame(0.72, false)}
+        {hold && (
+          <group ref={inner}>
+            {frame(0.5, true)}
+            <mesh
+              position={[0, 0.57, 0]}
+              geometry={plateInnerGeometry}
+              material={material(palette.path)}
+              receiveShadow
+            />
+          </group>
+        )}
       </group>
     </group>
-  )
-}
-
-function Lever({
-  position,
-  rotationY,
-  sim,
-  mechanismId,
-  interactive,
-}: {
-  position: Vec3
-  rotationY: number
-  sim: LevelSim
-  mechanismId: string
-  interactive: boolean
-}) {
-  const barRef = useRef<Group>(null)
-  const pulled = useRef(false)
-  const angle = useRef(LEVER_REST)
-  useFrame((_, delta) => {
-    const target = pulled.current ? LEVER_PULLED : LEVER_REST
-    angle.current += (target - angle.current) * Math.min(1, delta * 8)
-    const bar = barRef.current
-    if (!bar) return
-    bar.rotation.x = angle.current
-  })
-  const onClick = (event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation()
-    if (!interactive) return
-    const result = sim.command({ type: 'operate', mechanism: mechanismId })
-    if (result === 'ok') pulled.current = !pulled.current
-  }
-  return (
-    <group position={position} rotation={[0, rotationY, 0]}>
-      <mesh position={[0, 0, -0.02]} material={material(palette.terracotta)}>
-        <cylinderGeometry args={[0.08, 0.08, 0.06, 12]} />
-      </mesh>
-      <group ref={barRef} onClick={onClick} onPointerOver={pointer(true)} onPointerOut={pointer(false)}>
-        <mesh position={[0, 0.2, 0]} material={material(palette.glow)} castShadow>
-          <boxGeometry args={[0.06, 0.4, 0.06]} />
-        </mesh>
-        <mesh position={[0, 0.42, 0]} material={material(palette.glow)} castShadow>
-          <sphereGeometry args={[0.07, 12, 10]} />
-        </mesh>
-        <mesh>
-          <circleGeometry args={[0.32, 16]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        </mesh>
-      </group>
-    </group>
-  )
-}
-
-function MoverView({
-  mover,
-  sim,
-  hovered,
-  onHover,
-  onSelect,
-  interactive,
-}: {
-  mover: MoverDef
-  sim: LevelSim
-  hovered: string | null
-  onHover: (id: string | null) => void
-  onSelect: (id: string) => void
-  interactive: boolean
-}) {
-  const groupRef = useRef<Group>(null)
-  useFrame(() => {
-    const pose = sim.mechanismPose(mover.id)
-    if (!('offset' in pose) || !groupRef.current) return
-    groupRef.current.position.set(
-      mover.origin[0] + pose.offset[0],
-      mover.origin[1] + pose.offset[1],
-      mover.origin[2] + pose.offset[2],
-    )
-  })
-
-  return (
-    <>
-      <group ref={groupRef} position={mover.origin}>
-        <MechBlocks
-          id={mover.id}
-          blocks={mover.blocks.map((block) => ({
-            offset: block.offset,
-            color: block.color ? palette[block.color] : undefined,
-            kind: block.kind,
-          }))}
-          hovered={hovered}
-          onHover={onHover}
-          onSelect={onSelect}
-        />
-      </group>
-      {mover.handle && (
-        <Lever
-          position={handlePosition(mover.handle.block, mover.handle.face)}
-          rotationY={mover.handle.face === 'x' ? Math.PI / 2 : 0}
-          sim={sim}
-          mechanismId={mover.id}
-          interactive={interactive}
-        />
-      )}
-    </>
   )
 }
 
@@ -382,6 +345,9 @@ export function Mechanisms({
   onSelect,
   plateFx,
   interactive = true,
+  feedback,
+  hint,
+  canSelect,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -390,47 +356,37 @@ export function Mechanisms({
   onSelect: (id: string) => void
   plateFx: { current: PlateFx }
   interactive?: boolean
+  feedback: FeedbackRef
+  hint?: RenderHint | null
+  canSelect: (id: string) => boolean
 }) {
   return (
     <group>
-      {level.mechanisms.map((mechanism) => {
-        if (mechanism.type === 'rotator') {
-          return (
-            <RotatorView
-              key={mechanism.id}
-              rotator={mechanism}
-              sim={sim}
-              hovered={hovered}
-              onHover={onHover}
-              onSelect={onSelect}
-              interactive={interactive}
-            />
-          )
-        }
-        if (mechanism.type === 'mover') {
-          return (
-            <MoverView
-              key={mechanism.id}
-              mover={mechanism}
-              sim={sim}
-              hovered={hovered}
-              onHover={onHover}
-              onSelect={onSelect}
-              interactive={interactive}
-            />
-          )
-        }
-        if (mechanism.type !== 'plate') return null
-        return (
+      {level.mechanisms.map((mechanism) =>
+        mechanism.type === 'rotator' || mechanism.type === 'mover' ? (
+          <MovingView
+            key={mechanism.id}
+            definition={mechanism}
+            sim={sim}
+            hovered={hovered}
+            onHover={onHover}
+            onSelect={onSelect}
+            interactive={interactive}
+            feedback={feedback}
+            hint={hint}
+            canSelect={canSelect}
+          />
+        ) : mechanism.type === 'plate' ? (
           <PlateView
             key={mechanism.id}
             plate={mechanism}
             sim={sim}
             hovered={hovered === cellId(mechanism.tile)}
             plateFx={plateFx}
+            hint={hint}
           />
-        )
-      })}
+        ) : null,
+      )}
     </group>
   )
 }

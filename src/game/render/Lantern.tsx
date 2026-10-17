@@ -1,20 +1,24 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { CylinderGeometry, SphereGeometry, type Mesh } from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { Color, type Mesh, type PointLight } from 'three'
 import { surfaceY } from '../core/iso'
 import type { Vec3 } from '../levels/types'
-import { material } from './materials'
+import type { LevelSim } from '../core/sim'
+import type { RenderFeedback } from './feedback'
+import {
+  material,
+  useAnimatedMaterial,
+  lanternPostGeometry as postGeometry,
+  lanternCapGeometry as capGeometry,
+  lanternRibGeometry as ribGeometry,
+  lanternCoreGeometry as coreGeometry,
+  lanternSparkGeometry as sparkGeometry,
+} from './materials'
 import { palette } from './palette'
 
 const POST_HEIGHT = 0.5
 const LAMP_WIDTH = 0.22
 const LAMP_HEIGHT = 0.28
-const postGeometry = new CylinderGeometry(0.035, 0.04, POST_HEIGHT, 10)
-const capGeometry = new RoundedBoxGeometry(LAMP_WIDTH, 0.045, LAMP_WIDTH, 2, 0.02)
-const ribGeometry = new RoundedBoxGeometry(0.035, LAMP_HEIGHT - 0.07, 0.035, 1, 0.01)
-const coreGeometry = new RoundedBoxGeometry(0.13, 0.17, 0.13, 3, 0.04)
-const sparkGeometry = new SphereGeometry(0.028, 8, 6)
 const RIB = LAMP_WIDTH / 2 - 0.018
 
 function Sparks({ active, count }: { active: boolean; count: number }) {
@@ -69,15 +73,33 @@ export function Lantern({
   reached,
   sparkleScale,
   reducedMotion,
+  sim,
+  feedback,
 }: {
   goal: Vec3
   reached: boolean
   sparkleScale: number
   reducedMotion: boolean
+  sim?: LevelSim
+  feedback?: { current: RenderFeedback }
 }) {
   const [x, y, z] = goal
   const top = surfaceY(y)
   const count = reducedMotion ? 0 : Math.max(1, Math.round(10 * sparkleScale))
+  const fill = useAnimatedMaterial(palette.plum, 1, true)
+  const lamp = useRef<PointLight>(null)
+  const dark = useRef(new Color(palette.plum)),
+    bright = useRef(new Color(palette.glow))
+  useFrame(() => {
+    const progress = sim?.orbProgress()
+    const base = reached ? 1 : progress?.required ? progress.requiredCollected / progress.required : 0
+    const age = (performance.now() - (feedback?.current.goalLockedAt ?? -10000)) / 1000
+    const flash = age >= 0 && age < 0.5 ? Math.max(0, Math.sin((age / 0.5) * Math.PI * 4)) : 0
+    const value = Math.max(base, flash)
+    fill.color.copy(dark.current).lerp(bright.current, value)
+    fill.emissiveIntensity = 0.6 * value
+    if (lamp.current) lamp.current.intensity = 1.8 * value
+  })
   return (
     <group position={[x - 0.18, top, z - 0.18]}>
       <mesh
@@ -102,8 +124,9 @@ export function Lantern({
         ].map(([px, pz]) => (
           <mesh key={`${px},${pz}`} position={[px, 0, pz]} geometry={ribGeometry} material={material(palette.cream)} />
         ))}
-        <mesh geometry={coreGeometry} material={material(reached ? palette.glow : palette.plum, { glow: reached })} />
+        <mesh geometry={coreGeometry} material={fill} />
         <pointLight
+          ref={lamp}
           position={[0.05, 0, 0.05]}
           color={palette.glow}
           intensity={reached ? 1.8 : 0}

@@ -14,6 +14,7 @@ import {
   stateKey,
   tilesOf,
   walkGraph,
+  visibleTilesOf,
   type GameState,
   type Transition,
 } from './rules'
@@ -523,9 +524,11 @@ describe('T6.6 新机制规则', () => {
     // (2,1,2) 不挡本行，转后 (1,1,1) 遮住起点。
     const after = newAct(level, state, { type: 'operate', mechanism: 'tower' }).state
     const hidden = { ...after, at: '1,0,0' }
+    expect(visibleTilesOf(level, after).has('0,0,0')).toBe(false)
     expect(reachableFrom(level, hidden).has('0,0,0')).toBe(false)
     expect(reachableFrom(level, after).has('-1,0,0')).toBe(true)
     const restored = newAct(level, after, { type: 'operate', mechanism: 'tower' }).state
+    expect(visibleTilesOf(level, restored).has('0,0,0')).toBe(true)
     expect(reachableFrom(level, { ...restored, at: '1,0,0' }).has('0,0,0')).toBe(true)
   })
   it('推动可跨错觉连接并推上机关，箱子随后随机关移动', () => {

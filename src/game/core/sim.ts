@@ -211,7 +211,7 @@ export class LevelSim {
     return [...this.tiles().values()].find((tile) => cellId(tile.pos) === cellId(pos))
   }
 
-  characterPose(): { position: Vec3; heading: number; walking: boolean } {
+  characterPose(): { position: Vec3; heading: number; walking: boolean; pushing?: boolean } {
     if (this.pushMotion)
       return {
         position: segmentPoint(
@@ -221,6 +221,7 @@ export class LevelSim {
         ),
         heading: this.heading,
         walking: true,
+        pushing: true,
       }
     if (this.segment)
       return {
@@ -296,6 +297,18 @@ export class LevelSim {
       return { open: motion.from + (motion.to - motion.from) * easeInOut(Math.min(1, motion.elapsed / GATE_DURATION)) }
     if (!(id in this.shownGates)) throw new Error(`未知开关门 ${id}`)
     return { open: this.shownGates[id] ? 1 : 0 }
+  }
+
+  platePose(id: string): { pressed: boolean; spent: boolean } {
+    const plate = this.level.mechanisms.find((item) => item.id === id)
+    if (plate?.type !== 'plate') throw new Error(`未知压板 ${id}`)
+    const at = cellId(plate.tile)
+    const shown = this.pending && this.phase !== 'action' ? this.pending.state : this.current
+    const player = !this.characterPose().walking && this.displayAt === at
+    const crate =
+      plate.mode === 'hold' &&
+      Object.entries(shown.crates).some(([id, tile]) => tile === at && this.pushMotion?.crate !== id)
+    return { pressed: player || crate, spent: shown.spentPlates.includes(id) }
   }
 
   private tilePosition(id: string): Vec3 {

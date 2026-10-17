@@ -1,4 +1,4 @@
-import type { GateDef, LevelDef, MoverDef, RotatorDef, ScreenDir, TileRef } from '../levels/types'
+import type { GateDef, LevelDef, MoverDef, RotatorDef, ScreenDir, TileRef, Vec3 } from '../levels/types'
 import { buildGraph, cellId, screenKey, type Graph, type Tile } from './iso'
 import { advanceMover, moverBlocks, moverCursor, rotatorBlocks, type MoverCursor } from './mechanisms'
 import { rayHitsAny } from './visibility'
@@ -116,8 +116,21 @@ const directionOf = (from: Tile, to: Tile): ScreenDir | null => {
           : null
 }
 
+const visibleTiles = (tiles: Map<string, Tile>, blocks: Vec3[]): Set<string> =>
+  new Set(
+    [...tiles.values()].filter(({ pos: [x, y, z] }) => !rayHitsAny([x, y + 0.5, z], blocks)).map((tile) => tile.id),
+  )
+
+export function visibleTilesOf(level: LevelDef, state: GameState): Set<string> {
+  return visibleTiles(
+    tilesOf(level, state),
+    [...blocksOf(level, state)].map((block) => block.pos),
+  )
+}
+
 function entryFilter(level: LevelDef, state: GameState, tiles: Map<string, Tile>, ignoreCrate?: string) {
   const blocks = [...blocksOf(level, state)].map((block) => block.pos)
+  const visible = visibleTiles(tiles, blocks)
   const occupied = new Set(blocks.map(cellId))
   const crates = new Set(
     Object.entries(state.crates)
@@ -135,10 +148,7 @@ function entryFilter(level: LevelDef, state: GameState, tiles: Map<string, Tile>
     [...tiles.values()]
       .filter(
         ({ id, pos: [x, y, z] }) =>
-          !crates.has(id) &&
-          !closed.has(id) &&
-          !occupied.has(cellId([x, y + 1, z])) &&
-          !rayHitsAny([x, y + 0.5, z], blocks),
+          !crates.has(id) && !closed.has(id) && !occupied.has(cellId([x, y + 1, z])) && visible.has(id),
       )
       .map((tile) => tile.id),
   )

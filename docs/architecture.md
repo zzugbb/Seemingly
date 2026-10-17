@@ -79,6 +79,7 @@ src/
         ├── ending.ts
         ├── Decor.tsx
         ├── quality.ts
+        ├── feedback.ts        提示目标与渲染反馈时间戳
         ├── materials.ts
         └── palette.ts
 ```
@@ -263,6 +264,7 @@ export interface Transition {
 
 export function initialState(level: LevelDef): GameState
 export function tilesOf(level: LevelDef, state: GameState): Map<string, Tile>
+export function visibleTilesOf(level: LevelDef, state: GameState): Set<string> // 遮挡规则的只读视图，渲染用于点击过滤
 export function occupiedOf(level: LevelDef, state: GameState): Set<string>
 export function tileRefId(ref: TileRef): string
 export function gatesOf(level: LevelDef, state: GameState, departing?: boolean): Record<string, boolean>
@@ -355,11 +357,12 @@ export class LevelSim {
 
   tiles(): Map<string, Tile>
   tileAt(pos: Vec3): Tile | undefined
-  characterPose(): { position: Vec3; heading: number; walking: boolean }
+  characterPose(): { position: Vec3; heading: number; walking: boolean; pushing?: boolean }
   mechanismPose(id: string): { rotationY: number } | { offset: Vec3 }
   orbPose(id: string): { position: Vec3; collected: boolean }
   cratePose(id: string): { position: Vec3 } // T6.6
   gatePose(id: string): { open: number } // T6.6：0 关闭，1 完全打开
+  platePose(id: string): { pressed: boolean; spent: boolean } // T6.7：当前展示的静止压力与一次性状态
   patrolPose(id: string): { position: Vec3; heading: number } // T6.16
 }
 ```
@@ -415,7 +418,10 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 
 - `PlayScreen` 用 `useMemo` 按关卡和重开次数创建 `LevelSim`，传给 `Scene`。
 - `Scene` 的 `useFrame` 是唯一调用 `sim.update(dt)` 的地方，事件交给 `PlayScreen` 的回调（音效、提示、横幅、HUD 数字）。
+- `Scene` 的更新优先级为 `-1`，在其他显示组件读取姿态之前推进模拟器，避免小人与乘坐平台相差一帧；负优先级不接管渲染循环。
 - 渲染组件每帧从 `characterPose()`、`mechanismPose()`、`orbPose()` 读取位置，写到 `ref` 上。
+- `Crates`、`Gates`、两种压板分别读取 `cratePose`、`gatePose`、`platePose`，不推导游戏规则；箱子推动后、按住门动画尚未结束时，压板已显示按下。`visibleTilesOf` 在规则状态真正改变时刷新，禁止点击被遮挡的路面。
+- `Scene` 接受可选 `hint: { action, at }`，`at` 使用 `performance.now()`；路面、箱子、把手按该目标显示 2 秒高亮，提示计算和按钮由 T6.8 接入。光点收集和灯笼闪烁在模拟器事件发生时开始；撤销同步恢复光点、压板、把手和灯笼显示。动画更新只写 ref，几何体与材质由 `materials.ts` 共享，独立颜色或透明度动画使用该模块提供的实例材质并在卸载时释放。
 - HUD 的步数和光点数在 `step`、`orb`、`undo`、`mechanism-end` 事件后更新 React 状态，不每帧更新。
 - 撤销按钮调用 `sim.undo()`；提示按钮通过 `app/hints.ts` 查询 `stateKey(sim.state())` 的下一步，把结果交给 `Mechanisms`、`Blocks` 或 `Crates` 做 2 秒高亮，并在本局标记「用过提示」。
 

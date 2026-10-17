@@ -2,9 +2,15 @@ import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { Group, Mesh } from 'three'
 import { cellId, surfaceY } from '../core/iso'
+import { visibleTilesOf } from '../core/rules'
 import type { LevelSim, SimEvent } from '../core/sim'
 import type { LevelDef, Vec3 } from '../levels/types'
 import { Blocks } from './Blocks'
+import { Crates } from './Crates'
+import { Gates } from './Gates'
+import { Orbs } from './Orbs'
+import type { RenderFeedback, RenderHint } from './feedback'
+import { markerGeometry, useAnimatedMaterial } from './materials'
 import { CameraRig } from './CameraRig'
 import { Character } from './Character'
 import { Decor } from './Decor'
@@ -32,6 +38,7 @@ export function Scene({
   onEvent,
   onUnreachable,
   onLanternLit,
+  hint,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -44,6 +51,7 @@ export function Scene({
   onEvent?: (event: SimEvent) => void
   onUnreachable?: () => void
   onLanternLit?: () => void
+  hint?: RenderHint | null
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [won, setWon] = useState(false)
@@ -51,6 +59,8 @@ export function Scene({
   const [marker, setMarker] = useState<{ pos: Vec3; ok: boolean; at: number } | null>(null)
   const characterRef = useRef<Group>(null)
   const plateFx = useRef<PlateFx>({ spent: new Set(), flashAt: new Map() })
+  const feedback = useRef<RenderFeedback>({ blockedCrates: new Map(), blockedHandles: new Map(), goalLockedAt: -10000 })
+  const view = useRef({ state: sim.state(), visible: visibleTilesOf(level, sim.state()) })
   const motion = useRef({ heading: 0, phase: 0, wasWalking: false, arrive: 0 })
   const plateTiles = useMemo(
     () =>
@@ -64,6 +74,16 @@ export function Scene({
     const events = sim.update(delta)
     for (const event of events) {
       onEvent?.(event)
+      if (event.type === 'goal-locked') feedback.current.goalLockedAt = performance.now()
+      if (event.type === 'undo') {
+        setWon(false)
+        plateFx.current.spent = new Set(sim.state().spentPlates)
+        plateFx.current.flashAt.clear()
+        feedback.current.goalLockedAt = -10000
+        feedback.current.blockedCrates.clear()
+        feedback.current.blockedHandles.clear()
+        motion.current.heading = sim.characterPose().heading
+      }
       if (event.type === 'won') {
         setWon(true)
         onWon()
@@ -77,6 +97,8 @@ export function Scene({
         }
       }
     }
+    if (view.current.state !== sim.state())
+      view.current = { state: sim.state(), visible: visibleTilesOf(level, sim.state()) }
     const character = characterRef.current
     if (!character) return
     const pose = sim.characterPose()
@@ -91,11 +113,12 @@ export function Scene({
     character.rotation.y = anim.heading
     const body = character.getObjectByName('body')
     if (!body) return
+    body.rotation.x = pose.pushing ? 0.12 : 0
     if (pose.walking) {
       anim.phase += delta * Math.PI * 2.6
       anim.arrive = 0
-      body.rotation.z = Math.sin(anim.phase) * SWAY
-      body.position.y = Math.abs(Math.sin(anim.phase)) * BOB
+      body.rotation.z = pose.pushing ? 0 : Math.sin(anim.phase) * SWAY
+      body.position.y = pose.pushing ? 0 : Math.abs(Math.sin(anim.phase)) * BOB
       body.scale.y = 1
     } else if (anim.wasWalking) {
       anim.arrive = ARRIVE_TIME
@@ -115,10 +138,10 @@ export function Scene({
       body.scale.y = 1 + Math.sin(clock.elapsedTime * 1.6) * 0.02
     }
     anim.wasWalking = pose.walking
-  })
+  }, -1)
 
   const selectTile = (id: string) => {
-    if (!interactive) return
+    if (!interactive || !view.current.visible.has(id)) return
     const tile = sim.tiles().get(id)
     if (!tile) return
     const result = sim.command({ type: 'walk', tileId: id })
@@ -130,11 +153,18 @@ export function Scene({
     }
   }
 
+  const pushCrate = (id: string) => {
+    if (!interactive) return
+    const result = sim.command({ type: 'push', crate: id })
+    if (result === 'cannot-push') feedback.current.blockedCrates.set(id, performance.now())
+  }
+  const canSelect = (id: string) => interactive && view.current.visible.has(id)
   const blocks = level.blocks.map((block) => ({
     id: cellId(block.pos),
     pos: block.pos,
     color: palette[block.color],
     kind: block.kind,
+    oneWay: block.oneWay,
     lit: towerLit && towerTiles.has(cellId(block.pos)),
   }))
 
@@ -143,7 +173,15 @@ export function Scene({
       <Lights shadows={quality.shadows} />
       <CameraRig level={level} />
       <FloatingWorld still={reducedMotion} frozen={won && Boolean(level.ending)}>
-        <Blocks blocks={blocks} hovered={hovered} onHover={setHovered} onSelect={selectTile} bareCaps={plateTiles} />
+        <Blocks
+          blocks={blocks}
+          hovered={hovered}
+          onHover={setHovered}
+          onSelect={selectTile}
+          bareCaps={plateTiles}
+          hint={hint}
+          canSelect={canSelect}
+        />
         <Mechanisms
           level={level}
           sim={sim}
@@ -152,10 +190,23 @@ export function Scene({
           onSelect={selectTile}
           plateFx={plateFx}
           interactive={interactive}
+          feedback={feedback}
+          hint={hint}
+          canSelect={canSelect}
         />
+        <Orbs sim={sim} reducedMotion={reducedMotion} sparkleScale={quality.sparkleScale} />
+        <Crates sim={sim} feedback={feedback} hint={hint} onPush={pushCrate} interactive={interactive} />
+        <Gates sim={sim} feedback={feedback} hint={hint} interactive={interactive} />
         <Character ref={characterRef} />
         <Marker marker={marker} />
-        <Lantern goal={level.goal} reached={won} sparkleScale={quality.sparkleScale} reducedMotion={reducedMotion} />
+        <Lantern
+          goal={level.goal}
+          reached={won}
+          sparkleScale={quality.sparkleScale}
+          reducedMotion={reducedMotion}
+          sim={sim}
+          feedback={feedback}
+        />
         {won && level.ending && (
           <Finale
             ending={level.ending}
@@ -183,21 +234,26 @@ function FloatingWorld({ children, still, frozen }: { children: ReactNode; still
 
 function Marker({ marker }: { marker: { pos: Vec3; ok: boolean; at: number } | null }) {
   const ref = useRef<Mesh>(null)
+  const fill = useAnimatedMaterial(palette.markerSuccess, 0.8)
   useFrame(() => {
     const mesh = ref.current
     if (!mesh || !marker) return
     const age = (performance.now() - marker.at) / 1000
     const life = Math.max(0, 1 - age / 0.8)
     mesh.visible = life > 0
+    fill.color.set(marker.ok ? palette.markerSuccess : palette.markerError)
+    fill.opacity = life * 0.9
     mesh.scale.setScalar(0.6 + (1 - life) * 0.6)
-    ;(mesh.material as { opacity: number }).opacity = life * 0.9
   })
   if (!marker) return null
   const [x, y, z] = marker.pos
   return (
-    <mesh ref={ref} position={[x, surfaceY(y) + 0.01, z]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.28, 0.38, 32]} />
-      <meshBasicMaterial color={marker.ok ? '#ffffff' : '#e46d5f'} transparent depthWrite={false} />
-    </mesh>
+    <mesh
+      ref={ref}
+      position={[x, surfaceY(y) + 0.01, z]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      geometry={markerGeometry}
+      material={fill}
+    />
   )
 }

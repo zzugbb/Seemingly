@@ -20,6 +20,7 @@
 | --- | --- | --- |
 | path | `#f7ecd6` | 可行走路面的顶板 |
 | cream | `#fff7ea` | 悬停路面、角色头部、灯笼框 |
+| markerSuccess / markerError | `#ffffff` / `#e46d5f` | 既有点击成功与失败圆圈，统一从 palette 读取 |
 | sand | `#ecc795` | 岛屿地面 |
 | terracotta | `#de8d64` | 低处步道、终点基座、角色帽子 |
 | rose | `#e9a7a1` | 高塔 |
