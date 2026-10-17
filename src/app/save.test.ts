@@ -1,28 +1,58 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { emptySave, loadSave, writeSave } from './save'
-
 const memory = new Map<string, string>()
-
+const storage = () =>
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => memory.get(key) ?? null,
+    setItem: (key: string, value: string) => memory.set(key, value),
+  })
 afterEach(() => {
   memory.clear()
   vi.unstubAllGlobals()
 })
-
-const installStorage = () => {
-  vi.stubGlobal('localStorage', {
-    getItem: (key: string) => memory.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      memory.set(key, value)
-    },
+describe('v2 存档', () => {
+  it('v1 只保留静音，不迁移通关进度', () => {
+    storage()
+    memory.set('seemingly:save:v1', JSON.stringify({ version: 1, muted: true, completed: ['level-01'] }))
+    expect(loadSave()).toEqual({ ...emptySave(), muted: true })
   })
-}
-
-describe('存档', () => {
-  it('写入后能读回，坏数据退回空存档', () => {
-    installStorage()
-    writeSave({ version: 1, completed: ['level-00'], muted: true })
-    expect(loadSave()).toEqual({ version: 1, completed: ['level-00'], muted: true })
-    memory.set('seemingly:save:v1', '{')
+  it('v2 完整读写，优先于旧存档', () => {
+    storage()
+    const save = {
+      version: 2 as const,
+      muted: false,
+      levels: { 'level-00': { done: true, allOrbs: true, bestSteps: 1, parMet: true } },
+    }
+    memory.set('seemingly:save:v1', JSON.stringify({ version: 1, muted: true, completed: ['level-00'] }))
+    writeSave(save)
+    expect(loadSave()).toEqual(save)
+    expect(memory.has('seemingly:save:v2')).toBe(true)
+  })
+  it.each([
+    '{',
+    'null',
+    '[]',
+    '{"version":3}',
+    JSON.stringify({
+      version: 2,
+      muted: false,
+      levels: { x: { done: true, allOrbs: true, bestSteps: -1, parMet: true } },
+    }),
+  ])('损坏和未知数据退回空存档：%s', (raw) => {
+    storage()
+    memory.set('seemingly:save:v2', raw)
     expect(loadSave()).toEqual(emptySave())
+  })
+  it('无法访问本地存储时仍可在当前会话继续', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('blocked')
+      },
+      setItem: () => {
+        throw new Error('blocked')
+      },
+    })
+    expect(loadSave()).toEqual(emptySave())
+    expect(() => writeSave(emptySave())).not.toThrow()
   })
 })

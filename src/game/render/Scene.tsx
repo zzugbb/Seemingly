@@ -36,6 +36,7 @@ export function Scene({
   reducedMotion,
   onEndingReady,
   onEvent,
+  onStateChange,
   onUnreachable,
   onLanternLit,
   hint,
@@ -49,6 +50,7 @@ export function Scene({
   reducedMotion: boolean
   onEndingReady?: () => void
   onEvent?: (event: SimEvent) => void
+  onStateChange?: () => void
   onUnreachable?: () => void
   onLanternLit?: () => void
   hint?: RenderHint | null
@@ -70,6 +72,7 @@ export function Scene({
 
   const towerTiles = useMemo(() => new Set(level.ending?.tower.map(cellId)), [level])
 
+  const idle = useRef(sim.isIdle())
   useFrame(({ clock }, delta) => {
     const events = sim.update(delta)
     for (const event of events) {
@@ -97,8 +100,11 @@ export function Scene({
         }
       }
     }
-    if (view.current.state !== sim.state())
+    if (view.current.state !== sim.state() || idle.current !== sim.isIdle()) {
       view.current = { state: sim.state(), visible: visibleTilesOf(level, sim.state()) }
+      idle.current = sim.isIdle()
+      onStateChange?.()
+    }
     const character = characterRef.current
     if (!character) return
     const pose = sim.characterPose()
@@ -148,7 +154,8 @@ export function Scene({
     if (result === 'busy') return
     setMarker({ pos: tile.pos, ok: result === 'ok', at: performance.now() })
     if (result === 'unreachable') {
-      onBlocked('看起来连不上，换个角度试试')
+      const oneWay = level.blocks.some((block) => cellId(block.pos) === id && block.oneWay)
+      onBlocked(oneWay ? '只能从箭头方向进来' : '看起来连不上，换个角度试试')
       onUnreachable?.()
     }
   }
@@ -156,7 +163,11 @@ export function Scene({
   const pushCrate = (id: string) => {
     if (!interactive) return
     const result = sim.command({ type: 'push', crate: id })
-    if (result === 'cannot-push') feedback.current.blockedCrates.set(id, performance.now())
+    if (result === 'cannot-push') {
+      feedback.current.blockedCrates.set(id, performance.now())
+      onBlocked('前面过不去')
+      onUnreachable?.()
+    }
   }
   const canSelect = (id: string) => interactive && view.current.visible.has(id)
   const blocks = level.blocks.map((block) => ({
@@ -191,12 +202,13 @@ export function Scene({
           plateFx={plateFx}
           interactive={interactive}
           feedback={feedback}
+          onBlocked={onBlocked}
           hint={hint}
           canSelect={canSelect}
         />
         <Orbs sim={sim} reducedMotion={reducedMotion} sparkleScale={quality.sparkleScale} />
         <Crates sim={sim} feedback={feedback} hint={hint} onPush={pushCrate} interactive={interactive} />
-        <Gates sim={sim} feedback={feedback} hint={hint} interactive={interactive} />
+        <Gates sim={sim} onBlocked={onBlocked} feedback={feedback} hint={hint} interactive={interactive} />
         <Character ref={characterRef} />
         <Marker marker={marker} />
         <Lantern

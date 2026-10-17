@@ -12,10 +12,12 @@ import { palette } from './palette'
 export function Gates({
   sim,
   feedback,
+  onBlocked,
   hint,
   interactive = true,
 }: {
   sim: LevelSim
+  onBlocked?: (message: string) => void
   feedback: { current: RenderFeedback }
   hint?: RenderHint | null
   interactive?: boolean
@@ -24,7 +26,15 @@ export function Gates({
     <group>
       {sim.level.mechanisms.map((gate) =>
         gate.type === 'gate' ? (
-          <Gate key={gate.id} gate={gate} sim={sim} feedback={feedback} hint={hint} interactive={interactive} />
+          <Gate
+            key={gate.id}
+            gate={gate}
+            sim={sim}
+            onBlocked={onBlocked}
+            feedback={feedback}
+            hint={hint}
+            interactive={interactive}
+          />
         ) : null,
       )}
     </group>
@@ -34,11 +44,13 @@ function Gate({
   gate,
   sim,
   feedback,
+  onBlocked,
   hint,
   interactive,
 }: {
   gate: GateDef
   sim: LevelSim
+  onBlocked?: (message: string) => void
   feedback: { current: RenderFeedback }
   hint?: RenderHint | null
   interactive: boolean
@@ -62,6 +74,7 @@ function Gate({
           handle={gate.handle}
           sim={sim}
           id={gate.id}
+          onBlocked={onBlocked}
           feedback={feedback}
           hint={hint}
           interactive={interactive}

@@ -36,6 +36,7 @@ export function HandleControl({
   sim,
   id,
   feedback,
+  onBlocked,
   hint,
   interactive = true,
 }: {
@@ -43,6 +44,7 @@ export function HandleControl({
   sim: LevelSim
   id: string
   feedback: FeedbackRef
+  onBlocked?: (message: string) => void
   hint?: RenderHint | null
   interactive?: boolean
 }) {
@@ -93,8 +95,10 @@ export function HandleControl({
         onClick={(event) => {
           event.stopPropagation()
           if (!interactive) return
-          if (sim.command({ type: 'operate', mechanism: id }) === 'handle-used-up')
+          if (sim.command({ type: 'operate', mechanism: id }) === 'handle-used-up') {
             feedback.current.blockedHandles.set(id, performance.now())
+            onBlocked?.('已经用完了')
+          }
         }}
         onPointerOver={pointer(interactive)}
         onPointerOut={pointer(false)}
@@ -195,6 +199,7 @@ type MechProps = {
   onSelect: (id: string) => void
   hint?: RenderHint | null
   feedback: FeedbackRef
+  onBlocked?: (message: string) => void
   interactive: boolean
   canSelect: (id: string) => boolean
 }
@@ -245,6 +250,7 @@ function MovingView({ definition, ...props }: MechProps & { definition: RotatorD
           handle={definition.handle}
           id={definition.id}
           sim={props.sim}
+          onBlocked={props.onBlocked}
           feedback={props.feedback}
           hint={props.hint}
           interactive={props.interactive}
@@ -346,6 +352,7 @@ export function Mechanisms({
   plateFx,
   interactive = true,
   feedback,
+  onBlocked,
   hint,
   canSelect,
 }: {
@@ -357,6 +364,7 @@ export function Mechanisms({
   plateFx: { current: PlateFx }
   interactive?: boolean
   feedback: FeedbackRef
+  onBlocked?: (message: string) => void
   hint?: RenderHint | null
   canSelect: (id: string) => boolean
 }) {
@@ -372,6 +380,7 @@ export function Mechanisms({
             onHover={onHover}
             onSelect={onSelect}
             interactive={interactive}
+            onBlocked={onBlocked}
             feedback={feedback}
             hint={hint}
             canSelect={canSelect}

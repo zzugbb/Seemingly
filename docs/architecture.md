@@ -422,7 +422,7 @@ export function nextHint(level: LevelDef, state: GameState): Action | null // �
 - 渲染组件每帧从 `characterPose()`、`mechanismPose()`、`orbPose()` 读取位置，写到 `ref` 上。
 - `Crates`、`Gates`、两种压板分别读取 `cratePose`、`gatePose`、`platePose`，不推导游戏规则；箱子推动后、按住门动画尚未结束时，压板已显示按下。`visibleTilesOf` 在规则状态真正改变时刷新，禁止点击被遮挡的路面。
 - `Scene` 接受可选 `hint: { action, at }`，`at` 使用 `performance.now()`；路面、箱子、把手按该目标显示 2 秒高亮，提示计算和按钮由 T6.8 接入。光点收集和灯笼闪烁在模拟器事件发生时开始；撤销同步恢复光点、压板、把手和灯笼显示。动画更新只写 ref，几何体与材质由 `materials.ts` 共享，独立颜色或透明度动画使用该模块提供的实例材质并在卸载时释放。
-- HUD 的步数和光点数在 `step`、`orb`、`undo`、`mechanism-end` 事件后更新 React 状态，不每帧更新。
+- HUD 的步数和光点数在模拟器事件后更新 React 状态；`Scene.onStateChange` 在规则状态或空闲状态变化时补充通知（含门动画结束），不每帧更新。
 - 撤销按钮调用 `sim.undo()`；提示按钮通过 `app/hints.ts` 查询 `stateKey(sim.state())` 的下一步，把结果交给 `Mechanisms`、`Blocks` 或 `Crates` 做 2 秒高亮，并在本局标记「用过提示」。
 
 ## 页面状态与存档
@@ -458,7 +458,8 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 
 - `completeLevel`：`done = true`；`allOrbs ||= result.allOrbs`；`bestSteps` 取较小值；`parMet ||= !usedHint && steps <= targets[id].minActions`。
 - `isUnlocked`：主线第 1 关始终解锁，第 N+1 关在第 N 关 `done` 后解锁；挑战关 N 的规则见[设计稿](design.md#挑战章)——第 1 章挑战在第 1 章全部 `done` 后解锁，第 2～5 章挑战在该章所有关卡 `allOrbs` 后解锁。挑战关的解锁只看存档记录，不依赖当前会话。
-- 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。
+- 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。本地存储不可用时仍保留当前会话进度。
+- T6.8 兼容期仍保留首版九关：`mainLevels` 与旧的 `levels` 指向同一列表，`challengeLevels` 为空。首版没有目标表条目，通关保存时通过 `analyze` 获取其最少步数；横幅由后台策略提供最少步数。重制关卡始终使用设计者填写的 `targets`，不改写目标表。
 
 ## 音频
 

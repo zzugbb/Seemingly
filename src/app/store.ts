@@ -1,36 +1,57 @@
 import { create } from 'zustand'
-import { levels } from '../game/levels'
+import { challengeLevels, mainLevels, type LevelDef } from '../game/levels'
+import { targets } from '../game/levels/targets'
+import { analyze } from '../game/core/solver'
 import { detectQuality } from '../game/render/quality'
 import { loadSave, writeSave, type SaveData } from './save'
 
 export type Screen = 'title' | 'select' | 'play' | 'ending'
+export type LevelList = 'main' | 'challenge'
+export const levelLists = { main: mainLevels, challenge: challengeLevels }
 
 interface AppState {
   screen: Screen
-  levelIndex: number
+  current: { list: LevelList; index: number }
   save: SaveData
   quality: 'high' | 'low'
   goTitle: () => void
   goSelect: () => void
   goEnding: () => void
-  play: (levelIndex: number) => void
-  completeLevel: (id: string) => void
+  play: (list: LevelList, index: number) => void
+  completeLevel: (id: string, result: { steps: number; allOrbs: boolean; usedHint: boolean }) => void
   toggleMute: () => void
 }
 
 export const useApp = create<AppState>((set, get) => ({
   screen: 'title',
-  levelIndex: 0,
+  current: { list: 'main', index: 0 },
   save: loadSave(),
   quality: detectQuality(),
   goTitle: () => set({ screen: 'title' }),
   goSelect: () => set({ screen: 'select' }),
   goEnding: () => set({ screen: 'ending' }),
-  play: (levelIndex) => set({ screen: 'play', levelIndex }),
-  completeLevel: (id) => {
+  play: (list, index) => {
+    if (isUnlocked(get().save, list, index)) set({ screen: 'play', current: { list, index } })
+  },
+  completeLevel: (id, result) => {
+    const level = [...mainLevels, ...challengeLevels].find((item) => item.id === id)
+    if (!level || !Number.isSafeInteger(result.steps) || result.steps < 0) return
     const save = get().save
-    if (save.completed.includes(id)) return
-    const next = { ...save, completed: [...save.completed, id] }
+    const previous = save.levels[id]
+    // 首版九关没有难度目标，兼容期间仅在通关时求其最少步数。
+    const minimum = targets[id]?.minActions ?? analyze(level).minActions
+    const next: SaveData = {
+      ...save,
+      levels: {
+        ...save.levels,
+        [id]: {
+          done: true,
+          allOrbs: Boolean(previous?.allOrbs || result.allOrbs),
+          bestSteps: Math.min(previous?.bestSteps ?? Infinity, result.steps),
+          parMet: Boolean(previous?.parMet || (!result.usedHint && minimum !== null && result.steps <= minimum)),
+        },
+      },
+    }
     writeSave(next)
     set({ save: next })
   },
@@ -41,13 +62,23 @@ export const useApp = create<AppState>((set, get) => ({
   },
 }))
 
-export function firstPlayableIndex(completed: readonly string[]): number {
-  const index = levels.findIndex((level) => !completed.includes(level.id))
-  return index === -1 ? Math.max(0, levels.length - 1) : index
+export function firstPlayableIndex(save: SaveData): number {
+  const index = mainLevels.findIndex((level) => !save.levels[level.id]?.done)
+  return index === -1 ? Math.max(0, mainLevels.length - 1) : index
 }
 
-export function isUnlocked(index: number, completed: readonly string[]): boolean {
-  if (index <= 0) return true
-  const previous = levels[index - 1]
-  return previous ? completed.includes(previous.id) : false
+export function isUnlocked(
+  save: SaveData,
+  list: LevelList,
+  index: number,
+  lists: Record<LevelList, readonly LevelDef[]> = levelLists,
+): boolean {
+  const level = lists[list][index]
+  if (!level) return false
+  if (list === 'main') return index === 0 || Boolean(save.levels[lists.main[index - 1]?.id]?.done)
+  const chapter = lists.main.filter((item) => item.chapter === level.chapter)
+  return (
+    chapter.length > 0 &&
+    chapter.every((item) => (level.chapter === 1 ? save.levels[item.id]?.done : save.levels[item.id]?.allOrbs))
+  )
 }
