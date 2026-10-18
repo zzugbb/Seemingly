@@ -40,6 +40,7 @@ src/
 ├── audio/                     Web Audio 合成，不依赖 React
 │   ├── engine.ts              AudioContext、主音量、压缩器、音乐与音效总线、静音
 │   ├── theory.ts              纯函数：音名、频率、各章和弦与音阶
+│   ├── instruments.ts         第六关柔和键盘、持续声层、木质触感缓冲合成与缓存
 │   ├── reverb.ts              生成混响脉冲响应
 │   ├── music.ts               生成式环境音乐（调度器、铺底、低音、八音盒、换章）
 │   └── sfx.ts                 带音高的操作音
@@ -463,7 +464,7 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。本地存储不可用时仍保留当前会话进度。
 - T6.11 开发版主线为前两章六关，`mainLevels` 与 `levels` 指向同一列表，`challengeLevels` 为空；第六关完成后显示「后续章节即将开放」。全部关卡使用设计稿给定的 `targets`，通关保存不在主线程搜索状态图。
 - 存储的 v2 对象额外记录 `campaign: 'remake'`，区分 T6.8～T6.9 兼容期的同名旧关卡；没有该标记的旧记录仅保留静音。内存中的 `SaveData` 接口与存储键名不变，后续章节沿用该标记，不重复清理重制关卡进度。
-- T6.12a：保存对象增加 `revisions`（关卡编号到修订号）；`levels/index.ts` 从关卡的 `revision ?? 1` 导出版本表。读取旧记录时缺省修订号为 1，不匹配的关卡仅清除自身记录。第六关升级为 2，前五关和静音保留；新评价保存后刷新不再清除。`soundtrack` 与 `revision` 均由 builder 透传，不参与规则状态。
+- T6.12a：保存对象增加 `revisions`（关卡编号到修订号）；`levels/index.ts` 从关卡的 `revision ?? 1` 导出版本表。读取旧记录时缺省修订号为 1，不匹配的关卡仅清除自身记录。第六关 T6.12a 升级为 2，T6.12b 升级为 3，前五关和静音保留；新评价保存后刷新不再清除。`soundtrack` 与 `revision` 均由 builder 透传，不参与规则状态。
 
 ## 音频
 
@@ -476,7 +477,10 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - `app/sounds.ts`：把模拟器事件映射到音效：`step`→脚步，`mechanism-tick`→机关，`orb`→光点，`goal-locked`→提醒音，`undo`→撤销，`push`→推动，`gate`→开关门，`patrol-move`→巡逻者，`won`→灯笼。
 - 静音时立即停止全部音源并清理调度器，混响位于主音量之前，尾音也归零；取消静音时从暂停的和弦位置淡入。章内八音盒间隔随章节略作变化，均在 1.5～4 秒内，挑战关再按 90% 速度延长间隔。
 - 删除首版的 `ambient.ts`；旧的音频节点模拟测试随之移除，纯函数由 `theory.test.ts` 验证，音频生命周期及静音输出在真实浏览器中验证。巡逻者事件接线留到 T6.16。
-- T6.12a：仅游玩第六关时启用 `courtyard` 音乐配置，由 `App` 读取关卡字段传给 `MusicPlayer`；同章配置变化也执行三秒淡化，选关和标题恢复生成式配置。`theory.ts` 的 `courtyardNote(index)` 给出 32 秒周期的绝对音符时刻，调度器跳过已过去的音符，静音恢复沿用当前乐句时间；包络与音量见设计稿。
+- T6.12b：仅游玩第六关时启用 `courtyard` 配置，`App` 读取关卡字段传给 `MusicPlayer`；同章配置变化也三秒淡化，选关和标题恢复原生成式配置。`theory.ts` 的 `courtyardChordAt`、`courtyardNote` 与周期常量定义 96 秒乐句，实时音乐与效果音共用当前和弦。调度器跳过过去的整周期和音符，静音恢复不重新播放已经过去的音符。
+- `instruments.ts` 用 Web Audio 缓冲波形合成音色，不加载外部音频：柔和键盘采用基频加非整数泛音及各自衰减，持续声层用整数周期谐波保证循环接缝连续，木质触感用固定种子噪声与共鸣。缓存按音频上下文分离，键盘最多 12 音、持续层最多 8 和弦、木质触感两种。音乐单音与操作音复用键盘缓存，仍统一受引擎 12 音源上限管理。
+- 第六关持续声层不叠加独立低音；四秒起音、五秒释放，层增益 2.2。`sounds.ts` 接收关卡定义，只有 `courtyard` 在 `mechanism-start` 发运动材质声，并按机关顺序分配根音与五度音区；其他关卡的事件映射不变。`sfx.ts` 在第六关改用木质脚步和共用键盘回应；不参与任何规则求值。
+
 
 ## 结尾
 

@@ -4,11 +4,17 @@ import {
   chordAt,
   chordDuration,
   courtyardNote,
+  courtyardChordAt,
+  COURTYARD_CHORD_SECONDS,
+  COURTYARD_SECONDS,
+  COURTYARD_NOTE_COUNT,
+  COURTYARD_GAIN,
   midiFrequency,
   type Chapter,
   type Chord,
   type Soundtrack,
 } from './theory'
+import { feltBuffer, silkBuffer } from './instruments'
 
 interface Layer {
   chapter: Chapter
@@ -106,7 +112,10 @@ export class MusicPlayer {
     this.bus = undefined
   }
   currentChord(): Chord {
-    return chordAt(this.chapter, this.elapsed(), this.challenge)
+    return this.isCourtyard() ? courtyardChordAt(this.elapsed()) : chordAt(this.chapter, this.elapsed(), this.challenge)
+  }
+  isCourtyard(): boolean {
+    return this.soundtrack === 'courtyard'
   }
   currentScale(): readonly number[] {
     return chapterScale(this.chapter)
@@ -119,13 +128,13 @@ export class MusicPlayer {
       at = context.currentTime
     const gain = context.createGain()
     gain.gain.setValueAtTime(0, at)
-    gain.gain.linearRampToValueAtTime(1, at + 3)
+    gain.gain.linearRampToValueAtTime(this.isCourtyard() ? COURTYARD_GAIN : 1, at + 3)
     gain.connect(this.bus!.output)
     return {
       chapter,
       challenge,
       soundtrack: this.soundtrack,
-      nextNote: Math.floor(elapsed / 32) * 8,
+      nextNote: Math.floor(elapsed / COURTYARD_SECONDS) * COURTYARD_NOTE_COUNT,
       epoch: at - elapsed,
       nextChord: at + 0.01,
       nextBox: at + 1.5,
@@ -166,28 +175,34 @@ export class MusicPlayer {
     while (layer.nextChord < horizon) {
       const at = layer.nextChord,
         elapsed = Math.max(0, at - layer.epoch),
-        duration = chordDuration(layer.challenge)
+        duration = layer.soundtrack === 'courtyard' ? COURTYARD_CHORD_SECONDS : chordDuration(layer.challenge)
       const index = Math.floor((elapsed + 0.000001) / duration)
       const remaining = Math.max(0.001, layer.epoch + (index + 1) * duration - at)
-      const chord = chordAt(layer.chapter, elapsed + 0.000001, layer.challenge)
+      const courtyard = layer.soundtrack === 'courtyard'
+      const chord = courtyard
+        ? courtyardChordAt(elapsed + 0.000001)
+        : chordAt(layer.chapter, elapsed + 0.000001, layer.challenge)
       const pad = context.createBufferSource()
-      pad.buffer = padBuffer(context, chord)
+      pad.buffer = courtyard ? silkBuffer(context, chord) : padBuffer(context, chord)
       pad.loop = true
       const filter = context.createBiquadFilter()
       filter.type = 'lowpass'
       filter.frequency.value = 900
       const envelope = context.createGain()
-      const padVolume = layer.soundtrack === 'courtyard' ? 0.24 : 0.5
+      const padVolume = courtyard ? 0.32 : 0.5
+      const release = courtyard ? 5 : 3
       envelope.gain.setValueAtTime(0, at)
-      envelope.gain.linearRampToValueAtTime(padVolume, at + Math.min(2, remaining))
+      envelope.gain.linearRampToValueAtTime(padVolume, at + Math.min(courtyard ? 4 : 2, remaining))
       envelope.gain.setValueAtTime(padVolume, at + remaining)
-      envelope.gain.linearRampToValueAtTime(0, at + remaining + 3)
-      this.schedule(layer, pad, [filter, envelope], at, remaining + 3)
+      envelope.gain.linearRampToValueAtTime(0, at + remaining + release)
+      this.schedule(layer, pad, [filter, envelope], at, remaining + release)
+      layer.nextChord = at + remaining
+      if (courtyard) continue
       const bass = context.createOscillator()
       bass.type = 'sine'
       bass.frequency.value = midiFrequency(chord.notes[0] - 12)
       const bassGain = context.createGain()
-      const bassVolume = layer.soundtrack === 'courtyard' ? 0.12 : 0.3
+      const bassVolume = 0.3
       bassGain.gain.setValueAtTime(0, at)
       bassGain.gain.linearRampToValueAtTime(bassVolume, at + Math.min(1, remaining))
       bassGain.gain.setValueAtTime(bassVolume, at + remaining)
@@ -196,23 +211,25 @@ export class MusicPlayer {
       layer.nextChord = at + remaining
     }
     if (layer.soundtrack === 'courtyard') {
+      layer.nextNote = Math.max(
+        layer.nextNote,
+        Math.floor((now - layer.epoch) / COURTYARD_SECONDS) * COURTYARD_NOTE_COUNT,
+      )
       for (;;) {
         const note = courtyardNote(layer.nextNote)
         const at = layer.epoch + note.at
         if (at >= horizon) break
         layer.nextNote++
         if (at < now) continue
-        const tone = context.createOscillator()
-        tone.type = 'triangle'
-        tone.frequency.value = midiFrequency(note.note)
-        const filter = context.createBiquadFilter()
-        filter.type = 'lowpass'
-        filter.frequency.value = 1600
+        const tone = context.createBufferSource()
+        tone.buffer = feltBuffer(context, note.note)
+        const pan = context.createStereoPanner()
+        pan.pan.value = note.pan
         const envelope = context.createGain()
         envelope.gain.setValueAtTime(0, at)
-        envelope.gain.linearRampToValueAtTime(0.16, at + 0.035)
+        envelope.gain.linearRampToValueAtTime(0.3 * note.velocity, at + 0.02)
         envelope.gain.exponentialRampToValueAtTime(0.0001, at + note.duration)
-        this.schedule(layer, tone, [filter, envelope], at, note.duration + 0.01)
+        this.schedule(layer, tone, [envelope, pan], at, note.duration + 0.01)
       }
     } else
       while (layer.nextBox < horizon) {

@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { chapterScale, chordAt, chordDuration, courtyardNote, midiFrequency, stepNote, type Chapter } from './theory'
+import {
+  chapterScale,
+  chordAt,
+  chordDuration,
+  courtyardNote,
+  courtyardChordAt,
+  COURTYARD_NOTE_COUNT,
+  COURTYARD_SECONDS,
+  midiFrequency,
+  stepNote,
+  type Chapter,
+} from './theory'
 
 describe('五章调式与频率', () => {
   it.each([
@@ -42,14 +53,29 @@ describe('五章调式与频率', () => {
   })
 })
 
-describe('空庭主题乐句', () => {
-  it('乐句按时间有序，跨越和弦后仍保留八秒以上的留白', () => {
-    const notes = Array.from({ length: 24 }, (_, index) => courtyardNote(index))
+describe('空庭声景乐句', () => {
+  it('九十六秒乐句按时间前进，保留停顿且循环边界连续', () => {
+    const notes = Array.from({ length: COURTYARD_NOTE_COUNT * 2 }, (_, index) => courtyardNote(index))
     for (let i = 1; i < notes.length; i++) expect(notes[i].at).toBeGreaterThan(notes[i - 1].at)
-    expect(notes[4].at - notes[3].at).toBeGreaterThanOrEqual(8)
-    expect(notes[8].at - notes[7].at).toBeGreaterThanOrEqual(8)
-    expect(notes[8].at - notes[0].at).toBe(32)
-    expect(notes[8].note).toBe(notes[0].note)
-    expect(notes.every(({ note, duration }) => note >= 69 && note <= 76 && duration > 0)).toBe(true)
+    expect(notes.slice(1).some((note, i) => note.at - notes[i].at >= 8)).toBe(true)
+    for (let i = 0; i < COURTYARD_NOTE_COUNT; i++) {
+      expect(notes[i + COURTYARD_NOTE_COUNT].at - notes[i].at).toBe(COURTYARD_SECONDS)
+      expect(notes[i + COURTYARD_NOTE_COUNT].note).toBe(notes[i].note)
+    }
+    expect(
+      notes.every(
+        ({ note, duration, velocity, pan }) =>
+          note >= 57 && note <= 76 && duration > 0 && velocity > 0 && velocity <= 1 && Math.abs(pan) <= 1,
+      ),
+    ).toBe(true)
+  })
+  it('效果音与实际低音区和弦一致，十二秒边界与循环恢复正确', () => {
+    expect(courtyardChordAt(-1)).toEqual(courtyardChordAt(0))
+    expect(courtyardChordAt(11.999)).toEqual(courtyardChordAt(0))
+    expect(courtyardChordAt(12)).not.toEqual(courtyardChordAt(0))
+    expect(courtyardChordAt(COURTYARD_SECONDS)).toEqual(courtyardChordAt(0))
+    expect(courtyardChordAt(0).notes[0]).toBe(45)
+    for (let i = 0; i < 8; i++)
+      expect(courtyardChordAt(i * 12).notes.every((note) => note >= 41 && note <= 64)).toBe(true)
   })
 })

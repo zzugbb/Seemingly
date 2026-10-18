@@ -1,9 +1,14 @@
 import { audioEngine, type AudioBus } from './engine'
 import { music } from './music'
 import { midiFrequency, stepNote } from './theory'
+import { feltBuffer, woodBuffer } from './instruments'
 
 export type Sound =
-  'step' | 'mechanism' | 'orb' | 'lantern' | 'unreachable' | 'undo' | 'goalLocked' | 'push' | 'gate' | 'patrol'
+  'step' | 'turn' | 'mechanism' | 'orb' | 'lantern' | 'unreachable' | 'undo' | 'goalLocked' | 'push' | 'gate' | 'patrol'
+interface SoundOptions {
+  open?: boolean
+  register?: number
+}
 const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>()
 let previousChord = ''
 let footstep = 0
@@ -64,11 +69,46 @@ function friction(bus: AudioBus, at: number) {
   voice(bus, source, at, 0.16, 0.055, 0.015, filter)
 }
 
-export function renderSound(bus: AudioBus, sound: Sound, options: { open?: boolean } = {}): void {
+export function renderSound(bus: AudioBus, sound: Sound, options: SoundOptions = {}): void {
   const at = bus.context.currentTime,
     chord = music.currentChord(),
     scale = music.currentScale(),
     root = chord.notes[0]
+  if (music.isCourtyard()) {
+    const felt = (note: number, time: number, duration: number, volume: number) => {
+      const source = bus.context.createBufferSource()
+      source.buffer = feltBuffer(bus.context, note)
+      voice(bus, source, time, duration, volume, 0.015)
+    }
+    const grain = (turning: boolean, volume: number) => {
+      const source = bus.context.createBufferSource()
+      source.buffer = woodBuffer(bus.context, turning)
+      voice(bus, source, at, turning ? 0.9 : 0.12, volume, turning ? 0.12 : 0.005)
+    }
+    if (sound === 'step') {
+      grain(false, 0.12)
+      return
+    }
+    if (sound === 'turn') {
+      grain(true, 0.17)
+      felt(root + 12 + (options.register ?? 0), at + 0.08, 0.8, 0.035)
+      return
+    }
+    if (sound === 'mechanism') {
+      felt(root + 12 + (options.register ?? 0), at, 1, 0.065)
+      return
+    }
+    if (sound === 'orb') {
+      felt(root + 24, at, 3, 0.16)
+      felt(root + 31, at + 0.18, 3.5, 0.12)
+      return
+    }
+    if (sound === 'lantern') {
+      for (const [i, interval] of [12, 19, 24, 26].entries()) felt(root + interval, at + i * 0.18, 4, 0.14)
+      return
+    }
+  }
+  if (sound === 'turn') return
   if (sound === 'step') {
     if (previousChord !== chord.name) {
       previousChord = chord.name
@@ -94,7 +134,7 @@ export function renderSound(bus: AudioBus, sound: Sound, options: { open?: boole
     notes.forEach((note, index) => tone(bus, note, at + index * 0.1, 0.22, 0.055, 'triangle'))
   } else tone(bus, scale[scale.length - 1] + 12, at, 0.1, 0.012)
 }
-export function playSound(sound: Sound, options?: { open?: boolean }): void {
+export function playSound(sound: Sound, options?: SoundOptions): void {
   const bus = audioEngine.getBus()
   if (bus) renderSound(bus, sound, options)
 }

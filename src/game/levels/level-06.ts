@@ -5,7 +5,7 @@ export default defineLevel({
   id: 'level-06',
   title: '两难',
   chapter: 2,
-  revision: 2,
+  revision: 3,
   soundtrack: 'courtyard',
   build: (b) => {
     b.island({ x: [1, 9], z: [0, 1], y: -1, depth: 1.8 })
@@ -17,24 +17,25 @@ export default defineLevel({
     }
     for (let x = 2; x <= 8; x++) b.solid([x, -1, 4], 'terracotta')
 
-    const platforms: { pos: Vec3; color: 'terracotta' | 'rose' }[] = [
+    const platforms: { pos: Vec3; color: 'terracotta' | 'rose'; walkable?: boolean }[] = [
       { pos: [1, 1, 3], color: 'terracotta' },
       { pos: [5, 1, 1], color: 'terracotta' },
-      { pos: [10, 3, 5], color: 'rose' },
+      { pos: [10, 3, 5], color: 'rose', walkable: false },
       { pos: [6, 2, -3], color: 'rose' },
     ]
     for (const {
       pos: [x, y, z],
       color,
+      walkable = true,
     } of platforms) {
       b.column({ x, z, from: 0, to: y - 1 }, color)
-      b.path([x, y, z], color)
+      if (walkable) b.path([x, y, z], color)
+      else b.solid([x, y, z], color)
     }
 
     b.column({ x: 4, z: 4, from: 0, to: 2 }, 'teal')
     b.solid([6, 0, 7], 'teal')
     const frame: Vec3[] = [
-      [1, -1, 0],
       [2, -1, 0],
       [2, -1, -1],
       [3, -1, -1],
@@ -53,6 +54,7 @@ export default defineLevel({
       blocks: [
         { offset: [-1, 0, 0] },
         { offset: [4, 2, 4] },
+        { offset: [1, -1, 0] },
         ...frame.map((offset) => ({ offset, kind: 'solid' as const, color: 'teal' as const })),
       ],
       handle: { block: [6, 0, 7], face: 'z' },
@@ -69,7 +71,7 @@ export default defineLevel({
     })
 
     b.orb({ tile: [5, 1, 1] })
-    b.orb({ tile: [10, 3, 5], optional: true })
+    b.orb({ mechanism: 'west', block: 2, optional: true })
     b.tree([2, -1, 0])
     b.flower([8, -1, 7])
     b.window({ pos: [10, 1, 5], face: 'x' })

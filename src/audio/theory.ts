@@ -6,15 +6,65 @@ export interface Chord {
 export const CHORD_SECONDS = 8
 export type Soundtrack = 'generative' | 'courtyard'
 
-const COURTYARD_TIMES = [1, 3, 5.5, 8, 17, 19.5, 22, 25]
-const COURTYARD_NOTES = [69, 76, 74, 72, 69, 76, 71, 69]
+export const COURTYARD_SECONDS = 96
+export const COURTYARD_CHORD_SECONDS = 12
 
-export function courtyardNote(index: number): { at: number; note: number; duration: number } {
+const courtyardChords: readonly Chord[] = [
+  { name: 'Am(add9)', notes: [45, 52, 59, 60] },
+  { name: 'Fmaj7', notes: [41, 52, 57, 60] },
+  { name: 'Cmaj7', notes: [48, 55, 59, 64] },
+  { name: 'Gsus2', notes: [43, 50, 57, 62] },
+  { name: 'Dm9', notes: [50, 57, 60, 64] },
+  { name: 'Fmaj7', notes: [41, 52, 57, 60] },
+  { name: 'Am(add9)', notes: [45, 52, 59, 60] },
+  { name: 'Asus2', notes: [45, 52, 59, 64] },
+]
+const courtyardMelody = [
+  [2, 69, 0.65],
+  [4.8, 76, 0.42],
+  [8.3, 71, 0.38],
+  [14, 69, 0.5],
+  [18, 67, 0.38],
+  [21, 64, 0.45],
+  [26, 67, 0.5],
+  [29, 64, 0.36],
+  [37.5, 74, 0.54],
+  [41, 69, 0.4],
+  [45, 67, 0.35],
+  [51, 69, 0.55],
+  [54.5, 65, 0.4],
+  [58, 64, 0.32],
+  [63.5, 64, 0.45],
+  [67, 60, 0.32],
+  [74, 64, 0.5],
+  [77, 71, 0.36],
+  [81, 69, 0.45],
+  [86, 64, 0.38],
+  [89.5, 59, 0.3],
+  [92, 57, 0.3],
+] as const
+export const COURTYARD_NOTE_COUNT = courtyardMelody.length
+export const COURTYARD_GAIN = 2.2
+
+export function courtyardChordAt(seconds: number): Chord {
+  return courtyardChords[Math.floor(Math.max(0, seconds) / COURTYARD_CHORD_SECONDS) % courtyardChords.length]
+}
+
+export function courtyardNote(index: number): {
+  at: number
+  note: number
+  duration: number
+  velocity: number
+  pan: number
+} {
   const count = Math.max(0, Math.floor(index))
+  const [at, note, velocity] = courtyardMelody[count % COURTYARD_NOTE_COUNT]
   return {
-    at: Math.floor(count / 8) * 32 + COURTYARD_TIMES[count % 8],
-    note: COURTYARD_NOTES[count % 8],
-    duration: 2.4,
+    at: Math.floor(count / COURTYARD_NOTE_COUNT) * COURTYARD_SECONDS + at,
+    note,
+    duration: 5.5,
+    velocity,
+    pan: count % 2 === 0 ? -0.22 : 0.18,
   }
 }
 

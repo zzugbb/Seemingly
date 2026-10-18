@@ -13,7 +13,7 @@ const solveWithSound = (index: number) => {
     const command = step.type === 'walk' ? { type: 'walk' as const, tileId: sim.tileAt(step.to)!.id } : step
     expect(sim.command(command)).toBe('ok')
     for (let frame = 0; !sim.isIdle() && frame < 1000; frame++) {
-      sim.update(1 / 30).forEach(playSimEvent)
+      sim.update(1 / 30).forEach((event) => playSimEvent(event, level))
     }
   }
   expect(sim.status).toBe('won')
@@ -41,7 +41,7 @@ describe('模拟器音效接入', () => {
       { type: 'gate', id: 'gate', open: false },
       { type: 'mechanism-start', id: 'turn' },
     ]
-    events.forEach(playSimEvent)
+    events.forEach((event) => playSimEvent(event, levels[0]))
     expect(vi.mocked(playSound).mock.calls).toEqual([
       ['orb'],
       ['goalLocked'],
@@ -58,5 +58,12 @@ describe('模拟器音效接入', () => {
     expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(2)
     expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(1)
     expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
+  })
+  it('空庭：运动和到位分开发声，两座转盘使用不同音区', () => {
+    const sounds = solveWithSound(5)
+    expect(sounds.filter((sound) => sound === 'turn')).toHaveLength(7)
+    const turns = vi.mocked(playSound).mock.calls.filter(([sound]) => sound === 'turn')
+    expect(turns.filter(([, options]) => options?.register === 0)).toHaveLength(5)
+    expect(turns.filter(([, options]) => options?.register === 7)).toHaveLength(2)
   })
 })

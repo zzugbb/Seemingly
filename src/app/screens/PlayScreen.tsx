@@ -160,7 +160,7 @@ function Run({
   }, [toast])
 
   const onEvent = (event: SimEvent) => {
-    playSimEvent(event)
+    playSimEvent(event, level)
     refresh()
     if (event.type === 'goal-locked') setToast(`还差 ${event.missing} 个光点`)
     if (
