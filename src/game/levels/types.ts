@@ -102,6 +102,8 @@ export interface LevelDef {
   title: string // 中文关名
   chapter: 1 | 2 | 3 | 4 | 5
   challenge?: boolean
+  revision?: number
+  soundtrack?: 'courtyard'
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
   orbs: OrbDef[]

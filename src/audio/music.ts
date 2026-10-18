@@ -1,9 +1,20 @@
 import { audioEngine, type AudioBus } from './engine'
-import { chapterScale, chordAt, chordDuration, midiFrequency, type Chapter, type Chord } from './theory'
+import {
+  chapterScale,
+  chordAt,
+  chordDuration,
+  courtyardNote,
+  midiFrequency,
+  type Chapter,
+  type Chord,
+  type Soundtrack,
+} from './theory'
 
 interface Layer {
   chapter: Chapter
   challenge: boolean
+  soundtrack: Soundtrack
+  nextNote: number
   epoch: number
   nextChord: number
   nextBox: number
@@ -46,29 +57,31 @@ export class MusicPlayer {
   private timer: ReturnType<typeof setInterval> | undefined
   private chapter: Chapter = 1
   private challenge = false
+  private soundtrack: Soundtrack = 'generative'
   private paused = 0
 
-  start(chapter: Chapter = this.chapter, challenge = this.challenge): void {
+  start(chapter: Chapter = this.chapter, challenge = this.challenge, soundtrack = this.soundtrack): void {
     const bus = audioEngine.getBus('music')
     if (!bus) {
-      this.setChapter(chapter, challenge)
+      this.setChapter(chapter, challenge, soundtrack)
       return
     }
     if (this.bus?.context === bus.context && this.layer) {
-      this.setChapter(chapter, challenge)
+      this.setChapter(chapter, challenge, soundtrack)
       return
     }
     this.stop()
-    this.setChapter(chapter, challenge)
+    this.setChapter(chapter, challenge, soundtrack)
     this.bus = bus
     this.layer = this.createLayer(chapter, challenge, this.paused)
     this.tick()
     this.timer = setInterval(() => this.tick(), 100)
   }
-  setChapter(chapter: Chapter, challenge = false): void {
-    if (this.chapter === chapter && this.challenge === challenge) return
+  setChapter(chapter: Chapter, challenge = false, soundtrack: Soundtrack = 'generative'): void {
+    if (this.chapter === chapter && this.challenge === challenge && this.soundtrack === soundtrack) return
     this.chapter = chapter
     this.challenge = challenge
+    this.soundtrack = soundtrack
     this.paused = 0
     if (!this.bus || !this.layer) return
     if (this.retiring) this.disposeLayer(this.retiring)
@@ -111,6 +124,8 @@ export class MusicPlayer {
     return {
       chapter,
       challenge,
+      soundtrack: this.soundtrack,
+      nextNote: Math.floor(elapsed / 32) * 8,
       epoch: at - elapsed,
       nextChord: at + 0.01,
       nextBox: at + 1.5,
@@ -162,36 +177,58 @@ export class MusicPlayer {
       filter.type = 'lowpass'
       filter.frequency.value = 900
       const envelope = context.createGain()
+      const padVolume = layer.soundtrack === 'courtyard' ? 0.24 : 0.5
       envelope.gain.setValueAtTime(0, at)
-      envelope.gain.linearRampToValueAtTime(0.5, at + Math.min(2, remaining))
-      envelope.gain.setValueAtTime(0.5, at + remaining)
+      envelope.gain.linearRampToValueAtTime(padVolume, at + Math.min(2, remaining))
+      envelope.gain.setValueAtTime(padVolume, at + remaining)
       envelope.gain.linearRampToValueAtTime(0, at + remaining + 3)
       this.schedule(layer, pad, [filter, envelope], at, remaining + 3)
       const bass = context.createOscillator()
       bass.type = 'sine'
       bass.frequency.value = midiFrequency(chord.notes[0] - 12)
       const bassGain = context.createGain()
+      const bassVolume = layer.soundtrack === 'courtyard' ? 0.12 : 0.3
       bassGain.gain.setValueAtTime(0, at)
-      bassGain.gain.linearRampToValueAtTime(0.3, at + Math.min(1, remaining))
-      bassGain.gain.setValueAtTime(0.3, at + remaining)
+      bassGain.gain.linearRampToValueAtTime(bassVolume, at + Math.min(1, remaining))
+      bassGain.gain.setValueAtTime(bassVolume, at + remaining)
       bassGain.gain.linearRampToValueAtTime(0, at + remaining + 3)
       this.schedule(layer, bass, [bassGain], at, remaining + 3)
       layer.nextChord = at + remaining
     }
-    while (layer.nextBox < horizon) {
-      const at = layer.nextBox,
-        scale = chapterScale(layer.chapter)
-      const tone = context.createOscillator()
-      tone.type = 'sine'
-      tone.frequency.value = midiFrequency(scale[Math.floor(Math.random() * scale.length)] + 12)
-      const envelope = context.createGain()
-      envelope.gain.setValueAtTime(0, at)
-      envelope.gain.linearRampToValueAtTime(0.25, at + 0.008)
-      envelope.gain.exponentialRampToValueAtTime(0.0001, at + 1.2)
-      this.schedule(layer, tone, [envelope], at, 1.21)
-      const pace = [1, 0.94, 0.88, 0.82, 0.92][layer.chapter - 1]
-      layer.nextBox += (1.5 + Math.random() * 2.5 * pace) / (layer.challenge ? 0.9 : 1)
-    }
+    if (layer.soundtrack === 'courtyard') {
+      for (;;) {
+        const note = courtyardNote(layer.nextNote)
+        const at = layer.epoch + note.at
+        if (at >= horizon) break
+        layer.nextNote++
+        if (at < now) continue
+        const tone = context.createOscillator()
+        tone.type = 'triangle'
+        tone.frequency.value = midiFrequency(note.note)
+        const filter = context.createBiquadFilter()
+        filter.type = 'lowpass'
+        filter.frequency.value = 1600
+        const envelope = context.createGain()
+        envelope.gain.setValueAtTime(0, at)
+        envelope.gain.linearRampToValueAtTime(0.16, at + 0.035)
+        envelope.gain.exponentialRampToValueAtTime(0.0001, at + note.duration)
+        this.schedule(layer, tone, [filter, envelope], at, note.duration + 0.01)
+      }
+    } else
+      while (layer.nextBox < horizon) {
+        const at = layer.nextBox,
+          scale = chapterScale(layer.chapter)
+        const tone = context.createOscillator()
+        tone.type = 'sine'
+        tone.frequency.value = midiFrequency(scale[Math.floor(Math.random() * scale.length)] + 12)
+        const envelope = context.createGain()
+        envelope.gain.setValueAtTime(0, at)
+        envelope.gain.linearRampToValueAtTime(0.25, at + 0.008)
+        envelope.gain.exponentialRampToValueAtTime(0.0001, at + 1.2)
+        this.schedule(layer, tone, [envelope], at, 1.21)
+        const pace = [1, 0.94, 0.88, 0.82, 0.92][layer.chapter - 1]
+        layer.nextBox += (1.5 + Math.random() * 2.5 * pace) / (layer.challenge ? 0.9 : 1)
+      }
   }
 }
 export const music = new MusicPlayer()

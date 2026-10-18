@@ -4,6 +4,19 @@ export interface Chord {
   notes: readonly number[]
 }
 export const CHORD_SECONDS = 8
+export type Soundtrack = 'generative' | 'courtyard'
+
+const COURTYARD_TIMES = [1, 3, 5.5, 8, 17, 19.5, 22, 25]
+const COURTYARD_NOTES = [69, 76, 74, 72, 69, 76, 71, 69]
+
+export function courtyardNote(index: number): { at: number; note: number; duration: number } {
+  const count = Math.max(0, Math.floor(index))
+  return {
+    at: Math.floor(count / 8) * 32 + COURTYARD_TIMES[count % 8],
+    note: COURTYARD_NOTES[count % 8],
+    duration: 2.4,
+  }
+}
 
 // 九和弦省略五音，以四音声部保留根音、三音、七音和九音。
 const progressions: Record<Chapter, readonly Chord[]> = {

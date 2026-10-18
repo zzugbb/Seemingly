@@ -1,62 +1,94 @@
 import { defineLevel } from './builders'
+import type { Vec3 } from './types'
 
 export default defineLevel({
   id: 'level-06',
   title: '两难',
   chapter: 2,
+  revision: 2,
+  soundtrack: 'courtyard',
   build: (b) => {
-    b.island({ x: [-1, 2], z: [1, 3], y: -1 })
-    b.path([0, 0, 2], 'terracotta')
-    b.path([1, 0, 2], 'terracotta')
+    b.island({ x: [1, 9], z: [0, 1], y: -1, depth: 1.8 })
+    b.island({ x: [1, 9], z: [6, 7], y: -1, depth: 2.2 })
+    b.island({ x: [5, 7], z: [-4, -2], y: -1, depth: 2 })
+    for (let z = 2; z <= 5; z++) {
+      b.solid([1, -1, z], 'terracotta')
+      b.solid([9, -1, z], 'terracotta')
+    }
+    for (let x = 2; x <= 8; x++) b.solid([x, -1, 4], 'terracotta')
 
-    b.island({ x: [2, 4], z: [-1, 0], y: -1 })
-    b.path([3, 0, 0], 'terracotta')
-    b.orb({ tile: [3, 0, 0] })
+    const platforms: { pos: Vec3; color: 'terracotta' | 'rose' }[] = [
+      { pos: [1, 1, 3], color: 'terracotta' },
+      { pos: [5, 1, 1], color: 'terracotta' },
+      { pos: [10, 3, 5], color: 'rose' },
+      { pos: [6, 2, -3], color: 'rose' },
+    ]
+    for (const {
+      pos: [x, y, z],
+      color,
+    } of platforms) {
+      b.column({ x, z, from: 0, to: y - 1 }, color)
+      b.path([x, y, z], color)
+    }
 
-    b.island({ x: [4, 6], z: [3, 5], y: -1 })
-    b.column({ x: 5, z: 4, from: 0, to: 1 }, 'teal')
-    b.path([5, 2, 4], 'teal')
+    b.column({ x: 4, z: 4, from: 0, to: 2 }, 'teal')
+    b.solid([6, 0, 7], 'teal')
+    const frame: Vec3[] = [
+      [1, -1, 0],
+      [2, -1, 0],
+      [2, -1, -1],
+      [3, -1, -1],
+      [4, -1, -1],
+      [4, -1, 0],
+      [4, -1, 1],
+      [4, -1, 2],
+      [4, -1, 3],
+      [4, -1, 4],
+      [4, 0, 4],
+      [4, 1, 4],
+    ]
     b.rotator({
-      id: 'hub',
-      pivot: [5, 2, 4],
-      blocks: [{ offset: [-1, 0, 0] }, { offset: [0, 0, -1] }],
-      handle: { block: [5, 0, 4], face: 'z' },
+      id: 'west',
+      pivot: [4, 2, 4],
+      blocks: [
+        { offset: [-1, 0, 0] },
+        { offset: [4, 2, 4] },
+        ...frame.map((offset) => ({ offset, kind: 'solid' as const, color: 'teal' as const })),
+      ],
+      handle: { block: [6, 0, 7], face: 'z' },
     })
 
-    b.island({ x: [5, 7], z: [6, 8], y: -1, depth: 4 })
-    b.column({ x: 6, z: 7, from: 0, to: 2 }, 'rose')
-    b.path([6, 3, 7], 'rose')
-    b.orb({ tile: [6, 3, 7] })
-
-    b.island({ x: [8, 10], z: [4, 6], y: -1, depth: 4 })
-    b.column({ x: 9, z: 5, from: 0, to: 3 }, 'teal')
+    b.column({ x: 7, z: 4, from: 0, to: 2 }, 'teal')
+    b.solid([9, 1, 6], 'teal')
     b.rotator({
-      id: 'ferry',
-      pivot: [9, 3, 5],
-      blocks: [{ offset: [-1, 0, 0] }, { offset: [1, 0, 0] }],
-      handle: { block: [9, 0, 5], face: 'x' },
+      id: 'east',
+      pivot: [7, 2, 4],
+      initialStep: 3,
+      blocks: [{ offset: [-1, 0, 0] }, { offset: [-1, 0, -1] }],
+      handle: { block: [9, 1, 6], face: 'z' },
     })
-    b.orb({ mechanism: 'ferry', block: 1, optional: true })
 
-    b.island({ x: [9, 11], z: [7, 9], y: -1, depth: 5 })
-    b.column({ x: 10, z: 8, from: 0, to: 3 }, 'rose')
-    b.path([10, 4, 8], 'rose')
-
-    b.tree([-1, -1, 3])
-    b.window({ pos: [6, 1, 7], face: 'z' })
-    b.window({ pos: [10, 2, 8], face: 'x' })
-
-    b.start([0, 0, 2])
-    b.goal([10, 4, 8])
+    b.orb({ tile: [5, 1, 1] })
+    b.orb({ tile: [10, 3, 5], optional: true })
+    b.tree([2, -1, 0])
+    b.flower([8, -1, 7])
+    b.window({ pos: [10, 1, 5], face: 'x' })
+    b.window({ pos: [6, 0, -3], face: 'z' })
+    b.start([1, 1, 3])
+    b.goal([6, 2, -3])
   },
   solution: [
-    { type: 'walk', to: [3, 0, 0] },
-    { type: 'walk', to: [5, 2, 3] },
-    { type: 'operate', mechanism: 'hub' },
-    { type: 'walk', to: [6, 3, 7] },
-    { type: 'operate', mechanism: 'hub' },
-    { type: 'walk', to: [8, 3, 5] },
-    { type: 'operate', mechanism: 'ferry' },
-    { type: 'walk', to: [10, 4, 8] },
+    { type: 'walk', to: [3, 2, 4] },
+    { type: 'operate', mechanism: 'west' },
+    { type: 'operate', mechanism: 'west' },
+    { type: 'operate', mechanism: 'east' },
+    { type: 'walk', to: [5, 1, 1] },
+    { type: 'walk', to: [6, 2, 3] },
+    { type: 'operate', mechanism: 'west' },
+    { type: 'operate', mechanism: 'west' },
+    { type: 'operate', mechanism: 'east' },
+    { type: 'walk', to: [8, 4, 8] },
+    { type: 'operate', mechanism: 'west' },
+    { type: 'walk', to: [6, 2, -3] },
   ],
 })

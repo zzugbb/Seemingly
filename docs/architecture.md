@@ -187,6 +187,8 @@ export interface LevelDef {
   title: string
   chapter: 1 | 2 | 3 | 4 | 5 // T6.2 为 1～4，T6.6 扩展到 5
   challenge?: boolean // T6.6
+  revision?: number // T6.12a：未写为 1，用于使旧谜题评价失效
+  soundtrack?: 'courtyard' // T6.12a：第六关主题乐句，省略沿用章节生成式音乐
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
   orbs: OrbDef[] // T6.2
@@ -461,6 +463,7 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。本地存储不可用时仍保留当前会话进度。
 - T6.11 开发版主线为前两章六关，`mainLevels` 与 `levels` 指向同一列表，`challengeLevels` 为空；第六关完成后显示「后续章节即将开放」。全部关卡使用设计稿给定的 `targets`，通关保存不在主线程搜索状态图。
 - 存储的 v2 对象额外记录 `campaign: 'remake'`，区分 T6.8～T6.9 兼容期的同名旧关卡；没有该标记的旧记录仅保留静音。内存中的 `SaveData` 接口与存储键名不变，后续章节沿用该标记，不重复清理重制关卡进度。
+- T6.12a：保存对象增加 `revisions`（关卡编号到修订号）；`levels/index.ts` 从关卡的 `revision ?? 1` 导出版本表。读取旧记录时缺省修订号为 1，不匹配的关卡仅清除自身记录。第六关升级为 2，前五关和静音保留；新评价保存后刷新不再清除。`soundtrack` 与 `revision` 均由 builder 透传，不参与规则状态。
 
 ## 音频
 
@@ -468,11 +471,12 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - `theory.ts`：纯函数与数据，可单元测试。MIDI 编号与频率换算；五章的和弦进行与音阶，见[设计稿](design.md#音乐)；给定章节和时间返回当前和弦。
 - `reverb.ts`：用双声道指数衰减噪声生成 2.5 秒脉冲响应，交给 `ConvolverNode`。
 - 和弦铺底将每个音的双三角波合成到可循环的缓冲波形，低通与包络仍实时处理；每个上下文最多缓存 8 组波形。无需外部音频文件，换和弦及换章时仍可叠加淡化。引擎统一登记、释放音乐与音效音源，含预调度音源在内最多 12 个，超过时略过新音符。
-- `music.ts`：`MusicPlayer`，提供 `start(chapter)`、`setChapter(chapter)`（3 秒交叉淡化）、`stop()`、`currentChord()`、`currentScale()`。用前瞻调度：每 100 毫秒安排接下来 0.3 秒内的音符。同一时刻最多 12 个发声音源。
+- `music.ts`：`MusicPlayer`，提供 `start(chapter, challenge?, soundtrack?)`、`setChapter(chapter, challenge?, soundtrack?)`（3 秒交叉淡化）、`stop()`、`currentChord()`、`currentScale()`。用前瞻调度：每 100 毫秒安排接下来 0.3 秒内的音符。同一时刻最多 12 个发声音源。
 - `sfx.ts`：`step`、`mechanism`、`orb`、`lantern`、`unreachable`、`undo`、`goalLocked`、`push`、`gate`、`patrol`，音高取自 `music.currentChord()` 和 `currentScale()`；音乐未启动时使用第 1 章的和弦。
 - `app/sounds.ts`：把模拟器事件映射到音效：`step`→脚步，`mechanism-tick`→机关，`orb`→光点，`goal-locked`→提醒音，`undo`→撤销，`push`→推动，`gate`→开关门，`patrol-move`→巡逻者，`won`→灯笼。
 - 静音时立即停止全部音源并清理调度器，混响位于主音量之前，尾音也归零；取消静音时从暂停的和弦位置淡入。章内八音盒间隔随章节略作变化，均在 1.5～4 秒内，挑战关再按 90% 速度延长间隔。
 - 删除首版的 `ambient.ts`；旧的音频节点模拟测试随之移除，纯函数由 `theory.test.ts` 验证，音频生命周期及静音输出在真实浏览器中验证。巡逻者事件接线留到 T6.16。
+- T6.12a：仅游玩第六关时启用 `courtyard` 音乐配置，由 `App` 读取关卡字段传给 `MusicPlayer`；同章配置变化也执行三秒淡化，选关和标题恢复生成式配置。`theory.ts` 的 `courtyardNote(index)` 给出 32 秒周期的绝对音符时刻，调度器跳过已过去的音符，静音恢复沿用当前乐句时间；包络与音量见设计稿。
 
 ## 结尾
 

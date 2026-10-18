@@ -12,3 +12,6 @@ export const mainLevels = [level01, level02, level03, level04, level05, level06]
 
 export const challengeLevels: LevelDef[] = []
 export const levels = mainLevels
+export const levelRevisions: Record<string, number> = Object.fromEntries(
+  [...mainLevels, ...challengeLevels].map((level) => [level.id, level.revision ?? 1]),
+)

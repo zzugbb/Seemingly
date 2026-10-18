@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chapterScale, chordAt, chordDuration, midiFrequency, stepNote, type Chapter } from './theory'
+import { chapterScale, chordAt, chordDuration, courtyardNote, midiFrequency, stepNote, type Chapter } from './theory'
 
 describe('五章调式与频率', () => {
   it.each([
@@ -39,5 +39,17 @@ describe('五章调式与频率', () => {
     const chord = chordAt(1, 0)
     expect(Array.from({ length: 6 }, (_, step) => stepNote(chord, step))).toEqual([60, 64, 71, 74, 60, 64])
     expect(stepNote(chordAt(2, 8), 4)).toBe(53)
+  })
+})
+
+describe('空庭主题乐句', () => {
+  it('乐句按时间有序，跨越和弦后仍保留八秒以上的留白', () => {
+    const notes = Array.from({ length: 24 }, (_, index) => courtyardNote(index))
+    for (let i = 1; i < notes.length; i++) expect(notes[i].at).toBeGreaterThan(notes[i - 1].at)
+    expect(notes[4].at - notes[3].at).toBeGreaterThanOrEqual(8)
+    expect(notes[8].at - notes[7].at).toBeGreaterThanOrEqual(8)
+    expect(notes[8].at - notes[0].at).toBe(32)
+    expect(notes[8].note).toBe(notes[0].note)
+    expect(notes.every(({ note, duration }) => note >= 69 && note <= 76 && duration > 0)).toBe(true)
   })
 })

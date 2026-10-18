@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateLevels } from '../core/validate'
 import { LevelSim } from '../core/sim'
+import { analyze } from '../core/solver'
 import type { Vec3 } from './types'
 import { mainLevels, challengeLevels } from './index'
 import { targets } from './targets'
@@ -82,22 +83,41 @@ describe('第 1～2 章', () => {
     expect(sim.orbProgress().collected).toBe(2)
     expect(sim.steps()).toBe(targets['level-05'].minActionsAll)
   })
-  it('两难：在南塔转动中枢后能登船，全收集十步完成', () => {
+  it('两难：借东桥换乘西高台，全收集十八步完成', () => {
     const sim = new LevelSim(mainLevels[5])
-    walk(sim, [3, 0, 0])
-    walk(sim, [5, 2, 3])
-    operate(sim, 'hub')
-    walk(sim, [6, 3, 7])
-    operate(sim, 'hub')
-    operate(sim, 'ferry')
-    operate(sim, 'ferry')
-    walk(sim, [8, 3, 5])
-    expect(sim.state().at).toBe('ferry#1')
-    operate(sim, 'ferry')
-    walk(sim, [10, 4, 8])
+    walk(sim, [3, 2, 4])
+    operate(sim, 'west')
+    operate(sim, 'west')
+    operate(sim, 'east')
+    walk(sim, [5, 1, 1])
+    walk(sim, [6, 2, 3])
+    expect(sim.state().at).toBe('east#1')
+    operate(sim, 'west')
+    operate(sim, 'west')
+    operate(sim, 'east')
+    operate(sim, 'east')
+    walk(sim, [10, 3, 5])
+    walk(sim, [8, 2, 4])
+    operate(sim, 'east')
+    operate(sim, 'east')
+    operate(sim, 'east')
+    walk(sim, [8, 4, 8])
+    expect(sim.state().at).toBe('west#1')
+    const before = structuredClone(sim.state())
+    operate(sim, 'west')
+    expect(sim.undo()).toBe(true)
+    expect(sim.state()).toEqual(before)
+    operate(sim, 'west')
+    walk(sim, [6, 2, -3])
     expect(sim.status).toBe('won')
-    expect(sim.orbProgress().collected).toBe(3)
+    expect(sim.orbProgress().collected).toBe(2)
     expect(sim.steps()).toBe(targets['level-06'].minActionsAll)
+  })
+  it('两难：东桥必须参与中转，单独循环西转盘不能通关', () => {
+    const level = structuredClone(mainLevels[5])
+    const east = level.mechanisms.find((mechanism) => mechanism.id === 'east')!
+    if (east.type === 'rotator') east.handle = undefined
+    expect(analyze(level).minActions).toBeNull()
   })
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
     const broken = structuredClone(mainLevels[0])

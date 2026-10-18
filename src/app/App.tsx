@@ -25,9 +25,10 @@ export function App() {
       const level = levelLists[state.current.list][state.current.index]
       const chapter = state.screen === 'title' ? 1 : (level?.chapter ?? 1)
       const challenge = (state.screen === 'play' || state.screen === 'ending') && state.current.list === 'challenge'
+      const soundtrack = state.screen === 'play' || state.screen === 'ending' ? level?.soundtrack : undefined
       audioEngine.setMuted(state.save.muted)
       if (state.save.muted) music.stop()
-      else music.start(chapter, challenge)
+      else music.start(chapter, challenge, soundtrack ?? 'generative')
     }
     sync()
     const unsubscribe = useApp.subscribe((state, previous) => {

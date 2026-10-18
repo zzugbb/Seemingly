@@ -41,6 +41,8 @@ export function defineLevel(spec: {
   title: string
   chapter: LevelDef['chapter']
   challenge?: boolean
+  revision?: number
+  soundtrack?: LevelDef['soundtrack']
   hints?: string[]
   solution: SolutionStep[]
   ending?: EndingDef
@@ -115,6 +117,8 @@ export function defineLevel(spec: {
     title: spec.title,
     chapter: spec.chapter,
     challenge: spec.challenge,
+    revision: spec.revision,
+    soundtrack: spec.soundtrack,
     blocks,
     mechanisms,
     orbs,

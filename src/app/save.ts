@@ -1,3 +1,5 @@
+import { levelRevisions } from '../game/levels'
+
 export interface LevelRecord {
   done: boolean
   allOrbs: boolean
@@ -39,6 +41,8 @@ export function loadSave(): SaveData {
         )
       )
         return emptySave()
+      const revision = object(data.revisions) ? data.revisions[id] : undefined
+      if ((revision ?? 1) !== (levelRevisions[id] ?? 1)) continue
       Object.defineProperty(levels, id, {
         value: { done: record.done, allOrbs: record.allOrbs, bestSteps: record.bestSteps, parMet: record.parMet },
         enumerable: true,
@@ -54,7 +58,7 @@ export function loadSave(): SaveData {
 
 export function writeSave(save: SaveData) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ ...save, campaign: CAMPAIGN }))
+    localStorage.setItem(KEY, JSON.stringify({ ...save, campaign: CAMPAIGN, revisions: levelRevisions }))
   } catch {
     // 隐私模式或存储空间不足时，当前会话仍可继续。
   }
