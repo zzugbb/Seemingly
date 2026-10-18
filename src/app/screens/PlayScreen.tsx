@@ -189,12 +189,7 @@ function Run({
     if (level.ending) goEnding()
   }
   const hasNext = index + 1 < levelLists[list].length
-  const label =
-    list === 'challenge'
-      ? `挑战 ${level.chapter}`
-      : level.id === 'level-00'
-        ? '序章'
-        : `${index + (levelLists.main[0]?.id === 'level-00' ? 0 : 1)}`
+  const label = list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
   const message =
     !hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined
   return (

@@ -12,6 +12,7 @@ export interface SaveData {
 }
 
 const KEY = 'seemingly:save:v2'
+const CAMPAIGN = 'remake'
 export const emptySave = (): SaveData => ({ version: 2, levels: {}, muted: false })
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -45,7 +46,7 @@ export function loadSave(): SaveData {
         writable: true,
       })
     }
-    return { version: 2, levels, muted: data.muted }
+    return { version: 2, levels: data.campaign === CAMPAIGN ? levels : {}, muted: data.muted }
   } catch {
     return emptySave()
   }
@@ -53,7 +54,7 @@ export function loadSave(): SaveData {
 
 export function writeSave(save: SaveData) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(save))
+    localStorage.setItem(KEY, JSON.stringify({ ...save, campaign: CAMPAIGN }))
   } catch {
     // 隐私模式或存储空间不足时，当前会话仍可继续。
   }

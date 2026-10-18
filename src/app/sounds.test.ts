@@ -23,8 +23,12 @@ const solveWithSound = (index: number) => {
 describe('模拟器音效接入', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('转盘一档只响一次，整条路线每格脚步一次，抵达只点亮一次', () => {
-    expect(solveWithSound(2)).toEqual(['mechanism', 'step', 'step', 'step', 'step', 'step', 'step', 'lantern'])
+  it('转动：两次操作、收集光点和抵达分别发声，步数不等同于脚步数', () => {
+    const sounds = solveWithSound(3)
+    expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(2)
+    expect(sounds.filter((sound) => sound === 'step')).toHaveLength(10)
+    expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(1)
+    expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
   })
 
   it('新增音效事件保留门的开关方向，非音效事件不发声', () => {
@@ -48,7 +52,11 @@ describe('模拟器音效接入', () => {
     ])
   })
 
-  it('升降台跨两格发出两声机关，分段行走不多播起步或到位事件', () => {
-    expect(solveWithSound(3)).toEqual(['step', 'step', 'mechanism', 'mechanism', 'step', 'step', 'step', 'lantern'])
+  it('乘风：随桥转动不额外发出脚步音', () => {
+    const sounds = solveWithSound(4)
+    expect(sounds.filter((sound) => sound === 'step')).toHaveLength(6)
+    expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(2)
+    expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(1)
+    expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
   })
 })

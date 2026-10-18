@@ -69,14 +69,6 @@ const transitioned = (transition: Transition | null): Transition => {
 }
 
 describe('关卡数据与初始状态', () => {
-  it('旧九关补齐兼容数据，未放置光点时 builder 生成空数组', () => {
-    expect(levels).toHaveLength(9)
-    for (const level of levels) {
-      expect(level.chapter).toBe(1)
-      expect(level.orbs).toEqual([])
-    }
-  })
-
   it('保留光点定义顺序、章节和初始机关状态', () => {
     const level = withGears()
     expect(level.orbs).toEqual([{ tile: [1, 0, 0] }, { tile: [0, 0, 1], optional: true }])
@@ -334,7 +326,7 @@ describe('可达路线、合法动作与状态键', () => {
     for (const action of actions) expect(applyAction(level, state, action)).not.toBeNull()
   })
 
-  it.each(levels)('旧关卡 $id 的标准解法在规则层也能完成，路线与现有寻路一致', (level) => {
+  it.each(levels)('正式关卡 $id 的标准解法在规则层也能完成，路线与现有寻路一致', (level) => {
     let state = initialState(level)
     for (const step of level.solution) {
       const before = structuredClone(state)

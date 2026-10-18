@@ -1,51 +1,60 @@
 import { defineLevel } from './builders'
 
-// 升降台从 y=0 升到 y=2，才和左右两条高路对齐。屏幕上都在 b=0 这一行。
 export default defineLevel({
   id: 'level-03',
-  title: '升起',
+  title: '错位',
   chapter: 1,
   build: (b) => {
-    b.island({ x: [0, 2], z: [1, 3], y: -1 })
-    b.column({ x: 0, z: 2, from: 0, to: 1 }, 'terracotta')
-    b.column({ x: 1, z: 2, from: 0, to: 1 }, 'terracotta')
-    b.column({ x: 2, z: 2, from: 0, to: 1 }, 'terracotta')
-    b.path([0, 2, 2], 'terracotta')
-    b.path([1, 2, 2], 'terracotta')
-    b.path([2, 2, 2], 'terracotta')
+    b.island({ x: [-1, 3], z: [-2, 3], y: -1 })
+    for (const pos of [
+      [0, 0, 2],
+      [1, 0, 2],
+      [2, 0, 2],
+      [0, 0, 1],
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 0, -1],
+      [2, 0, -1],
+    ] as const)
+      b.path([...pos], 'terracotta')
+    b.orb({ tile: [2, 0, -1] })
 
-    b.island({ x: [3, 3], z: [1, 3], y: -1 })
-    b.mover({
-      id: 'lift',
-      origin: [3, 0, 2],
-      axis: 'y',
-      stops: [0, 2],
-      blocks: [{ offset: [0, 0, 0] }],
-      handle: { block: [2, 1, 2], face: 'z' },
-    })
+    b.island({ x: [5, 7], z: [3, 6], y: -1, depth: 4 })
+    b.column({ x: 6, z: 5, from: 0, to: 2 }, 'rose')
+    b.column({ x: 6, z: 4, from: 0, to: 2 }, 'rose')
+    b.path([6, 3, 5], 'rose')
+    b.path([6, 3, 4], 'rose')
 
-    b.island({ x: [4, 6], z: [1, 3], y: -1 })
-    b.column({ x: 4, z: 2, from: 0, to: 1 }, 'rose')
-    b.column({ x: 5, z: 2, from: 0, to: 1 }, 'rose')
-    b.path([4, 2, 2], 'rose')
-    b.path([5, 2, 2], 'rose')
-    b.column({ x: 6, z: 1, from: 0, to: 4 }, 'rose')
-    b.window({ pos: [6, 1, 1], face: 'x' })
-    b.window({ pos: [6, 2, 1], face: 'z' })
-    b.window({ pos: [6, 4, 1], face: 'x' })
+    b.island({ x: [4, 7], z: [0, 1], y: -1 })
+    for (const x of [4, 5, 6]) {
+      b.solid([x, 0, 1], 'terracotta')
+      b.path([x, 1, 1], 'terracotta')
+    }
+    b.orb({ tile: [6, 1, 1] })
 
-    b.tree([0, -1, 3])
-    b.tree([6, -1, 3])
-    b.flower([2, -1, 1])
-    b.flower([4, -1, 3])
+    b.island({ x: [8, 10], z: [1, 3], y: -1 })
+    for (const x of [8, 9]) {
+      b.column({ x, z: 2, from: 0, to: 1 }, 'sand')
+      b.path([x, 2, 2], 'cream')
+    }
 
-    b.start([0, 2, 2])
-    b.goal([5, 2, 2])
+    b.island({ x: [8, 11], z: [4, 6], y: -1, depth: 5 })
+    for (const x of [9, 10]) {
+      b.column({ x, z: 5, from: 0, to: 3 }, 'rose')
+      b.path([x, 4, 5], 'rose')
+    }
+    b.orb({ tile: [10, 4, 5] })
+
+    b.tree([-1, -1, 3])
+    b.flower([11, -1, 6])
+    b.window({ pos: [10, 2, 5], face: 'x' })
+
+    b.start([0, 0, 2])
+    b.goal([9, 2, 2])
   },
   solution: [
-    { type: 'walk', to: [2, 2, 2] },
-    { type: 'operate', mechanism: 'lift' },
-    { type: 'walk', to: [3, 2, 2] },
-    { type: 'walk', to: [5, 2, 2] },
+    { type: 'walk', to: [2, 0, -1] },
+    { type: 'walk', to: [10, 4, 5] },
+    { type: 'walk', to: [9, 2, 2] },
   ],
 })

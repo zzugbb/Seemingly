@@ -1,35 +1,38 @@
 import { defineLevel } from './builders'
 
-// 屏幕路线 (0,2)→(0,1)→(0,0)→(1,0)→(2,0) 都在高度 0，再错觉接到 (3,0) 高度 3 的塔顶。
 export default defineLevel({
   id: 'level-01',
-  title: '看似',
+  title: '启程',
   chapter: 1,
-  hints: ['点击路面，小人会走过去', '看起来连着，就能走过去'],
+  hints: ['点击路面，小人会走过去', '集齐光点，灯笼才会亮'],
   build: (b) => {
-    b.island({ x: [-1, 2], z: [-1, 3], y: -1 })
-    b.path([0, 0, 2], 'terracotta')
-    b.path([0, 0, 1], 'terracotta')
-    b.path([0, 0, 0], 'terracotta')
-    b.path([1, 0, 0], 'terracotta')
-    b.path([2, 0, 0], 'terracotta')
+    b.island({ x: [-1, 3], z: [-1, 3], y: -1 })
+    for (const pos of [
+      [0, 0, 3],
+      [0, 0, 2],
+      [0, 0, 1],
+      [1, 0, 1],
+      [2, 0, 1],
+      [0, 0, 0],
+      [0, 0, -1],
+      [1, 0, -1],
+    ] as const)
+      b.path([...pos], 'terracotta')
+    b.orb({ tile: [1, 0, -1] })
 
-    b.island({ x: [5, 8], z: [1, 4], y: -1 })
-    b.column({ x: 6, z: 3, from: 0, to: 2 }, 'rose')
-    b.path([6, 3, 3], 'rose')
+    b.island({ x: [4, 6], z: [2, 4], y: -1 })
+    b.column({ x: 5, z: 3, from: 0, to: 1 }, 'rose')
+    b.path([5, 2, 3], 'rose')
 
-    b.column({ x: 7, z: 2, from: 0, to: 4 }, 'rose')
-    b.window({ pos: [7, 1, 2], face: 'x' })
-    b.window({ pos: [7, 2, 2], face: 'z' })
-    b.window({ pos: [7, 4, 2], face: 'x' })
+    b.tree([-1, -1, 0])
+    b.flower([3, -1, 3])
+    b.tree([6, -1, 4])
 
-    b.tree([-1, -1, 3])
-    b.tree([2, -1, 3])
-    b.flower([1, -1, 3])
-    b.flower([6, -1, 4])
-
-    b.start([0, 0, 2])
-    b.goal([6, 3, 3])
+    b.start([0, 0, 3])
+    b.goal([5, 2, 3])
   },
-  solution: [{ type: 'walk', to: [6, 3, 3] }],
+  solution: [
+    { type: 'walk', to: [1, 0, -1] },
+    { type: 'walk', to: [5, 2, 3] },
+  ],
 })

@@ -20,13 +20,7 @@ export function LevelSelect() {
           disabled={!unlocked}
           onClick={() => play(list, index)}
         >
-          <span className="level-index">
-            {list === 'challenge'
-              ? `挑战 ${level.chapter}`
-              : level.id === 'level-00'
-                ? '序章'
-                : index + (mainLevels[0].id === 'level-00' ? 0 : 1)}
-          </span>
+          <span className="level-index">{list === 'challenge' ? `挑战 ${level.chapter}` : index + 1}</span>
           <span className="level-name">{level.title}</span>
           <Ratings value={save.levels[level.id]} />
           {list === 'challenge' && !unlocked && (

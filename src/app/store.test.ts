@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mainLevels, type LevelDef } from '../game/levels'
+import { targets } from '../game/levels/targets'
 import { emptySave } from './save'
 import { firstPlayableIndex, isUnlocked, useApp } from './store'
 beforeEach(() => useApp.setState({ screen: 'title', current: { list: 'main', index: 0 }, save: emptySave() }))
@@ -11,7 +12,12 @@ describe('进度与评价', () => {
     for (let i = 0; i < mainLevels.length; i++) {
       expect(firstPlayableIndex(save)).toBe(i)
       expect(isUnlocked(save, 'main', i)).toBe(true)
-      save.levels[mainLevels[i].id] = { done: true, allOrbs: true, bestSteps: 1, parMet: true }
+      save.levels[mainLevels[i].id] = {
+        done: true,
+        allOrbs: true,
+        bestSteps: targets[mainLevels[i].id].minActions,
+        parMet: true,
+      }
     }
     expect(firstPlayableIndex(save)).toBe(mainLevels.length - 1)
     expect(isUnlocked(save, 'main', 99)).toBe(false)
@@ -26,14 +32,17 @@ describe('进度与评价', () => {
   it('保存历史最好；提示影响本次步数评价，后续无提示仍可获得', () => {
     const complete = useApp.getState().completeLevel,
       id = mainLevels[0].id
+    const minimum = targets[id].minActions
     complete(id, { steps: 4, allOrbs: false, usedHint: true })
     expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: false, bestSteps: 4, parMet: false })
-    complete(id, { steps: 1, allOrbs: true, usedHint: true })
-    expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: true, bestSteps: 1, parMet: false })
-    complete(id, { steps: 1, allOrbs: false, usedHint: false })
+    complete(id, { steps: minimum + 1, allOrbs: false, usedHint: false })
+    expect(useApp.getState().save.levels[id].parMet).toBe(false)
+    complete(id, { steps: minimum, allOrbs: true, usedHint: true })
+    expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: true, bestSteps: minimum, parMet: false })
+    complete(id, { steps: minimum, allOrbs: false, usedHint: false })
     expect(useApp.getState().save.levels[id].parMet).toBe(true)
     complete(id, { steps: 8, allOrbs: false, usedHint: true })
-    expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: true, bestSteps: 1, parMet: true })
+    expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: true, bestSteps: minimum, parMet: true })
   })
   it('拒绝直接进入未解锁或不存在的关卡', () => {
     useApp.getState().play('main', 1)

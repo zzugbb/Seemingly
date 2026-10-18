@@ -459,7 +459,8 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - `completeLevel`：`done = true`；`allOrbs ||= result.allOrbs`；`bestSteps` 取较小值；`parMet ||= !usedHint && steps <= targets[id].minActions`。
 - `isUnlocked`：主线第 1 关始终解锁，第 N+1 关在第 N 关 `done` 后解锁；挑战关 N 的规则见[设计稿](design.md#挑战章)——第 1 章挑战在第 1 章全部 `done` 后解锁，第 2～5 章挑战在该章所有关卡 `allOrbs` 后解锁。挑战关的解锁只看存档记录，不依赖当前会话。
 - 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。本地存储不可用时仍保留当前会话进度。
-- T6.8 兼容期仍保留首版九关：`mainLevels` 与旧的 `levels` 指向同一列表，`challengeLevels` 为空。首版没有目标表条目，通关保存时通过 `analyze` 获取其最少步数；横幅由后台策略提供最少步数。重制关卡始终使用设计者填写的 `targets`，不改写目标表。
+- T6.11 开发版主线为前两章六关，`mainLevels` 与 `levels` 指向同一列表，`challengeLevels` 为空；第六关完成后显示「后续章节即将开放」。全部关卡使用设计稿给定的 `targets`，通关保存不在主线程搜索状态图。
+- 存储的 v2 对象额外记录 `campaign: 'remake'`，区分 T6.8～T6.9 兼容期的同名旧关卡；没有该标记的旧记录仅保留静音。内存中的 `SaveData` 接口与存储键名不变，后续章节沿用该标记，不重复清理重制关卡进度。
 
 ## 音频
 

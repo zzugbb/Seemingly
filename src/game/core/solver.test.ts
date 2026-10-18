@@ -253,14 +253,14 @@ describe('求解器指标与提示', () => {
   })
 })
 
-describe('首版关卡兼容性与性能', () => {
-  it.each(levels)('$id 在两秒内求出不长于标准解法的解', (level) => {
+describe('正式关卡求解与性能', () => {
+  it.each(levels)('$id 在两秒内求出与标准解法等长的最优解', (level) => {
     const started = performance.now()
     const metrics = analyze(level)
     expect(performance.now() - started).toBeLessThan(2000)
     expect(metrics.minActions).not.toBeNull()
-    expect(metrics.minActions!).toBeLessThanOrEqual(level.solution.length)
-    expect(metrics.minActionsAll).toBe(metrics.minActions)
+    expect(metrics.minActions).toBe(level.solution.length)
+    expect(metrics.minActionsAll).toBeGreaterThanOrEqual(metrics.minActions!)
   })
 })
 

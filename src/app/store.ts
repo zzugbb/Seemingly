@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { challengeLevels, mainLevels, type LevelDef } from '../game/levels'
 import { targets } from '../game/levels/targets'
-import { analyze } from '../game/core/solver'
 import { detectQuality } from '../game/render/quality'
 import { loadSave, writeSave, type SaveData } from './save'
 
@@ -38,8 +37,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (!level || !Number.isSafeInteger(result.steps) || result.steps < 0) return
     const save = get().save
     const previous = save.levels[id]
-    // 首版九关没有难度目标，兼容期间仅在通关时求其最少步数。
-    const minimum = targets[id]?.minActions ?? analyze(level).minActions
+    const minimum = targets[id]?.minActions
     const next: SaveData = {
       ...save,
       levels: {
@@ -48,7 +46,7 @@ export const useApp = create<AppState>((set, get) => ({
           done: true,
           allOrbs: Boolean(previous?.allOrbs || result.allOrbs),
           bestSteps: Math.min(previous?.bestSteps ?? Infinity, result.steps),
-          parMet: Boolean(previous?.parMet || (!result.usedHint && minimum !== null && result.steps <= minimum)),
+          parMet: Boolean(previous?.parMet || (!result.usedHint && minimum !== undefined && result.steps <= minimum)),
         },
       },
     }
