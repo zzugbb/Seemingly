@@ -81,7 +81,7 @@ describe('v2 存档', () => {
     writeSave(updated)
     expect(loadSave()).toEqual(updated)
   })
-  it('第三关修订只清除旧评价，其他已校准关卡保留', () => {
+  it.each(['level-03', 'level-04'])('%s 修订只清除旧评价，其他已校准关卡保留', (id) => {
     storage()
     const record = { done: true, allOrbs: true, bestSteps: 3, parMet: true }
     const save = {
@@ -90,17 +90,20 @@ describe('v2 存档', () => {
       levels: {
         'level-01': record,
         'level-02': record,
-        'level-03': record,
+        [id]: record,
         'level-06': record,
       },
     }
     writeSave(save)
     const raw = JSON.parse(memory.get('seemingly:save:v2')!) as { revisions: Record<string, number> }
-    raw.revisions['level-03'] = 1
+    raw.revisions[id] = 1
     memory.set('seemingly:save:v2', JSON.stringify(raw))
     const loaded = loadSave()
     expect(loaded.levels).toEqual({ 'level-01': record, 'level-02': record, 'level-06': record })
-    const updated = { ...loaded, levels: { ...loaded.levels, 'level-03': { ...record, bestSteps: 4 } } }
+    const updated = {
+      ...loaded,
+      levels: { ...loaded.levels, [id]: { ...record, bestSteps: id === 'level-03' ? 4 : 6 } },
+    }
     writeSave(updated)
     expect(loadSave()).toEqual(updated)
   })

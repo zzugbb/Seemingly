@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateLevels } from '../core/validate'
 import { LevelSim } from '../core/sim'
+import { surfaceY } from '../core/iso'
 import { analyze } from '../core/solver'
 import type { Vec3 } from './types'
 import { mainLevels, challengeLevels } from './index'
@@ -99,18 +100,38 @@ describe('第 1～2 章', () => {
     expect(sim.status).toBe('won')
     expect(sim.steps()).toBe(4)
   })
-  it('转动：同一轮南北朝向拿两个光点，全收集七步完成', () => {
+  it('转动：先乘下层平台取选做，再回北台，全收集十二步；乘坐撤销恢复站位', () => {
     const sim = new LevelSim(mainLevels[3])
-    walk(sim, [6, 2, 4])
     operate(sim, 'bridge')
-    walk(sim, [8, 4, 8])
+    walk(sim, [3, 1, 4])
+    expect(sim.state().at).toBe('bridge#2')
+    const before = structuredClone(sim.state())
+    operate(sim, 'bridge')
+    expect(sim.characterPose().position).toEqual([6, surfaceY(1), 7])
+    expect(sim.undo()).toBe(true)
+    expect(sim.state()).toEqual(before)
+    operate(sim, 'bridge')
+    walk(sim, [9, 3, 9])
+    expect(sim.orbProgress().collected).toBe(1)
+    walk(sim, [6, 1, 7])
+    operate(sim, 'bridge')
+    operate(sim, 'bridge')
     walk(sim, [5, 1, 1])
-    walk(sim, [6, 2, 4])
-    operate(sim, 'bridge')
-    walk(sim, [9, 3, 5])
-    expect(sim.status).toBe('won')
     expect(sim.orbProgress().collected).toBe(2)
+    operate(sim, 'bridge')
+    walk(sim, [6, 2, 3])
+    operate(sim, 'bridge')
+    walk(sim, sim.level.goal)
+    expect(sim.status).toBe('won')
     expect(sim.steps()).toBe(targets['level-04'].minActionsAll)
+  })
+  it('转动：没有下层乘台仍能走主线，但选做光点不可到达', () => {
+    const level = structuredClone(mainLevels[3])
+    const bridge = level.mechanisms.find((mechanism) => mechanism.id === 'bridge')!
+    if (bridge.type === 'rotator') bridge.blocks[2].kind = 'solid'
+    const metrics = analyze(level)
+    expect(metrics.minActions).toBe(6)
+    expect(metrics.minActionsAll).toBeNull()
   })
   it('乘风：先转两次登上另一条桥臂，全收集八步完成', () => {
     const sim = new LevelSim(mainLevels[4])
