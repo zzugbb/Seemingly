@@ -40,7 +40,7 @@ src/
 ├── audio/                     Web Audio 合成，不依赖 React
 │   ├── engine.ts              AudioContext、主音量、压缩器、音乐与音效总线、静音
 │   ├── theory.ts              纯函数：音名、频率、各章和弦与音阶
-│   ├── instruments.ts         第六关柔和键盘、持续声层、木质触感缓冲合成与缓存
+│   ├── instruments.ts         主题音乐柔和键盘、持续声层、木质触感缓冲合成与缓存
 │   ├── reverb.ts              生成混响脉冲响应
 │   ├── music.ts               生成式环境音乐（调度器、铺底、低音、八音盒、换章）
 │   └── sfx.ts                 带音高的操作音
@@ -189,7 +189,7 @@ export interface LevelDef {
   chapter: 1 | 2 | 3 | 4 | 5 // T6.2 为 1～4，T6.6 扩展到 5
   challenge?: boolean // T6.6
   revision?: number // T6.12a：未写为 1，用于使旧谜题评价失效
-  soundtrack?: 'courtyard' // T6.12a：第六关主题乐句，省略沿用章节生成式音乐
+  soundtrack?: 'courtyard' // 第一、六关主题乐句；章节 1 为启程，2 为空庭，省略沿用生成式音乐
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
   orbs: OrbDef[] // T6.2
@@ -482,6 +482,9 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - 第六关持续声层不叠加独立低音；四秒起音、五秒释放，层增益 8.8（T6.12c：比上一版增加约 12 dB）。`sounds.ts` 接收关卡定义，只有 `courtyard` 在 `mechanism-start` 发运动材质声，并按机关顺序分配根音与五度音区；其他关卡的事件映射不变。`sfx.ts` 在第六关改用木质脚步和共用键盘回应；不参与任何规则求值。
 
 - T6.12d 将第六关铺底包络电平从 0.32 降到 0.08，并在铺底低通之前串联 180 Hz 高通（Q=0.707）；键盘旋律包络系数从 0.3 提到 1.2，继续乘音符力度。层增益仍为 8.8，操作音及其他关卡保持原值。
+- T6.12e：仅第一关新增 `soundtrack: 'courtyard'`，沿用相同音色与混音；`courtyardChordAt(seconds, chapter=2)`、`courtyardNote(index, chapter=2)` 在章节 1 选择 C 大调启程乐句，其他章节保持空庭乐句。实时调度与 `currentChord()` 均传入章节，音效同步使用实际和弦。默认参数保留第六关已有输出；第 2～5 关、标题和选关仍为生成式配置。
+- 第一关 `revision: 2`，旧第一关评价独立失效，其他五关记录和静音保留；加载时不级联清空后续已解锁关卡。
+
 
 ## 结尾
 

@@ -23,6 +23,14 @@ const solveWithSound = (index: number) => {
 describe('模拟器音效接入', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('启程：两处光点与回庭点灯分别发声，没有机关声', () => {
+    const sounds = solveWithSound(0)
+    expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(2)
+    expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
+    expect(sounds).not.toContain('turn')
+    expect(sounds).not.toContain('mechanism')
+  })
+
   it('转动：两次操作、收集光点和抵达分别发声，步数不等同于脚步数', () => {
     const sounds = solveWithSound(3)
     expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(2)
@@ -41,7 +49,7 @@ describe('模拟器音效接入', () => {
       { type: 'gate', id: 'gate', open: false },
       { type: 'mechanism-start', id: 'turn' },
     ]
-    events.forEach((event) => playSimEvent(event, levels[0]))
+    events.forEach((event) => playSimEvent(event, levels[1]))
     expect(vi.mocked(playSound).mock.calls).toEqual([
       ['orb'],
       ['goalLocked'],

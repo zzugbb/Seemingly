@@ -79,3 +79,24 @@ describe('空庭声景乐句', () => {
       expect(courtyardChordAt(i * 12).notes.every((note) => note >= 41 && note <= 64)).toBe(true)
   })
 })
+
+describe('启程声景乐句', () => {
+  it('使用独立的明亮乐句，共用九十六秒结构与暂停恢复边界', () => {
+    expect(courtyardChordAt(0, 1).name).toBe('Cadd9')
+    expect(courtyardChordAt(11.999, 1)).toEqual(courtyardChordAt(0, 1))
+    expect(courtyardChordAt(12, 1).name).toBe('G6')
+    expect(courtyardChordAt(COURTYARD_SECONDS, 1)).toEqual(courtyardChordAt(0, 1))
+    const scale = new Set([0, 2, 4, 5, 7, 9, 11])
+    for (let i = 0; i < COURTYARD_NOTE_COUNT; i++) {
+      const note = courtyardNote(i, 1)
+      expect(scale.has(note.note % 12)).toBe(true)
+      expect(note.note).toBeGreaterThanOrEqual(69)
+      expect(note.note).toBeLessThanOrEqual(84)
+      expect(note.at).toBe(courtyardNote(i, 2).at)
+      expect(courtyardNote(i + COURTYARD_NOTE_COUNT, 1).at).toBe(note.at + COURTYARD_SECONDS)
+      expect(courtyardNote(i + COURTYARD_NOTE_COUNT, 1).note).toBe(note.note)
+    }
+    expect(courtyardNote(0, 1).note).not.toBe(courtyardNote(0, 2).note)
+    expect(courtyardNote(0)).toEqual(courtyardNote(0, 2))
+  })
+})

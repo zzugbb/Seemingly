@@ -36,13 +36,36 @@ describe('第 1～2 章', () => {
   it('启程：先去灯笼会提示缺光点，撤销可恢复到出发前', () => {
     const level = mainLevels[0],
       sim = new LevelSim(level)
-    expect(walk(sim, level.goal)).toContainEqual({ type: 'goal-locked', missing: 1 })
+    expect(walk(sim, level.goal)).toContainEqual({ type: 'goal-locked', missing: 2 })
     expect(sim.status).toBe('playing')
     expect(sim.undo()).toBe(true)
     expect(sim.steps()).toBe(0)
     expect(sim.state().at).toBe(level.start.join(','))
     walk(sim, [1, 0, -1])
+    expect(walk(sim, level.goal)).toContainEqual({ type: 'goal-locked', missing: 1 })
+    walk(sim, [6, 2, 3])
+    expect(sim.orbProgress().collected).toBe(2)
+    expect(sim.undo()).toBe(true)
+    expect(sim.orbProgress().collected).toBe(1)
+    walk(sim, [6, 2, 3])
     expect(walk(sim, level.goal)).toContainEqual({ type: 'won' })
+  })
+  it.each([
+    [
+      [1, 0, -1],
+      [6, 2, 3],
+    ],
+    [
+      [6, 2, 3],
+      [1, 0, -1],
+    ],
+  ] as const)('启程：两处光点可按任一顺序收集，回庭点灯都是三步', (first, second) => {
+    const sim = new LevelSim(mainLevels[0])
+    walk(sim, [...first])
+    walk(sim, [...second])
+    expect(sim.orbProgress().collected).toBe(2)
+    expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'won' })
+    expect(sim.steps()).toBe(3)
   })
   it('错位：岔路没有捷径，长路线会顺路收集两处光点', () => {
     const sim = new LevelSim(mainLevels[2])

@@ -27,7 +27,7 @@ describe('v2 存档', () => {
       }),
     )
     expect(loadSave()).toEqual({ ...emptySave(), muted: true })
-    const remade = { ...loadSave(), levels: { 'level-01': { done: true, allOrbs: true, bestSteps: 2, parMet: true } } }
+    const remade = { ...loadSave(), levels: { 'level-01': { done: true, allOrbs: true, bestSteps: 3, parMet: true } } }
     writeSave(remade)
     expect(loadSave()).toEqual(remade)
   })
@@ -36,12 +36,31 @@ describe('v2 存档', () => {
     const save = {
       version: 2 as const,
       muted: false,
-      levels: { 'level-01': { done: true, allOrbs: true, bestSteps: 1, parMet: true } },
+      levels: { 'level-01': { done: true, allOrbs: true, bestSteps: 3, parMet: true } },
     }
     memory.set('seemingly:save:v1', JSON.stringify({ version: 1, muted: true, completed: ['level-01'] }))
     writeSave(save)
     expect(loadSave()).toEqual(save)
     expect(memory.has('seemingly:save:v2')).toBe(true)
+  })
+  it('第一关修订清除旧评价，但保留其他关卡与静音，新评价可持久保存', () => {
+    storage()
+    const record = { done: true, allOrbs: true, bestSteps: 2, parMet: true }
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: true,
+        levels: { 'level-01': record, 'level-02': record, 'level-06': record },
+        revisions: { 'level-06': 3 },
+      }),
+    )
+    const loaded = loadSave()
+    expect(loaded).toEqual({ version: 2, muted: true, levels: { 'level-02': record, 'level-06': record } })
+    const updated = { ...loaded, levels: { ...loaded.levels, 'level-01': { ...record, bestSteps: 3 } } }
+    writeSave(updated)
+    expect(loadSave()).toEqual(updated)
   })
   it.each([undefined, 2])('关卡修订只清除第六关旧评价，重新完成后刷新仍保留（旧修订 %s）', (revision) => {
     storage()

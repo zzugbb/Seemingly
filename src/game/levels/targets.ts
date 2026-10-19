@@ -7,9 +7,9 @@ export interface LevelTarget {
   tradeoffsMin?: number
 }
 
-// 数值来自设计稿；第六关采用 T6.12b 试玩校准稿。
+// 数值来自设计稿；第一关采用 T6.12e、第六关采用 T6.12b 试玩校准稿。
 export const targets: Record<string, LevelTarget> = {
-  'level-01': { minActions: 2, minActionsAll: 2, illusionsMin: 0 },
+  'level-01': { minActions: 3, minActionsAll: 3, illusionsMin: 1 },
   'level-02': { minActions: 2, minActionsAll: 2, illusionsMin: 1 },
   'level-03': { minActions: 3, minActionsAll: 3, illusionsMin: 1 },
   'level-04': {

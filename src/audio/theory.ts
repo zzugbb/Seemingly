@@ -19,6 +19,18 @@ const courtyardChords: readonly Chord[] = [
   { name: 'Am(add9)', notes: [45, 52, 59, 60] },
   { name: 'Asus2', notes: [45, 52, 59, 64] },
 ]
+const dawnChords: readonly Chord[] = [
+  { name: 'Cadd9', notes: [48, 55, 62, 64] },
+  { name: 'G6', notes: [43, 55, 59, 64] },
+  { name: 'Am7', notes: [45, 55, 60, 64] },
+  { name: 'Fmaj7', notes: [41, 52, 57, 60] },
+  { name: 'Dm9', notes: [50, 57, 60, 64] },
+  { name: 'Cmaj7/E', notes: [52, 55, 59, 60] },
+  { name: 'Fmaj7', notes: [41, 52, 57, 60] },
+  { name: 'Cadd9', notes: [48, 55, 62, 64] },
+]
+const dawnMelody = [72, 76, 79, 76, 74, 72, 76, 79, 74, 79, 76, 77, 76, 72, 69, 72, 76, 79, 84, 79, 76, 72]
+
 const courtyardMelody = [
   [2, 69, 0.65],
   [4.8, 76, 0.42],
@@ -49,11 +61,15 @@ export const COURTYARD_PAD_GAIN = 0.08
 export const COURTYARD_PAD_HIGHPASS = 180
 export const COURTYARD_MELODY_GAIN = 1.2
 
-export function courtyardChordAt(seconds: number): Chord {
-  return courtyardChords[Math.floor(Math.max(0, seconds) / COURTYARD_CHORD_SECONDS) % courtyardChords.length]
+export function courtyardChordAt(seconds: number, chapter: Chapter = 2): Chord {
+  const chords = chapter === 1 ? dawnChords : courtyardChords
+  return chords[Math.floor(Math.max(0, seconds) / COURTYARD_CHORD_SECONDS) % chords.length]
 }
 
-export function courtyardNote(index: number): {
+export function courtyardNote(
+  index: number,
+  chapter: Chapter = 2,
+): {
   at: number
   note: number
   duration: number
@@ -64,7 +80,7 @@ export function courtyardNote(index: number): {
   const [at, note, velocity] = courtyardMelody[count % COURTYARD_NOTE_COUNT]
   return {
     at: Math.floor(count / COURTYARD_NOTE_COUNT) * COURTYARD_SECONDS + at,
-    note,
+    note: chapter === 1 ? dawnMelody[count % COURTYARD_NOTE_COUNT] : note,
     duration: 5.5,
     velocity,
     pan: count % 2 === 0 ? -0.22 : 0.18,

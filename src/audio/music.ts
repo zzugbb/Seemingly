@@ -115,7 +115,9 @@ export class MusicPlayer {
     this.bus = undefined
   }
   currentChord(): Chord {
-    return this.isCourtyard() ? courtyardChordAt(this.elapsed()) : chordAt(this.chapter, this.elapsed(), this.challenge)
+    return this.isCourtyard()
+      ? courtyardChordAt(this.elapsed(), this.chapter)
+      : chordAt(this.chapter, this.elapsed(), this.challenge)
   }
   isCourtyard(): boolean {
     return this.soundtrack === 'courtyard'
@@ -183,7 +185,7 @@ export class MusicPlayer {
       const remaining = Math.max(0.001, layer.epoch + (index + 1) * duration - at)
       const courtyard = layer.soundtrack === 'courtyard'
       const chord = courtyard
-        ? courtyardChordAt(elapsed + 0.000001)
+        ? courtyardChordAt(elapsed + 0.000001, layer.chapter)
         : chordAt(layer.chapter, elapsed + 0.000001, layer.challenge)
       const pad = context.createBufferSource()
       pad.buffer = courtyard ? silkBuffer(context, chord) : padBuffer(context, chord)
@@ -227,7 +229,7 @@ export class MusicPlayer {
         Math.floor((now - layer.epoch) / COURTYARD_SECONDS) * COURTYARD_NOTE_COUNT,
       )
       for (;;) {
-        const note = courtyardNote(layer.nextNote)
+        const note = courtyardNote(layer.nextNote, layer.chapter)
         const at = layer.epoch + note.at
         if (at >= horizon) break
         layer.nextNote++
