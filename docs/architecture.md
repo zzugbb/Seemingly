@@ -189,7 +189,7 @@ export interface LevelDef {
   chapter: 1 | 2 | 3 | 4 | 5 // T6.2 为 1～4，T6.6 扩展到 5
   challenge?: boolean // T6.6
   revision?: number // T6.12a：未写为 1，用于使旧谜题评价失效
-  soundtrack?: 'courtyard' // 第一、六关主题乐句；章节 1 为启程，2 为空庭，省略沿用生成式音乐
+  soundtrack?: 'courtyard' // 校准关卡的主题乐句；章节 1 为启程，2 为空庭，省略沿用生成式音乐
   blocks: BlockDef[]
   mechanisms: MechanismDef[]
   orbs: OrbDef[] // T6.2
@@ -485,6 +485,7 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - T6.12e：仅第一关新增 `soundtrack: 'courtyard'`，沿用相同音色与混音；`courtyardChordAt(seconds, chapter=2)`、`courtyardNote(index, chapter=2)` 在章节 1 选择 C 大调启程乐句，其他章节保持空庭乐句。实时调度与 `currentChord()` 均传入章节，音效同步使用实际和弦。默认参数保留第六关已有输出；第 2～5 关、标题和选关仍为生成式配置。
 - 第一关 `revision: 2`，旧第一关评价独立失效，其他五关记录和静音保留；加载时不级联清空后续已解锁关卡。
 
+- T6.12f：第二关 `revision: 2`，接入章节 1 的 `courtyard` 乐句与材质音效，不新增音频管线；存档按原有修订表仅清除第二关旧评价。第一关迁移测试显式提供第二关当前修订，以验证各关评价相互独立。
 
 ## 结尾
 

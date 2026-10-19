@@ -53,12 +53,31 @@ describe('v2 存档', () => {
         campaign: 'remake',
         muted: true,
         levels: { 'level-01': record, 'level-02': record, 'level-06': record },
-        revisions: { 'level-06': 3 },
+        revisions: { 'level-02': 2, 'level-06': 3 },
       }),
     )
     const loaded = loadSave()
     expect(loaded).toEqual({ version: 2, muted: true, levels: { 'level-02': record, 'level-06': record } })
     const updated = { ...loaded, levels: { ...loaded.levels, 'level-01': { ...record, bestSteps: 3 } } }
+    writeSave(updated)
+    expect(loadSave()).toEqual(updated)
+  })
+  it('第二关修订只清除自身旧评价，第一关和第六关新记录保留', () => {
+    storage()
+    const record = { done: true, allOrbs: true, bestSteps: 3, parMet: true }
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: false,
+        levels: { 'level-01': record, 'level-02': record, 'level-06': record },
+        revisions: { 'level-01': 2, 'level-06': 3 },
+      }),
+    )
+    const loaded = loadSave()
+    expect(loaded.levels).toEqual({ 'level-01': record, 'level-06': record })
+    const updated = { ...loaded, levels: { ...loaded.levels, 'level-02': record } }
     writeSave(updated)
     expect(loadSave()).toEqual(updated)
   })

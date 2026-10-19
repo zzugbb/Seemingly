@@ -49,7 +49,7 @@ describe('模拟器音效接入', () => {
       { type: 'gate', id: 'gate', open: false },
       { type: 'mechanism-start', id: 'turn' },
     ]
-    events.forEach((event) => playSimEvent(event, levels[1]))
+    events.forEach((event) => playSimEvent(event, { ...levels[1], soundtrack: undefined }))
     expect(vi.mocked(playSound).mock.calls).toEqual([
       ['orb'],
       ['goalLocked'],
