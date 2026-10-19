@@ -44,7 +44,7 @@ const courtyardMelody = [
   [92, 57, 0.3],
 ] as const
 export const COURTYARD_NOTE_COUNT = courtyardMelody.length
-export const COURTYARD_GAIN = 2.2
+export const COURTYARD_GAIN = 8.8
 
 export function courtyardChordAt(seconds: number): Chord {
   return courtyardChords[Math.floor(Math.max(0, seconds) / COURTYARD_CHORD_SECONDS) % courtyardChords.length]
