@@ -81,7 +81,7 @@ describe('v2 存档', () => {
     writeSave(updated)
     expect(loadSave()).toEqual(updated)
   })
-  it.each(['level-03', 'level-04'])('%s 修订只清除旧评价，其他已校准关卡保留', (id) => {
+  it.each(['level-03', 'level-04', 'level-05'])('%s 修订只清除旧评价，其他已校准关卡保留', (id) => {
     storage()
     const record = { done: true, allOrbs: true, bestSteps: 3, parMet: true }
     const save = {
@@ -102,7 +102,7 @@ describe('v2 存档', () => {
     expect(loaded.levels).toEqual({ 'level-01': record, 'level-02': record, 'level-06': record })
     const updated = {
       ...loaded,
-      levels: { ...loaded.levels, [id]: { ...record, bestSteps: id === 'level-03' ? 4 : 6 } },
+      levels: { ...loaded.levels, [id]: { ...record, bestSteps: id === 'level-03' ? 4 : id === 'level-04' ? 6 : 8 } },
     }
     writeSave(updated)
     expect(loadSave()).toEqual(updated)
@@ -117,7 +117,7 @@ describe('v2 存档', () => {
         campaign: 'remake',
         muted: true,
         levels: { 'level-05': record, 'level-06': record },
-        revisions: revision === undefined ? undefined : { 'level-06': revision },
+        revisions: { 'level-05': 2, ...(revision === undefined ? {} : { 'level-06': revision }) },
       }),
     )
     const loaded = loadSave()

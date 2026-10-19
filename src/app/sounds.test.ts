@@ -60,10 +60,10 @@ describe('模拟器音效接入', () => {
     ])
   })
 
-  it('乘风：随桥转动不额外发出脚步音', () => {
+  it('乘风：换乘时发脚步，随桥运动不额外发出脚步音', () => {
     const sounds = solveWithSound(4)
-    expect(sounds.filter((sound) => sound === 'step')).toHaveLength(6)
-    expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(2)
+    expect(sounds.filter((sound) => sound === 'step')).toHaveLength(7)
+    expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(4)
     expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(1)
     expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
   })
