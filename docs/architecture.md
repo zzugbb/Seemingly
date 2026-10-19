@@ -486,6 +486,7 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - 第一关 `revision: 2`，旧第一关评价独立失效，其他五关记录和静音保留；加载时不级联清空后续已解锁关卡。
 
 - T6.12f：第二关 `revision: 2`，接入章节 1 的 `courtyard` 乐句与材质音效，不新增音频管线；存档按原有修订表仅清除第二关旧评价。第一关迁移测试显式提供第二关当前修订，以验证各关评价相互独立。
+- T6.12g：第三关 `revision: 2`，接入章节 1 的主题声景；沿用已有按关修订迁移，不影响其他关卡与静音。
 
 ## 结尾
 
