@@ -9,6 +9,9 @@ import {
   COURTYARD_SECONDS,
   COURTYARD_NOTE_COUNT,
   COURTYARD_GAIN,
+  COURTYARD_PAD_GAIN,
+  COURTYARD_PAD_HIGHPASS,
+  COURTYARD_MELODY_GAIN,
   midiFrequency,
   type Chapter,
   type Chord,
@@ -189,13 +192,21 @@ export class MusicPlayer {
       filter.type = 'lowpass'
       filter.frequency.value = 900
       const envelope = context.createGain()
-      const padVolume = courtyard ? 0.32 : 0.5
+      const padVolume = courtyard ? COURTYARD_PAD_GAIN : 0.5
       const release = courtyard ? 5 : 3
       envelope.gain.setValueAtTime(0, at)
       envelope.gain.linearRampToValueAtTime(padVolume, at + Math.min(courtyard ? 4 : 2, remaining))
       envelope.gain.setValueAtTime(padVolume, at + remaining)
       envelope.gain.linearRampToValueAtTime(0, at + remaining + release)
-      this.schedule(layer, pad, [filter, envelope], at, remaining + release)
+      const nodes: AudioNode[] = [filter, envelope]
+      if (courtyard) {
+        const highpass = context.createBiquadFilter()
+        highpass.type = 'highpass'
+        highpass.frequency.value = COURTYARD_PAD_HIGHPASS
+        highpass.Q.value = 0.707
+        nodes.unshift(highpass)
+      }
+      this.schedule(layer, pad, nodes, at, remaining + release)
       layer.nextChord = at + remaining
       if (courtyard) continue
       const bass = context.createOscillator()
@@ -227,7 +238,7 @@ export class MusicPlayer {
         pan.pan.value = note.pan
         const envelope = context.createGain()
         envelope.gain.setValueAtTime(0, at)
-        envelope.gain.linearRampToValueAtTime(0.3 * note.velocity, at + 0.02)
+        envelope.gain.linearRampToValueAtTime(COURTYARD_MELODY_GAIN * note.velocity, at + 0.02)
         envelope.gain.exponentialRampToValueAtTime(0.0001, at + note.duration)
         this.schedule(layer, tone, [envelope, pan], at, note.duration + 0.01)
       }
