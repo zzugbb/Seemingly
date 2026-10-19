@@ -22,10 +22,10 @@ export function App() {
     let active = true
     const sync = () => {
       const state = useApp.getState()
-      const level = levelLists[state.current.list][state.current.index]
-      const chapter = state.screen === 'title' ? 1 : (level?.chapter ?? 1)
+      const level = state.screen === 'title' ? levelLists.main[0] : levelLists[state.current.list][state.current.index]
+      const chapter = level?.chapter ?? 1
       const challenge = (state.screen === 'play' || state.screen === 'ending') && state.current.list === 'challenge'
-      const soundtrack = state.screen === 'play' || state.screen === 'ending' ? level?.soundtrack : undefined
+      const soundtrack = level?.soundtrack
       audioEngine.setMuted(state.save.muted)
       if (state.save.muted) music.stop()
       else music.start(chapter, challenge, soundtrack ?? 'generative')
