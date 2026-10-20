@@ -33,6 +33,7 @@ export interface LevelBuilder {
   goal(pos: Vec3): void
   tree(pos: Vec3): void
   flower(pos: Vec3): void
+  lamp(pos: Vec3): void
   window(spec: { pos: Vec3; face: Face }): void
 }
 
@@ -103,6 +104,10 @@ export function defineLevel(spec: {
     },
     flower(pos) {
       decor.flowers.push(pos)
+    },
+    lamp(pos) {
+      decor.lanterns ??= []
+      decor.lanterns.push(pos)
     },
     window(entry) {
       decor.windows.push(entry)

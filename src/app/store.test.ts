@@ -1,10 +1,22 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { mainLevels, type LevelDef } from '../game/levels'
+import { mainLevels, sampleLevels, levelRevisions, type LevelDef } from '../game/levels'
 import { targets } from '../game/levels/targets'
 import { emptySave } from './save'
 import { firstPlayableIndex, isUnlocked, useApp } from './store'
 beforeEach(() => useApp.setState({ screen: 'title', current: { list: 'main', index: 0 }, save: emptySave() }))
 describe('进度与评价', () => {
+  it('独立样段随时可进入，通关不写入主线评价、修订或解锁', () => {
+    const before = useApp.getState().save
+    useApp.getState().play('sample', 0)
+    expect(useApp.getState().current).toEqual({ list: 'sample', index: 0 })
+    expect(useApp.getState().screen).toBe('play')
+    useApp.getState().completeLevel(sampleLevels[0].id, { steps: 12, allOrbs: true, usedHint: false })
+    expect(useApp.getState().save).toBe(before)
+    expect(levelRevisions[sampleLevels[0].id]).toBeUndefined()
+    expect(firstPlayableIndex(before)).toBe(0)
+    expect(isUnlocked(before, 'main', 1)).toBe(false)
+    expect(isUnlocked(before, 'sample', 1)).toBe(false)
+  })
   it('逐关解锁并继续到第一个未通关关卡，未知记录不解锁', () => {
     const save = emptySave()
     expect(firstPlayableIndex(save)).toBe(0)
@@ -65,7 +77,7 @@ describe('进度与评价', () => {
       { id: 'y', chapter: 2 },
       { id: 'z', chapter: 3 },
     ] as LevelDef[]
-    const lists = { main, challenge },
+    const lists = { main, challenge, sample: [] },
       save = emptySave()
     const record = { done: true, allOrbs: false, bestSteps: 3, parMet: false }
     save.levels.a = record

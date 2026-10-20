@@ -230,6 +230,15 @@ export function Scene({
           />
         )}
         <Decor decor={level.decor} quality={quality} reducedMotion={reducedMotion} />
+        {level.decor.lanterns?.map((position) => (
+          <Lantern
+            key={position.join(',')}
+            goal={position}
+            reached={won}
+            sparkleScale={quality.sparkleScale}
+            reducedMotion={reducedMotion}
+          />
+        ))}
       </FloatingWorld>
     </group>
   )

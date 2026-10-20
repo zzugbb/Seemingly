@@ -4,7 +4,7 @@ import { playSound } from '../../audio/sfx'
 import { stateKey } from '../../game/core/rules'
 import { LevelSim, type SimEvent } from '../../game/core/sim'
 import { type LevelDef } from '../../game/levels'
-import { targets } from '../../game/levels/targets'
+import { sampleTargets, targets } from '../../game/levels/targets'
 import { Scene } from '../../game/render/Scene'
 import type { RenderHint } from '../../game/render/feedback'
 import { prefersReducedMotion, qualitySettings } from '../../game/render/quality'
@@ -26,8 +26,19 @@ export function PlayScreen() {
 
 function LevelPlay({ level, list, index }: { level: LevelDef; list: LevelList; index: number }) {
   const [runId, setRunId] = useState(0)
+  const [started, setStarted] = useState(list !== 'sample')
   const restart = useCallback(() => setRunId((id) => id + 1), [])
-  return <Run key={runId} level={level} list={list} index={index} onRestart={restart} />
+  return (
+    <Run
+      key={runId}
+      level={level}
+      list={list}
+      index={index}
+      onRestart={restart}
+      started={started}
+      onStart={() => setStarted(true)}
+    />
+  )
 }
 
 function Run({
@@ -35,14 +46,19 @@ function Run({
   list,
   index,
   onRestart,
+  started,
+  onStart,
 }: {
   level: LevelDef
   list: LevelList
   index: number
   onRestart: () => void
+  started: boolean
+  onStart: () => void
 }) {
+  const sample = list === 'sample'
   const ending = useApp((state) => state.screen === 'ending')
-  const goSelect = useApp((state) => state.goSelect)
+  const goSelect = useApp((state) => (sample ? state.goTitle : state.goSelect))
   const play = useApp((state) => state.play)
   const completeLevel = useApp((state) => state.completeLevel)
   const goEnding = useApp((state) => state.goEnding)
@@ -57,16 +73,28 @@ function Run({
   const [endingReady, setEndingReady] = useState(false)
   const [hint, setHint] = useState<RenderHint | null>(null)
   const [thinking, setThinking] = useState(true)
-  const [minimum, setMinimum] = useState<number | null>(targets[level.id]?.minActions ?? null)
+  const target = (sample ? sampleTargets : targets)[level.id]
+  const [minimum, setMinimum] = useState<number | null>(target?.minActions ?? null)
+  const [showSampleResult, setShowSampleResult] = useState(false)
   const usedHint = useRef(false)
   const client = useRef<ReturnType<typeof prepareHints> | null>(null)
   const query = useRef(0)
-  const snapshot = () => ({ steps: sim.steps(), ...sim.orbProgress(), canUndo: sim.canUndo() })
+  const snapshot = () => ({
+    steps: sim.steps(),
+    ...sim.orbProgress(),
+    canUndo: sim.canUndo(),
+    busy: !sim.isIdle(),
+    walking: sim.characterPose().walking,
+  })
   const [hud, setHud] = useState(snapshot)
   const refresh = () => {
     const next = snapshot()
     setHud((previous) =>
-      previous.steps === next.steps && previous.collected === next.collected && previous.canUndo === next.canUndo
+      previous.steps === next.steps &&
+      previous.collected === next.collected &&
+      previous.canUndo === next.canUndo &&
+      previous.busy === next.busy &&
+      previous.walking === next.walking
         ? previous
         : next,
     )
@@ -86,7 +114,7 @@ function Run({
     void hints.ready
       .then((value) => {
         if (active) {
-          setMinimum(targets[level.id]?.minActions ?? value)
+          setMinimum(target?.minActions ?? value)
           setThinking(false)
         }
       })
@@ -99,7 +127,16 @@ function Run({
       client.current = null
       hints.dispose()
     }
-  }, [level])
+  }, [level, target])
+
+  useEffect(() => {
+    if (!sample || !result) {
+      setShowSampleResult(false)
+      return
+    }
+    const timer = window.setTimeout(() => setShowSampleResult(true), reducedMotion ? 200 : 2200)
+    return () => window.clearTimeout(timer)
+  }, [sample, result, reducedMotion])
 
   const undo = useCallback(() => {
     if (!sim.undo()) return
@@ -133,6 +170,7 @@ function Run({
     const onKey = (event: KeyboardEvent) => {
       if (
         ending ||
+        !started ||
         event.repeat ||
         (event.target instanceof HTMLElement &&
           (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)))
@@ -152,7 +190,7 @@ function Run({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [goSelect, ending, onRestart, undo, requestHint])
+  }, [goSelect, ending, started, onRestart, undo, requestHint])
   useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(null), 1800)
@@ -176,6 +214,10 @@ function Run({
     const steps = sim.steps()
     const progress = sim.orbProgress()
     const allOrbs = progress.collected === progress.total
+    if (sample) {
+      setResult({ steps, ratings: { done: true, allOrbs, parMet: false }, unlocked: '' })
+      return
+    }
     completeLevel(level.id, { steps, allOrbs, usedHint: usedHint.current })
     const after = useApp.getState().save
     const newlyUnlocked = levelLists.challenge.flatMap((item, i) =>
@@ -189,11 +231,11 @@ function Run({
     if (level.ending) goEnding()
   }
   const hasNext = index + 1 < levelLists[list].length
-  const label = list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
+  const label = sample ? '独立体验' : list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
   const message =
     !hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined
   return (
-    <div className="screen">
+    <div className={`screen${sample ? ' sample-screen' : ''}`}>
       <Canvas
         className="stage"
         orthographic
@@ -208,7 +250,7 @@ function Run({
           sim={sim}
           quality={settings}
           reducedMotion={reducedMotion}
-          interactive={!ending}
+          interactive={!ending && started}
           hint={hint}
           onEndingReady={() => setEndingReady(true)}
           onEvent={onEvent}
@@ -216,10 +258,10 @@ function Run({
           onUnreachable={() => playSound('unreachable')}
           onLanternLit={() => playSound('lantern')}
           onWon={won}
-          onBlocked={setToast}
+          onBlocked={(text) => setToast(sample && text.includes('换个角度') ? '这里还没连通，试试调整建筑' : text)}
         />
       </Canvas>
-      {!ending && (
+      {!ending && started && (
         <Hud
           label={`${label} · ${level.title}`}
           steps={hud.steps}
@@ -232,9 +274,15 @@ function Run({
           onRestart={onRestart}
           onSelect={goSelect}
           onToggleMute={toggleMute}
+          selectLabel={sample ? '回到标题' : undefined}
+          description={
+            sample
+              ? `必需光点 ${hud.requiredCollected}/${hud.required} · 选做${hud.collected > hud.requiredCollected ? '已发现' : '未发现'}`
+              : undefined
+          }
         />
       )}
-      {!ending && !level.challenge && level.hints && (
+      {!ending && !sample && !level.challenge && level.hints && (
         <footer className="hints">
           {level.hints.map((text) => (
             <span key={text}>{text}</span>
@@ -242,8 +290,59 @@ function Run({
         </footer>
       )}
       <Toast message={toast} />
+      {sample && !started && (
+        <section className="sample-card sample-intro" aria-label="叠庭体验说明">
+          <p className="sample-eyebrow">独立体验</p>
+          <h1>{level.title}</h1>
+          <p>收集两束光，点亮庭院尽头的灯。</p>
+          <p className="sample-caption">
+            转轮转动桥臂 · 拉杆升降平台
+            <br />
+            点击浅色路面行走，站在平台上可以随它移动。
+          </p>
+          <div className="result-actions">
+            <button className="hud-button" type="button" onClick={onStart}>
+              走进庭院
+            </button>
+            <button className="hud-button" type="button" onClick={goSelect}>
+              返回
+            </button>
+          </div>
+        </section>
+      )}
+      {sample && started && !result && (
+        <footer className="hints sample-status" aria-live="polite">
+          <span>
+            {hud.busy
+              ? hud.walking
+                ? '正在前往路面'
+                : '建筑正在移动'
+              : hud.requiredCollected === hud.required
+                ? '光已集齐，灯笼等待点亮'
+                : '转轮转动桥臂 · 拉杆升降平台'}
+          </span>
+        </footer>
+      )}
+      {sample && result && showSampleResult && (
+        <section className="sample-card sample-result" aria-label="叠庭体验完成" aria-live="polite">
+          <p className="sample-eyebrow">{result.ratings.allOrbs ? '全部光点已找到' : '庭院已点亮'}</p>
+          <h2>{result.ratings.allOrbs ? '每一束光，都回到了庭院' : '灯亮了，回廊也有了新的模样'}</h2>
+          <p>
+            {result.ratings.allOrbs ? '你也探索了上层侧翼，找到了远处的光。' : '远处还有一束选做的光，等待下一次探索。'}
+          </p>
+          <p className="sample-caption">本次行走与操作共 {result.steps} 步</p>
+          <div className="result-actions">
+            <button className="hud-button" type="button" onClick={onRestart}>
+              再探索一次
+            </button>
+            <button className="hud-button" type="button" onClick={goSelect}>
+              回到标题
+            </button>
+          </div>
+        </section>
+      )}
       {ending && endingReady && <Ending />}
-      {result && !ending && !level.ending && (
+      {result && !sample && !ending && !level.ending && (
         <CompleteBanner
           title={level.title}
           ratings={{ ...result.ratings, parMet: !usedHint.current && minimum !== null && result.steps <= minimum }}

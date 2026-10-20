@@ -538,6 +538,12 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - `.github/workflows/pages.yml`：推送到 `main` 或提交 PR 时，执行类型检查、格式检查、测试和构建；只有推送到 `main` 时才发布。
 - 地址：`https://zzugbb.github.io/Seemingly/`。
 
+## 独立体验样段（T6.12m）
+
+独立样段 T6.12m：`levels/index.ts` 单独导出 `sampleLevels`，不加入主线、挑战或正式修订号表。`sampleTargets` 独立保存难度目标。页面状态增加 `sample`，无需解锁；`completeLevel` 仅接受主线与挑战 ID，样段通关不写评价。标题提供入口，`?sample=1` 控制初始页面；提示 worker 与样段共用现有求解策略。样段页面重试重建模拟器，撤销取消结果计时器。
+
+`DecorDef.lanterns` 与 builder 的 `lamp` 只添加装饰坐标。场景复用灯笼组件，在通关后点亮、撤销后恢复，不生成路面或改变规则。
+
 ## 提交约定
 
 - 提交信息用中文，前缀沿用 `feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`chore:`。

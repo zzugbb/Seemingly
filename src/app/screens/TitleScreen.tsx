@@ -58,6 +58,9 @@ export function TitleScreen() {
             选关
           </button>
         </div>
+        <button className="hud-button sample-entry" type="button" onClick={() => play('sample', 0)}>
+          体验新样段 · 叠庭
+        </button>
       </div>
     </div>
   )

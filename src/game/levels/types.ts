@@ -87,6 +87,7 @@ export interface DecorDef {
   trees: Vec3[]
   flowers: Vec3[]
   windows: { pos: Vec3; face: Face }[]
+  lanterns?: Vec3[]
 }
 
 export type SolutionStep =
