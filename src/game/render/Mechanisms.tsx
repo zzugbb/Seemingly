@@ -4,8 +4,8 @@ import type { Group, Mesh } from 'three'
 import { cellId } from '../core/iso'
 import type { LevelSim } from '../core/sim'
 import type { HandleDef, LevelDef, MechBlockDef, MoverDef, PlateDef, RotatorDef } from '../levels/types'
-import { WalkTile, pointer } from './Blocks'
-import { hintStrength, type RenderFeedback, type RenderHint } from './feedback'
+import { ActiveBlock, WalkTile, pointer } from './Blocks'
+import { hintStrength, mechanismStrength, type RenderFeedback, type RenderHint } from './feedback'
 import {
   blockGeometry,
   handleDotGeometry,
@@ -39,6 +39,8 @@ export function HandleControl({
   onBlocked,
   hint,
   interactive = true,
+  tactile = false,
+  reducedMotion = false,
 }: {
   handle: HandleDef
   sim: LevelSim
@@ -47,6 +49,8 @@ export function HandleControl({
   onBlocked?: (message: string) => void
   hint?: RenderHint | null
   interactive?: boolean
+  tactile?: boolean
+  reducedMotion?: boolean
 }) {
   const root = useRef<Group>(null),
     moving = useRef<Group>(null),
@@ -60,12 +64,21 @@ export function HandleControl({
     const used = sim.state().handleUses[id] ?? 0
     const exhausted = handle.uses !== undefined && used >= handle.uses
     const pulse = hintStrength(hint, 'operate', id)
+    const active = tactile ? mechanismStrength(feedback.current, id) : 0
     fill.color.set(exhausted ? palette.plum : palette.glow)
+    if (!exhausted && active) fill.color.lerp(material(palette.cream).color, active * 0.3)
+    if (tactile) {
+      fill.emissive.set(palette.glow)
+      fill.emissiveIntensity = active * 0.18
+    }
     fill.opacity = pulse || 1
     if (root.current) {
       const age = (performance.now() - (feedback.current.blockedHandles.get(id) ?? -10000)) / 1000
       root.current.position.x = age >= 0 && age < 0.5 ? Math.sin(age * Math.PI * 40) * 0.04 * (1 - age / 0.5) : 0
-      root.current.scale.setScalar(pulse ? 1.15 : 1)
+      const motion = tactile ? feedback.current.mechanisms.get(id) : undefined
+      const pressAge = (performance.now() - (motion?.startedAt ?? -10000)) / 180
+      const press = !reducedMotion && pressAge >= 0 && pressAge < 1 ? Math.sin(pressAge * Math.PI) * 0.08 : 0
+      root.current.scale.setScalar(pulse ? 1.15 : 1 - press)
     }
     dots.current.forEach((dot, index) => {
       if (dot) dot.material = material(index < (handle.uses ?? 0) - used ? palette.glow : palette.plum)
@@ -94,8 +107,11 @@ export function HandleControl({
         name={`handle-${id}`}
         onClick={(event) => {
           event.stopPropagation()
-          if (!interactive) return
-          if (sim.command({ type: 'operate', mechanism: id }) === 'handle-used-up') {
+          if (!interactive || (tactile && sim.status === 'won')) return
+          const result = sim.command({ type: 'operate', mechanism: id })
+          if (tactile && result === 'busy')
+            onBlocked?.(sim.characterPose().walking ? '小人正在行走，请稍候' : '建筑正在移动，请稍候')
+          if (result === 'handle-used-up') {
             feedback.current.blockedHandles.set(id, performance.now())
             onBlocked?.('已经用完了')
           }
@@ -151,6 +167,7 @@ function MechBlocks({
   onSelect,
   hint,
   canSelect,
+  activity,
 }: {
   id: string
   blocks: MechBlockDef[]
@@ -159,6 +176,7 @@ function MechBlocks({
   onSelect: (id: string) => void
   hint?: RenderHint | null
   canSelect: (id: string) => boolean
+  activity?: () => number
 }) {
   return (
     <>
@@ -176,7 +194,10 @@ function MechBlocks({
             canSelect={() => canSelect(tileId)}
             onHover={(on) => onHover(on ? tileId : null)}
             onSelect={() => onSelect(tileId)}
+            activity={activity}
           />
+        ) : activity ? (
+          <ActiveBlock key={tileId} position={block.offset} color={color} activity={activity} />
         ) : (
           <mesh
             key={tileId}
@@ -202,6 +223,8 @@ type MechProps = {
   onBlocked?: (message: string) => void
   interactive: boolean
   canSelect: (id: string) => boolean
+  tactile: boolean
+  reducedMotion: boolean
 }
 function MovingView({ definition, ...props }: MechProps & { definition: RotatorDef | MoverDef }) {
   const group = useRef<Group>(null)
@@ -243,6 +266,7 @@ function MovingView({ definition, ...props }: MechProps & { definition: RotatorD
           onSelect={props.onSelect}
           hint={props.hint}
           canSelect={props.canSelect}
+          activity={props.tactile ? () => mechanismStrength(props.feedback.current, definition.id) : undefined}
         />
       </group>
       {definition.handle && (
@@ -254,6 +278,8 @@ function MovingView({ definition, ...props }: MechProps & { definition: RotatorD
           feedback={props.feedback}
           hint={props.hint}
           interactive={props.interactive}
+          tactile={props.tactile}
+          reducedMotion={props.reducedMotion}
         />
       )}
     </>
@@ -355,6 +381,8 @@ export function Mechanisms({
   onBlocked,
   hint,
   canSelect,
+  tactile = false,
+  reducedMotion = false,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -367,6 +395,8 @@ export function Mechanisms({
   onBlocked?: (message: string) => void
   hint?: RenderHint | null
   canSelect: (id: string) => boolean
+  tactile?: boolean
+  reducedMotion?: boolean
 }) {
   return (
     <group>
@@ -384,6 +414,8 @@ export function Mechanisms({
             feedback={feedback}
             hint={hint}
             canSelect={canSelect}
+            tactile={tactile}
+            reducedMotion={reducedMotion}
           />
         ) : mechanism.type === 'plate' ? (
           <PlateView

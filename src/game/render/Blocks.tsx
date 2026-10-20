@@ -11,6 +11,16 @@ export const pointer = (on: boolean) => (event: ThreeEvent<PointerEvent>) => {
   document.body.style.cursor = on ? 'pointer' : ''
 }
 
+export function ActiveBlock({ position, color, activity }: { position?: Vec3; color: string; activity: () => number }) {
+  const fill = useAnimatedMaterial(color, 1, true)
+  useFrame(() => {
+    const value = activity()
+    fill.color.set(color).lerp(material(palette.cream).color, value * 0.18)
+    fill.emissiveIntensity = value * 0.06
+  })
+  return <mesh position={position} geometry={blockGeometry} material={fill} castShadow receiveShadow />
+}
+
 export function WalkTile({
   position,
   color,
@@ -22,6 +32,7 @@ export function WalkTile({
   hint,
   tileId = '',
   canSelect,
+  activity,
 }: {
   position: Vec3
   color: string
@@ -33,14 +44,19 @@ export function WalkTile({
   hint?: RenderHint | null
   tileId?: string
   canSelect?: () => boolean
+  activity?: () => number
 }) {
   const slab = useRef<Mesh>(null)
   const glow = useAnimatedMaterial(palette.glow, 0.8, true)
   useFrame(() => {
     if (!slab.current) return
     const pulse = hintStrength(hint, 'walk', tileId)
-    glow.opacity = pulse
-    slab.current.material = pulse ? glow : material(hovered ? palette.cream : palette.path)
+    const active = activity?.() ?? 0
+    glow.color.set(pulse ? palette.glow : palette.path)
+    if (!pulse) glow.color.lerp(material(palette.cream).color, active)
+    glow.opacity = pulse || 1
+    glow.emissiveIntensity = pulse ? 0.6 : active * 0.12
+    slab.current.material = pulse || active ? glow : material(hovered ? palette.cream : palette.path)
   })
   const hover = (on: boolean) => (event: ThreeEvent<PointerEvent>) => {
     const active = on && (canSelect?.() ?? true)
@@ -58,7 +74,11 @@ export function WalkTile({
       onPointerOver={hover(true)}
       onPointerOut={hover(false)}
     >
-      <mesh geometry={blockGeometry} material={material(color)} castShadow receiveShadow />
+      {activity ? (
+        <ActiveBlock color={color} activity={activity} />
+      ) : (
+        <mesh geometry={blockGeometry} material={material(color)} castShadow receiveShadow />
+      )}
       {cap && (
         <mesh
           ref={slab}

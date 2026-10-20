@@ -544,6 +544,8 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 
 `DecorDef.lanterns` 与 builder 的 `lamp` 只添加装饰坐标。场景复用灯笼组件，在通关后点亮、撤销后恢复，不生成路面或改变规则。
 
+T6.12n 样段操作反馈由游戏页通过 `Scene.tactile` 显式开启，正式关卡及标题默认关闭。`RenderFeedback.mechanisms` 记录模拟器启动、到位事件的时间戳；材质、把手缩放与标记透明度在 `useFrame` 更新 ref，不更改模拟器状态。撤销清空时间戳和目标圆圈；底部文字仅在事件或计时结束时更新。临时材质沿用 `useAnimatedMaterial` 的创建与释放，几何体复用现有缓存。
+
 ## 提交约定
 
 - 提交信息用中文，前缀沿用 `feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`chore:`。

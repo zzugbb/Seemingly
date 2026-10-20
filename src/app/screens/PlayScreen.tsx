@@ -76,6 +76,7 @@ function Run({
   const target = (sample ? sampleTargets : targets)[level.id]
   const [minimum, setMinimum] = useState<number | null>(target?.minActions ?? null)
   const [showSampleResult, setShowSampleResult] = useState(false)
+  const [motionNotice, setMotionNotice] = useState<{ text: string; settled: boolean } | null>(null)
   const usedHint = useRef(false)
   const client = useRef<ReturnType<typeof prepareHints> | null>(null)
   const query = useRef(0)
@@ -197,9 +198,24 @@ function Run({
     return () => window.clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    if (!motionNotice?.settled) return
+    const timer = window.setTimeout(() => setMotionNotice(null), 1400)
+    return () => window.clearTimeout(timer)
+  }, [motionNotice])
+
   const onEvent = (event: SimEvent) => {
     playSimEvent(event, level)
     refresh()
+    if (sample) {
+      if (event.type === 'walk-start' || event.type === 'undo') setMotionNotice(null)
+      if (event.type === 'mechanism-start' || event.type === 'mechanism-end') {
+        const mechanism = level.mechanisms.find((item) => item.id === event.id)
+        const name = mechanism?.type === 'rotator' ? '桥臂' : '升降台'
+        const settled = event.type === 'mechanism-end'
+        setMotionNotice({ text: settled ? `${name}已到位` : `${name}${name === '桥臂' ? '转动' : '移动'}中`, settled })
+      }
+    }
     if (event.type === 'goal-locked') setToast(`还差 ${event.missing} 个光点`)
     if (
       event.type === 'walk-start' ||
@@ -250,6 +266,7 @@ function Run({
           sim={sim}
           quality={settings}
           reducedMotion={reducedMotion}
+          tactile={sample}
           interactive={!ending && started}
           hint={hint}
           onEndingReady={() => setEndingReady(true)}
@@ -316,10 +333,9 @@ function Run({
             {hud.busy
               ? hud.walking
                 ? '正在前往路面'
-                : '建筑正在移动'
-              : hud.requiredCollected === hud.required
-                ? '光已集齐，灯笼等待点亮'
-                : '转轮转动桥臂 · 拉杆升降平台'}
+                : (motionNotice?.text ?? '建筑正在移动')
+              : (motionNotice?.text ??
+                (hud.requiredCollected === hud.required ? '光已集齐，灯笼等待点亮' : '转轮转动桥臂 · 拉杆升降平台'))}
           </span>
         </footer>
       )}

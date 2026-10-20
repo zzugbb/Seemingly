@@ -40,6 +40,7 @@ export function Scene({
   onUnreachable,
   onLanternLit,
   hint,
+  tactile = false,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -54,6 +55,7 @@ export function Scene({
   onUnreachable?: () => void
   onLanternLit?: () => void
   hint?: RenderHint | null
+  tactile?: boolean
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [won, setWon] = useState(false)
@@ -61,7 +63,12 @@ export function Scene({
   const [marker, setMarker] = useState<{ pos: Vec3; ok: boolean; at: number } | null>(null)
   const characterRef = useRef<Group>(null)
   const plateFx = useRef<PlateFx>({ spent: new Set(), flashAt: new Map() })
-  const feedback = useRef<RenderFeedback>({ blockedCrates: new Map(), blockedHandles: new Map(), goalLockedAt: -10000 })
+  const feedback = useRef<RenderFeedback>({
+    blockedCrates: new Map(),
+    blockedHandles: new Map(),
+    goalLockedAt: -10000,
+    mechanisms: new Map(),
+  })
   const view = useRef({ state: sim.state(), visible: visibleTilesOf(level, sim.state()) })
   const motion = useRef({ heading: 0, phase: 0, wasWalking: false, arrive: 0 })
   const plateTiles = useMemo(
@@ -78,6 +85,14 @@ export function Scene({
     for (const event of events) {
       onEvent?.(event)
       if (event.type === 'goal-locked') feedback.current.goalLockedAt = performance.now()
+      if (tactile && event.type === 'mechanism-start') {
+        feedback.current.mechanisms.set(event.id, { startedAt: performance.now(), settledAt: null })
+        setMarker(null)
+      }
+      if (tactile && event.type === 'mechanism-end') {
+        const motion = feedback.current.mechanisms.get(event.id)
+        if (motion) motion.settledAt = performance.now()
+      }
       if (event.type === 'undo') {
         setWon(false)
         plateFx.current.spent = new Set(sim.state().spentPlates)
@@ -85,6 +100,8 @@ export function Scene({
         feedback.current.goalLockedAt = -10000
         feedback.current.blockedCrates.clear()
         feedback.current.blockedHandles.clear()
+        feedback.current.mechanisms.clear()
+        if (tactile) setMarker(null)
         motion.current.heading = sim.characterPose().heading
       }
       if (event.type === 'won') {
@@ -147,11 +164,14 @@ export function Scene({
   }, -1)
 
   const selectTile = (id: string) => {
-    if (!interactive || !view.current.visible.has(id)) return
+    if (!interactive || (tactile && sim.status === 'won') || !view.current.visible.has(id)) return
     const tile = sim.tiles().get(id)
     if (!tile) return
     const result = sim.command({ type: 'walk', tileId: id })
-    if (result === 'busy') return
+    if (result === 'busy') {
+      if (tactile) onBlocked('建筑正在移动，请稍候')
+      return
+    }
     setMarker({ pos: tile.pos, ok: result === 'ok', at: performance.now() })
     if (result === 'unreachable') {
       const oneWay = level.blocks.some((block) => cellId(block.pos) === id && block.oneWay)
@@ -205,12 +225,14 @@ export function Scene({
           onBlocked={onBlocked}
           hint={hint}
           canSelect={canSelect}
+          tactile={tactile}
+          reducedMotion={reducedMotion}
         />
         <Orbs sim={sim} reducedMotion={reducedMotion} sparkleScale={quality.sparkleScale} />
         <Crates sim={sim} feedback={feedback} hint={hint} onPush={pushCrate} interactive={interactive} />
         <Gates sim={sim} onBlocked={onBlocked} feedback={feedback} hint={hint} interactive={interactive} />
         <Character ref={characterRef} />
-        <Marker marker={marker} />
+        <Marker marker={marker} sim={tactile ? sim : undefined} reducedMotion={tactile && reducedMotion} />
         <Lantern
           goal={level.goal}
           reached={won}
@@ -253,28 +275,45 @@ function FloatingWorld({ children, still, frozen }: { children: ReactNode; still
   return <group ref={ref}>{children}</group>
 }
 
-function Marker({ marker }: { marker: { pos: Vec3; ok: boolean; at: number } | null }) {
+function Marker({
+  marker,
+  sim,
+  reducedMotion,
+}: {
+  marker: { pos: Vec3; ok: boolean; at: number } | null
+  sim?: LevelSim
+  reducedMotion: boolean
+}) {
   const ref = useRef<Mesh>(null)
   const fill = useAnimatedMaterial(palette.markerSuccess, 0.8)
+  const outline = useAnimatedMaterial(palette.plumDeep, 0.42)
+  const arrival = useRef({ markerAt: -1, at: 0 })
   useFrame(() => {
     const mesh = ref.current
     if (!mesh || !marker) return
-    const age = (performance.now() - marker.at) / 1000
-    const life = Math.max(0, 1 - age / 0.8)
+    const now = performance.now()
+    if (arrival.current.markerAt !== marker.at) arrival.current = { markerAt: marker.at, at: now }
+    if (sim?.characterPose().walking && marker.ok) arrival.current.at = now
+    const age = (now - marker.at) / 1000
+    const life = sim && marker.ok ? Math.max(0, 1 - (now - arrival.current.at) / 600) : Math.max(0, 1 - age / 0.8)
     mesh.visible = life > 0
     fill.color.set(marker.ok ? palette.markerSuccess : palette.markerError)
     fill.opacity = life * 0.9
-    mesh.scale.setScalar(0.6 + (1 - life) * 0.6)
+    outline.opacity = life * 0.42
+    mesh.scale.setScalar(reducedMotion || (sim && marker.ok) ? 0.85 : 0.6 + (1 - life) * 0.6)
   })
   if (!marker) return null
   const [x, y, z] = marker.pos
+  // 样段圆圈须高于抬起 0.03 的悬停顶板，避免点击时被顶板盖住。
   return (
     <mesh
       ref={ref}
-      position={[x, surfaceY(y) + 0.01, z]}
+      position={[x, surfaceY(y) + (sim ? 0.05 : 0.01), z]}
       rotation={[-Math.PI / 2, 0, 0]}
       geometry={markerGeometry}
       material={fill}
-    />
+    >
+      {sim && marker.ok && <mesh geometry={markerGeometry} material={outline} scale={1.18} position={[0, 0, -0.002]} />}
+    </mesh>
   )
 }
