@@ -136,7 +136,6 @@ export function LevelSelect() {
             <aside className="entry-preview">
               <div className="entry-preview-stage" aria-hidden="true">
                 <Canvas
-                  key={previewLevel.id}
                   className="stage"
                   orthographic
                   shadows={settings.shadows}
@@ -145,6 +144,7 @@ export function LevelSelect() {
                   camera={{ position: [30, 30, 30], zoom: 40 }}
                 >
                   <Scene
+                    key={previewLevel.id}
                     level={previewLevel}
                     sim={sim}
                     interactive={false}
