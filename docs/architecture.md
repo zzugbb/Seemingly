@@ -550,7 +550,15 @@ T6.12n 样段操作反馈由游戏页通过 `Scene.tactile` 显式开启，正�
 
 设计与任务分解见 [opening-plan.md](opening-plan.md)。目标仍为六个主线 ID、两章各三关；新二至六关沿用现有 builder、规则、模拟器、求解器与存档格式，不新增关卡模式或迁移框架。参考实现尚未写进运行文件，按 T6.12q～t1 逐关同时替换数据与该关目标、修订、行为测试。
 
-T6.12p 只把现有 tactile 反馈扩大到 main 游玩，并按交接文档切换底部状态与不可达文案；正式 HUD、CompleteBanner、评价与下一关保持。样段独有的免评价、进入卡和完成卡仍按 list 分支，不按关名判断。正式第五关使用独立 id level-05 的完整定义，sample-01 仍留在 sampleLevels 且不写正式进度。T6.12t1 将第六关替换为回环、revision 4；不新增联动、镜头或存档格式。T6.12u 在 t1 后核对新第五、六关连续流程，不能沿用旧版第六关的验收。
+T6.12p 只把现有 tactile 反馈扩大到 main 游玩，并按交接文档切换底部状态与不可达文案；正式 HUD、CompleteBanner、评价与下一关保持。样段独有的免评价、进入卡和完成卡仍按 list 分支，不按关名判断。正式第五关使用独立 id level-05 的完整定义，sample-01 仍留在 sampleLevels 且不写正式进度。T6.12t1 将第六关替换为回环、revision 4；不新增联动、镜头或存档格式。T6.12u 在 t3 后从新入口核对新第五、六关连续流程，不能沿用旧版第六关的验收。
+
+## 入口页面实现边界（T6.12o2，待开发）
+
+[entry-design.md](entry-design.md) 为标题／选关的实现合同。t2 在 t1 后更新标题，t3 更新选关，u 在 t3 后回归全流程。复用现有 store 的 firstPlayableIndex、isUnlocked、play 和 toggleMute；展示统计只遍历实际正式 ID，不新增存档字段、解锁规则、音频或关卡 metadata 字段。主题短句放 app 展示数据，必要纯辅助函数可放既有 app 目录。
+
+标题只渲染 mainLevels[0] 初始场景。选关桌面最多一个 Canvas，初始预览 firstPlayableIndex，hover／focus 只更改本页状态；不能改变 store.current、触发音乐切换、启动提示 Worker 或写存档。窄屏不挂载选关预览画布。复用 Scene／LevelSim／CameraRig、共享材质与几何体；两个非游戏场景均 interactive=false、tactile=false，CameraRig 全局算法与固定方向不变。
+
+DOM 样式限定入口作用域，关内 HUD、评价和样段完成流程保持。docs/assets 的入口图是设计参考，不作为站点资源导入。标题／选关原组件源码仍未替换，文档定稿不等于 t2、t3 已完成。
 
 ## 提交约定
 
