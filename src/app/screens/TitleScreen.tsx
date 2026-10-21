@@ -45,10 +45,6 @@ export function TitleScreen() {
           <button className="entry-secondary" type="button" onClick={goSelect}>
             选择关卡
           </button>
-          <button className="entry-sample" type="button" onClick={() => play('sample', 0)}>
-            <span>独立体验 · 叠庭</span>
-            <span>不计入主线进度</span>
-          </button>
         </div>
         <div className="entry-stage" aria-hidden="true">
           <Canvas

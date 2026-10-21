@@ -580,10 +580,6 @@ button:disabled:hover {
   }
 }
 
-.sample-entry {
-  margin-top: 16px;
-  pointer-events: auto;
-}
 .sample-card {
   position: absolute;
   z-index: 2;
@@ -708,7 +704,6 @@ button:disabled:hover {
 
 .entry-title .entry-primary,
 .entry-title .entry-secondary,
-.entry-title .entry-sample,
 .entry-title .entry-mute {
   border: 0;
   font: inherit;
@@ -752,29 +747,6 @@ button:disabled:hover {
 
 .entry-title .entry-secondary:hover {
   background: rgba(255, 247, 234, 0.92);
-}
-
-.entry-title .entry-sample {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  min-height: 44px;
-  margin-top: 24px;
-  padding: 0;
-  background: transparent;
-  color: #5b4569;
-  text-align: left;
-}
-
-.entry-title .entry-sample span:first-child {
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.entry-title .entry-sample span:last-child {
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .entry-stage {
@@ -840,8 +812,7 @@ button:disabled:hover {
   .entry-progress,
   .entry-title .entry-primary,
   .entry-caption,
-  .entry-title .entry-secondary,
-  .entry-title .entry-sample {
+  .entry-title .entry-secondary {
     order: 3;
   }
 
@@ -874,11 +845,6 @@ button:disabled:hover {
     min-width: 0;
   }
 
-  .entry-title .entry-sample {
-    align-items: center;
-    text-align: center;
-  }
-
   .entry-mute {
     top: calc(12px + env(safe-area-inset-top));
     right: calc(12px + env(safe-area-inset-right));
@@ -888,7 +854,6 @@ button:disabled:hover {
 @media (prefers-reduced-motion: reduce) {
   .entry-title .entry-primary,
   .entry-title .entry-secondary,
-  .entry-title .entry-sample,
   .entry-title .entry-mute {
     transition: none;
   }

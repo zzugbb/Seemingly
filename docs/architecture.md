@@ -540,25 +540,25 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 
 ## 独立体验样段（T6.12m）
 
-独立样段 T6.12m：`levels/index.ts` 单独导出 `sampleLevels`，不加入主线、挑战或正式修订号表。`sampleTargets` 独立保存难度目标。页面状态增加 `sample`，无需解锁；`completeLevel` 仅接受主线与挑战 ID，样段通关不写评价。标题提供入口，`?sample=1` 控制初始页面；提示 worker 与样段共用现有求解策略。样段页面重试重建模拟器，撤销取消结果计时器。
+独立样段 T6.12m：`levels/index.ts` 单独导出 `sampleLevels`，不加入主线、挑战或正式修订号表。`sampleTargets` 独立保存难度目标。页面状态增加 `sample`，无需解锁；`completeLevel` 仅接受主线与挑战 ID，样段通关不写评价。T6.12u2 起正常标题不提供样段入口，仅内部 `?sample=1` 控制初始页面；提示 worker 与样段共用现有求解策略。样段页面重试重建模拟器，撤销取消结果计时器。
 
 `DecorDef.lanterns` 与 builder 的 `lamp` 只添加装饰坐标。场景复用灯笼组件，在通关后点亮、撤销后恢复，不生成路面或改变规则。
 
 T6.12n 先由样段通过 `Scene.tactile` 开启操作反馈。T6.12p 起，main 与 sample 游玩显式开启，标题不传该参数因而关闭，挑战关留待以后评估，不按关名判断。`RenderFeedback.mechanisms` 记录模拟器启动、到位事件的时间戳；材质、把手缩放与标记透明度在 `useFrame` 更新 ref，不更改模拟器状态。撤销清空时间戳和目标圆圈；底部文字仅在事件或计时结束时更新。临时材质沿用 `useAnimatedMaterial` 的创建与释放，几何体复用现有缓存。
 
-## 前六关重排的实现边界（T6.12o／o1，待开发）
+## 前六关重排的实现边界（T6.12o／o1，已实现）
 
-设计与任务分解见 [opening-plan.md](opening-plan.md)。目标仍为六个主线 ID、两章各三关；新二至六关沿用现有 builder、规则、模拟器、求解器与存档格式，不新增关卡模式或迁移框架。参考实现尚未写进运行文件，按 T6.12q～t1 逐关同时替换数据与该关目标、修订、行为测试。
+设计与任务分解见 [opening-plan.md](opening-plan.md)。目标仍为六个主线 ID、两章各三关；新二至六关沿用现有 builder、规则、模拟器、求解器与存档格式，不新增关卡模式或迁移框架。T6.12q～t1 已逐关替换数据与该关目标、修订、行为测试，T6.12u 已完成主线连续回归。
 
-T6.12p 已把现有 tactile 反馈扩大到 main 游玩，并按交接文档切换底部状态与不可达文案；正式 HUD、CompleteBanner、评价与下一关保持。样段独有的免评价、进入卡和完成卡仍按 list 分支，不按关名判断。正式第五关仍待 T6.12t，使用独立 id level-05 的完整定义，sample-01 仍留在 sampleLevels 且不写正式进度。T6.12t1 将第六关替换为回环、revision 4；不新增联动、镜头或存档格式。T6.12u 在 t3 后从新入口核对新第五、六关连续流程，不能沿用旧版第六关的验收。
+T6.12p 已把现有 tactile 反馈扩大到 main 游玩，并按交接文档切换底部状态与不可达文案；正式 HUD、CompleteBanner、评价与下一关保持。样段独有的免评价、进入卡和完成卡仍按 list 分支，不按关名判断。T6.12t 已实现正式第五关，使用独立 id level-05 的完整定义，sample-01 仍留在 sampleLevels 且不写正式进度。T6.12t1 已将第六关替换为回环、revision 4；不新增联动、镜头或存档格式。T6.12u 在 t3 后从新入口核对新第五、六关连续流程，不能沿用旧版第六关的验收。
 
-## 入口页面实现边界（T6.12o2，待开发）
+## 入口页面实现边界（T6.12o2，已实现）
 
-[entry-design.md](entry-design.md) 为标题／选关的实现合同。t2 在 t1 后更新标题，t3 更新选关，u 在 t3 后回归全流程。复用现有 store 的 firstPlayableIndex、isUnlocked、play 和 toggleMute；展示统计只遍历实际正式 ID，不新增存档字段、解锁规则、音频或关卡 metadata 字段。主题短句放 app 展示数据，必要纯辅助函数可放既有 app 目录。
+[entry-design.md](entry-design.md) 为标题／选关的实现合同。t2、t3 已实现标题和选关，u 已回归全流程；u1 修正预览 Canvas 复用，u2 移除正常页面的样段入口。复用现有 store 的 firstPlayableIndex、isUnlocked、play 和 toggleMute；展示统计只遍历实际正式 ID，不新增存档字段、解锁规则、音频或关卡 metadata 字段。主题短句放 app 展示数据，必要纯辅助函数可放既有 app 目录。
 
 标题只渲染 mainLevels[0] 初始场景。选关桌面最多一个 Canvas，初始预览 firstPlayableIndex，hover／focus 只更改本页状态；不能改变 store.current、触发音乐切换、启动提示 Worker 或写存档。窄屏不挂载选关预览画布。复用 Scene／LevelSim／CameraRig、共享材质与几何体；两个非游戏场景均 interactive=false、tactile=false，CameraRig 全局算法与固定方向不变。
 
-DOM 样式限定入口作用域，关内 HUD、评价和样段完成流程保持。docs/assets 的入口图是设计参考，不作为站点资源导入。标题／选关原组件源码仍未替换，文档定稿不等于 t2、t3 已完成。
+DOM 样式限定入口作用域，关内 HUD、评价和样段完成流程保持。docs/assets 的入口图是设计参考，不作为站点资源导入。标题／选关已按稿替换；样段只保留内部直达及存档隔离，不在正常导航中提供重复关卡入口。
 
 ## 提交约定
 
