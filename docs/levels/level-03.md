@@ -2,7 +2,7 @@
 
 ## 状态与适用任务
 
-T6.12o 设计定稿，交由 **T6.12r** 实现；运行中的第三关仍为旧版「错位」。历史设计见 `git show 734c8a2:docs/levels/level-03.md`。规则与指标已验证，尚未做实现后的视觉验收。共同约束见 [交接方案](../opening-plan.md)。
+T6.12r 已按本稿实现。运行中的第三关为「随行」、revision 3。历史设计见 `git show 734c8a2:docs/levels/level-03.md`。
 
 ## 教学点与原来如此
 

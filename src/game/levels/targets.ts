@@ -11,7 +11,7 @@ export interface LevelTarget {
 export const targets: Record<string, LevelTarget> = {
   'level-01': { minActions: 3, minActionsAll: 3, illusionsMin: 1 },
   'level-02': { minActions: 3, minActionsAll: 3, illusionsMin: 2, tradeoffsMin: 1 },
-  'level-03': { minActions: 4, minActionsAll: 4, illusionsMin: 5 },
+  'level-03': { minActions: 4, minActionsAll: 4, illusionsMin: 2 },
   'level-04': {
     minActions: 6,
     minActionsAll: 12,
