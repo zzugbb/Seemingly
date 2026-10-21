@@ -257,7 +257,7 @@ function Run({
         orthographic
         shadows={settings.shadows}
         dpr={[1, settings.maxDpr]}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: true, stencil: true }}
         camera={{ position: [30, 30, 30], zoom: 40 }}
         onPointerMissed={() => (document.body.style.cursor = '')}
       >

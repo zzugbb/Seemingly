@@ -1,11 +1,16 @@
 import { useEffect, useMemo } from 'react'
 import {
+  AlwaysStencilFunc,
   BoxGeometry,
   CircleGeometry,
+  ConeGeometry,
   CylinderGeometry,
+  EqualStencilFunc,
+  GreaterDepth,
   MeshBasicMaterial,
   MeshStandardMaterial,
   RingGeometry,
+  ReplaceStencilOp,
   SphereGeometry,
   TorusGeometry,
 } from 'three'
@@ -43,9 +48,44 @@ export const lanternCapGeometry = new RoundedBoxGeometry(0.22, 0.045, 0.22, 2, 0
 export const lanternRibGeometry = new RoundedBoxGeometry(0.035, 0.21, 0.035, 1, 0.01)
 export const lanternCoreGeometry = new RoundedBoxGeometry(0.13, 0.17, 0.13, 3, 0.04)
 export const lanternSparkGeometry = new SphereGeometry(0.028, 8, 6)
+export const characterShadowGeometry = new CircleGeometry(0.28, 24)
+export const characterBodyGeometry = new CylinderGeometry(0.12, 0.24, 0.48, 20)
+export const characterHeadGeometry = new SphereGeometry(0.16, 24, 16)
+export const characterEyeGeometry = new SphereGeometry(0.025, 12, 8)
+export const characterHatGeometry = new ConeGeometry(0.17, 0.34, 20)
 export const hitMaterial = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
 
+// 只画被场景挡住的片段；模板位排除角色自身遮挡，避免剪影盖住可见的脸和衣服。
+export const characterOcclusionMaterial = new MeshBasicMaterial({
+  color: palette.cream,
+  transparent: true,
+  opacity: 0.7,
+  depthFunc: GreaterDepth,
+  depthWrite: false,
+  stencilWrite: true,
+  stencilRef: 0,
+  stencilFunc: EqualStencilFunc,
+  stencilFuncMask: 1,
+  stencilWriteMask: 0,
+})
+
 const cache = new Map<string, MeshStandardMaterial>()
+const characterCache = new Map<string, MeshStandardMaterial>()
+
+export function characterMaterial(color: string) {
+  let mat = characterCache.get(color)
+  if (!mat) {
+    mat = material(color).clone()
+    mat.stencilWrite = true
+    mat.stencilRef = 1
+    mat.stencilFunc = AlwaysStencilFunc
+    mat.stencilFuncMask = 1
+    mat.stencilWriteMask = 1
+    mat.stencilZPass = ReplaceStencilOp
+    characterCache.set(color, mat)
+  }
+  return mat
+}
 
 export function material(color: string, options: { flat?: boolean; opacity?: number; glow?: boolean } = {}) {
   const opacity = options.opacity ?? 1

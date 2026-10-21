@@ -1,34 +1,85 @@
 import { forwardRef } from 'react'
 import type { Group } from 'three'
-import { material } from './materials'
+import {
+  characterBodyGeometry,
+  characterEyeGeometry,
+  characterHatGeometry,
+  characterHeadGeometry,
+  characterMaterial,
+  characterOcclusionMaterial,
+  characterShadowGeometry,
+  material,
+} from './materials'
 import { palette } from './palette'
 
-export const Character = forwardRef<Group>(function Character(_, ref) {
+export const Character = forwardRef<Group, { occlusion?: boolean }>(function Character({ occlusion = false }, ref) {
+  const fill = occlusion ? characterMaterial : material
   return (
     <group ref={ref}>
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0.02, 0]}
+        geometry={characterShadowGeometry}
         material={material(palette.plumDeep, { opacity: 0.25 })}
-      >
-        <circleGeometry args={[0.28, 24]} />
-      </mesh>
+      />
       <group name="body">
-        <mesh position={[0, 0.24, 0]} castShadow material={material(palette.plumDeep)}>
-          <cylinderGeometry args={[0.12, 0.24, 0.48, 20]} />
-        </mesh>
-        <mesh position={[0, 0.58, 0]} castShadow material={material(palette.cream)}>
-          <sphereGeometry args={[0.16, 24, 16]} />
-        </mesh>
-        <mesh position={[-0.055, 0.64, 0.14]} material={material(palette.plumDeep)}>
-          <sphereGeometry args={[0.025, 12, 8]} />
-        </mesh>
-        <mesh position={[0.055, 0.64, 0.14]} material={material(palette.plumDeep)}>
-          <sphereGeometry args={[0.025, 12, 8]} />
-        </mesh>
-        <mesh position={[0, 0.78, -0.03]} rotation={[0.2, 0, 0]} castShadow material={material(palette.terracotta)}>
-          <coneGeometry args={[0.17, 0.34, 20]} />
-        </mesh>
+        <mesh
+          position={[0, 0.24, 0]}
+          geometry={characterBodyGeometry}
+          renderOrder={1}
+          castShadow
+          material={fill(palette.plumDeep)}
+        />
+        <mesh
+          position={[0, 0.58, 0]}
+          geometry={characterHeadGeometry}
+          renderOrder={1}
+          castShadow
+          material={fill(palette.cream)}
+        />
+        <mesh
+          position={[-0.055, 0.64, 0.14]}
+          geometry={characterEyeGeometry}
+          renderOrder={1}
+          material={fill(palette.plumDeep)}
+        />
+        <mesh
+          position={[0.055, 0.64, 0.14]}
+          geometry={characterEyeGeometry}
+          renderOrder={1}
+          material={fill(palette.plumDeep)}
+        />
+        <mesh
+          position={[0, 0.78, -0.03]}
+          rotation={[0.2, 0, 0]}
+          geometry={characterHatGeometry}
+          renderOrder={1}
+          castShadow
+          material={fill(palette.terracotta)}
+        />
+        {occlusion && (
+          <>
+            <mesh
+              position={[0, 0.24, 0]}
+              geometry={characterBodyGeometry}
+              material={characterOcclusionMaterial}
+              renderOrder={2}
+            />
+            <mesh
+              position={[0, 0.58, 0]}
+              geometry={characterHeadGeometry}
+              material={characterOcclusionMaterial}
+              renderOrder={2}
+            />
+            <mesh
+              position={[0, 0.78, -0.03]}
+              rotation={[0.2, 0, 0]}
+              geometry={characterHatGeometry}
+              material={characterOcclusionMaterial}
+              renderOrder={2}
+            />
+          </>
+        )}
       </group>
     </group>
   )

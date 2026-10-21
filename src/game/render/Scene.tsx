@@ -231,7 +231,7 @@ export function Scene({
         <Orbs sim={sim} reducedMotion={reducedMotion} sparkleScale={quality.sparkleScale} />
         <Crates sim={sim} feedback={feedback} hint={hint} onPush={pushCrate} interactive={interactive} />
         <Gates sim={sim} onBlocked={onBlocked} feedback={feedback} hint={hint} interactive={interactive} />
-        <Character ref={characterRef} />
+        <Character ref={characterRef} occlusion={interactive} />
         <Marker marker={marker} sim={tactile ? sim : undefined} reducedMotion={tactile && reducedMotion} />
         <Lantern
           goal={level.goal}
