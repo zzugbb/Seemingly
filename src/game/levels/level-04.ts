@@ -2,20 +2,16 @@ import { defineLevel } from './builders'
 
 export default defineLevel({
   id: 'level-04',
-  title: '转动',
+  title: '换乘',
   chapter: 2,
-  revision: 2,
+  revision: 3,
   soundtrack: 'courtyard',
-  hints: ['点击金色转轮，桥会转动 90 度'],
+  hints: ['浅色顶板是路面，金色转轮改变建筑'],
   build: (b) => {
-    b.island({ x: [-1, 3], z: [0, 3], y: -1 })
-    b.path([0, 0, 2], 'terracotta')
-    b.path([1, 0, 2], 'terracotta')
-    b.path([2, 0, 2], 'terracotta')
-
-    b.island({ x: [4, 10], z: [0, 6], y: -1, depth: 3 })
-    b.column({ x: 6, z: 4, from: 0, to: 1 }, 'teal')
-    b.path([6, 2, 4], 'teal')
+    b.island({ x: [-1, 3], z: [1, 3], y: -1, depth: 2.5 })
+    for (const x of [0, 1, 2]) b.path([x, 0, 2], 'terracotta')
+    b.island({ x: [4, 9], z: [0, 8], y: -1, depth: 3.5 })
+    b.column({ x: 6, z: 4, from: 0, to: 2 }, 'teal')
     for (const pos of [
       [6, 0, 5],
       [6, 0, 6],
@@ -24,44 +20,43 @@ export default defineLevel({
     ] as const)
       b.solid([...pos], 'teal')
     b.rotator({
-      id: 'bridge',
+      id: 'ferry',
       pivot: [6, 2, 4],
       blocks: [
         { offset: [-1, 0, 0] },
         { offset: [1, 0, 0] },
-        { offset: [0, -1, -3] },
-        { offset: [0, -1, -1], kind: 'solid', color: 'teal' },
-        { offset: [0, -1, -2], kind: 'solid', color: 'teal' },
+        { offset: [3, 1, 1] },
+        { offset: [1, -1, 0], kind: 'solid', color: 'teal' },
+        { offset: [1, -1, 1], kind: 'solid', color: 'teal' },
+        { offset: [2, -1, 1], kind: 'solid', color: 'teal' },
+        { offset: [3, -1, 1], kind: 'solid', color: 'teal' },
+        { offset: [3, 0, 1], kind: 'solid', color: 'teal' },
       ],
       handle: { block: [8, 0, 6], face: 'z' },
     })
-
+    b.orb({ mechanism: 'ferry', block: 0 })
+    b.solid([4, 0, 4], 'terracotta')
+    b.path([4, 1, 4], 'terracotta')
     b.solid([5, 0, 1], 'terracotta')
     b.path([5, 1, 1], 'terracotta')
-    b.orb({ tile: [5, 1, 1] })
-
-    b.column({ x: 9, z: 5, from: 0, to: 2 }, 'rose')
-    b.path([9, 3, 5], 'rose')
-
-    b.island({ x: [7, 10], z: [7, 10], y: -1, depth: 4 })
-    b.column({ x: 9, z: 9, from: 0, to: 2 }, 'rose')
-    b.path([9, 3, 9], 'rose')
-    b.orb({ tile: [9, 3, 9], optional: true })
-
+    b.orb({ tile: [5, 1, 1], optional: true })
+    b.island({ x: [11, 13], z: [6, 8], y: -1, depth: 5 })
+    b.column({ x: 12, z: 7, from: 0, to: 4 }, 'rose')
+    b.path([12, 5, 7], 'rose')
     b.tree([-1, -1, 3])
-    b.window({ pos: [9, 1, 5], face: 'z' })
-    b.flower([7, -1, 9])
-    b.window({ pos: [9, 1, 9], face: 'z' })
-
+    b.flower([7, -1, 8])
+    b.window({ pos: [12, 2, 7], face: 'x' })
     b.start([0, 0, 2])
-    b.goal([9, 3, 5])
+    b.goal([12, 5, 7])
   },
   solution: [
-    { type: 'walk', to: [6, 2, 4] },
-    { type: 'operate', mechanism: 'bridge' },
-    { type: 'walk', to: [5, 1, 1] },
-    { type: 'walk', to: [6, 2, 4] },
-    { type: 'operate', mechanism: 'bridge' },
-    { type: 'walk', to: [9, 3, 5] },
+    { type: 'walk', to: [5, 2, 4] },
+    { type: 'operate', mechanism: 'ferry' },
+    { type: 'walk', to: [4, 1, 4] },
+    { type: 'operate', mechanism: 'ferry' },
+    { type: 'operate', mechanism: 'ferry' },
+    { type: 'walk', to: [6, 2, 5] },
+    { type: 'operate', mechanism: 'ferry' },
+    { type: 'walk', to: [12, 5, 7] },
   ],
 })

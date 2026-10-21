@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { validateLevels } from '../core/validate'
 import { LevelSim } from '../core/sim'
-import { surfaceY } from '../core/iso'
 import { applyAction, initialState, legalActions, stateKey } from '../core/rules'
 import { analyze } from '../core/solver'
 import type { LevelDef, Vec3 } from './types'
@@ -45,7 +44,7 @@ describe('第 1～2 章', () => {
   it('按顺序提供六关，两章各三关，每关都有设计者给定的难度目标', () => {
     expect(mainLevels.map((level) => level.id)).toEqual(Array.from({ length: 6 }, (_, index) => `level-0${index + 1}`))
     expect(mainLevels.map((level) => level.chapter)).toEqual([1, 1, 1, 2, 2, 2])
-    expect(mainLevels.map((level) => level.title)).toEqual(['启程', '转动', '随行', '转动', '乘风', '两难'])
+    expect(mainLevels.map((level) => level.title)).toEqual(['启程', '转动', '随行', '换乘', '乘风', '两难'])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
@@ -173,38 +172,49 @@ describe('第 1～2 章', () => {
     expect(analyze(level).minActions).toBeNull()
     expect(canWinWithoutRiding(mainLevels[2])).toBe(false)
   })
-  it('转动：先乘下层平台取选做，再回北台，全收集十二步；乘坐撤销恢复站位', () => {
+  it('换乘：北台作为选做中转站，短桥取光再换长臂，十二步全收集', () => {
     const sim = new LevelSim(mainLevels[3])
-    operate(sim, 'bridge')
-    walk(sim, [3, 1, 4])
-    expect(sim.state().at).toBe('bridge#2')
-    const before = structuredClone(sim.state())
-    operate(sim, 'bridge')
-    expect(sim.characterPose().position).toEqual([6, surfaceY(1), 7])
-    expect(sim.undo()).toBe(true)
-    expect(sim.state()).toEqual(before)
-    operate(sim, 'bridge')
-    walk(sim, [9, 3, 9])
-    expect(sim.orbProgress().collected).toBe(1)
-    walk(sim, [6, 1, 7])
-    operate(sim, 'bridge')
-    operate(sim, 'bridge')
+    walk(sim, [5, 2, 4])
+    expect(sim.state().at).toBe('ferry#0')
+    expect(sim.orbProgress().requiredCollected).toBe(1)
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
     walk(sim, [5, 1, 1])
     expect(sim.orbProgress().collected).toBe(2)
-    operate(sim, 'bridge')
+    expect(sim.undo()).toBe(true)
+    expect(sim.orbProgress().collected).toBe(1)
+    walk(sim, [5, 1, 1])
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
     walk(sim, [6, 2, 3])
-    operate(sim, 'bridge')
-    walk(sim, sim.level.goal)
+    expect(sim.state().at).toBe('ferry#1')
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
+    const events = walk(sim, sim.level.goal)
+    expect(events).toContainEqual({ type: 'step', tileId: 'ferry#2' })
     expect(sim.status).toBe('won')
     expect(sim.steps()).toBe(targets['level-04'].minActionsAll)
   })
-  it('转动：没有下层乘台仍能走主线，但选做光点不可到达', () => {
+  it('换乘：主线在南侧下短桥、换长臂，不能只坐同一条桥到灯笼', () => {
+    const sim = new LevelSim(mainLevels[3])
+    walk(sim, [5, 2, 4])
+    operate(sim, 'ferry')
+    walk(sim, [4, 1, 4])
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
+    walk(sim, [6, 2, 5])
+    expect(sim.state().at).toBe('ferry#1')
+    operate(sim, 'ferry')
+    walk(sim, sim.level.goal)
+    expect(sim.status).toBe('won')
+    expect(sim.orbProgress().collected).toBe(1)
+    expect(sim.steps()).toBe(8)
     const level = structuredClone(mainLevels[3])
-    const bridge = level.mechanisms.find((mechanism) => mechanism.id === 'bridge')!
-    if (bridge.type === 'rotator') bridge.blocks[2].kind = 'solid'
-    const metrics = analyze(level)
-    expect(metrics.minActions).toBe(6)
-    expect(metrics.minActionsAll).toBeNull()
+    const ferry = level.mechanisms.find((mechanism) => mechanism.id === 'ferry')!
+    if (ferry.type === 'rotator') ferry.blocks[1].kind = 'solid'
+    expect(analyze(level).minActions).toBeNull()
   })
   it('乘风：北台作为选做中转站，短桥取光再换长臂，十二步全收集', () => {
     const sim = new LevelSim(mainLevels[4])

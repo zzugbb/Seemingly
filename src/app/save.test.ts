@@ -138,6 +138,38 @@ describe('v2 存档', () => {
     )
     expect(loadSave().levels).toEqual({ 'level-01': record, 'level-02': record, 'level-06': record })
   })
+  it('第四关当前修订 3 保留评价，修订 2 清除且不搬用第五关', () => {
+    storage()
+    const record = { done: true, allOrbs: true, bestSteps: 8, parMet: true }
+    const older = { done: true, allOrbs: true, bestSteps: 12, parMet: false }
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: false,
+        levels: { 'level-03': record, 'level-04': older, 'level-05': record, 'level-06': record },
+        revisions: { 'level-03': 3, 'level-04': 2, 'level-05': 2, 'level-06': 3 },
+      }),
+    )
+    expect(loadSave().levels).toEqual({ 'level-03': record, 'level-05': record, 'level-06': record })
+    expect(loadSave().muted).toBe(false)
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: false,
+        levels: { 'level-03': record, 'level-04': record, 'level-05': record },
+        revisions: { 'level-03': 3, 'level-04': 3, 'level-05': 2 },
+      }),
+    )
+    const kept = loadSave()
+    expect(kept.levels['level-04']).toEqual(record)
+    expect(kept.levels['level-05']).toEqual(record)
+    writeSave(kept)
+    expect(loadSave()).toEqual(kept)
+  })
   it.each(['level-03', 'level-04', 'level-05'])('%s 修订只清除旧评价，其他已校准关卡保留', (id) => {
     storage()
     const record = { done: true, allOrbs: true, bestSteps: 3, parMet: true }

@@ -31,12 +31,12 @@ describe('模拟器音效接入', () => {
     expect(sounds).not.toContain('mechanism')
   })
 
-  it('转动：两次操作、收集光点和抵达分别发声，步数不等同于脚步数', () => {
-    const sounds = solveWithSound(3)
-    expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(2)
-    expect(sounds.filter((sound) => sound === 'step')).toHaveLength(10)
+  it('转动：一次操作、收集光点和抵达分别发声，脚步多于操作步', () => {
+    const sounds = solveWithSound(1)
+    expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(1)
     expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(1)
     expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
+    expect(sounds.filter((sound) => sound === 'step').length).toBeGreaterThan(2)
   })
 
   it('新增音效事件保留门的开关方向，非音效事件不发声', () => {

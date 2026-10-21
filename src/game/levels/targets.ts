@@ -13,7 +13,7 @@ export const targets: Record<string, LevelTarget> = {
   'level-02': { minActions: 3, minActionsAll: 3, illusionsMin: 2, tradeoffsMin: 1 },
   'level-03': { minActions: 4, minActionsAll: 4, illusionsMin: 2 },
   'level-04': {
-    minActions: 6,
+    minActions: 8,
     minActionsAll: 12,
     reachableStatesMin: 16,
     randomWin: { steps: 30, maxRate: 0.6 },
