@@ -60,8 +60,8 @@ describe('模拟器音效接入', () => {
     ])
   })
 
-  it('乘风：换乘时发脚步，随桥运动不额外发出脚步音', () => {
-    const sounds = solveWithSound(4)
+  it('换乘：换乘时发脚步，随桥运动不额外发出脚步音', () => {
+    const sounds = solveWithSound(3)
     expect(sounds.filter((sound) => sound === 'step')).toHaveLength(7)
     expect(sounds.filter((sound) => sound === 'mechanism')).toHaveLength(4)
     expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(1)

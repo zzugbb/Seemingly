@@ -2,7 +2,7 @@
 
 ## 状态、来源与范围
 
-T6.12o 目标设计，交由 **T6.12t** 实现；当前代码第五关仍为「乘风」。复用基线 `734c8a2:src/game/levels/sample-01.ts` 的完整布局，仅将 id 改为 `level-05`、revision 改为 3。chapter 2、title、hints、courtyard 声景、三盏装饰灯、机关、光点及标准解法均保留。参考实现已经包含变换；不能让正式列表直接引用 id 为 sample-01 的对象。
+T6.12t 已按本稿实现。运行中的第五关为「叠庭」、revision 3，正式 id 为 level-05。独立 sample-01 仍保留。
 
 ## 教学点与原来如此
 

@@ -152,7 +152,7 @@ describe('v2 存档', () => {
         revisions: { 'level-03': 3, 'level-04': 2, 'level-05': 2, 'level-06': 3 },
       }),
     )
-    expect(loadSave().levels).toEqual({ 'level-03': record, 'level-05': record, 'level-06': record })
+    expect(loadSave().levels).toEqual({ 'level-03': record, 'level-06': record })
     expect(loadSave().muted).toBe(false)
     memory.set(
       'seemingly:save:v2',
@@ -161,7 +161,7 @@ describe('v2 存档', () => {
         campaign: 'remake',
         muted: false,
         levels: { 'level-03': record, 'level-04': record, 'level-05': record },
-        revisions: { 'level-03': 3, 'level-04': 3, 'level-05': 2 },
+        revisions: { 'level-03': 3, 'level-04': 3, 'level-05': 3 },
       }),
     )
     const kept = loadSave()
@@ -206,7 +206,7 @@ describe('v2 存档', () => {
         campaign: 'remake',
         muted: true,
         levels: { 'level-05': record, 'level-06': record },
-        revisions: { 'level-05': 2, ...(revision === undefined ? {} : { 'level-06': revision }) },
+        revisions: { 'level-05': 3, ...(revision === undefined ? {} : { 'level-06': revision }) },
       }),
     )
     const loaded = loadSave()
