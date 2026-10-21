@@ -57,6 +57,7 @@ function Run({
   onStart: () => void
 }) {
   const sample = list === 'sample'
+  const tactile = list === 'main' || sample
   const ending = useApp((state) => state.screen === 'ending')
   const goSelect = useApp((state) => (sample ? state.goTitle : state.goSelect))
   const play = useApp((state) => state.play)
@@ -145,6 +146,7 @@ function Run({
     setHint(null)
     setResult(null)
     setToast(null)
+    setMotionNotice(null)
     setThinking(false)
   }, [sim])
   const requestHint = useCallback(async () => {
@@ -207,13 +209,10 @@ function Run({
   const onEvent = (event: SimEvent) => {
     playSimEvent(event, level)
     refresh()
-    if (sample) {
+    if (tactile) {
       if (event.type === 'walk-start' || event.type === 'undo') setMotionNotice(null)
       if (event.type === 'mechanism-start' || event.type === 'mechanism-end') {
-        const mechanism = level.mechanisms.find((item) => item.id === event.id)
-        const name = mechanism?.type === 'rotator' ? '桥臂' : '升降台'
-        const settled = event.type === 'mechanism-end'
-        setMotionNotice({ text: settled ? `${name}已到位` : `${name}${name === '桥臂' ? '转动' : '移动'}中`, settled })
+        setMotionNotice(mechanismNotice(level, event.id, event.type === 'mechanism-end'))
       }
     }
     if (event.type === 'goal-locked') setToast(`还差 ${event.missing} 个光点`)
@@ -247,6 +246,7 @@ function Run({
     if (level.ending) goEnding()
   }
   const hasNext = index + 1 < levelLists[list].length
+  const status = playStatus(tactile, hud, motionNotice)
   const label = sample ? '独立体验' : list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
   const message =
     !hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined
@@ -266,7 +266,7 @@ function Run({
           sim={sim}
           quality={settings}
           reducedMotion={reducedMotion}
-          tactile={sample}
+          tactile={tactile}
           interactive={!ending && started}
           hint={hint}
           onEndingReady={() => setEndingReady(true)}
@@ -275,7 +275,7 @@ function Run({
           onUnreachable={() => playSound('unreachable')}
           onLanternLit={() => playSound('lantern')}
           onWon={won}
-          onBlocked={(text) => setToast(sample && text.includes('换个角度') ? '这里还没连通，试试调整建筑' : text)}
+          onBlocked={(text) => setToast(blockedCopy(list, level, text))}
         />
       </Canvas>
       {!ending && started && (
@@ -299,11 +299,9 @@ function Run({
           }
         />
       )}
-      {!ending && !sample && !level.challenge && level.hints && (
-        <footer className="hints">
-          {level.hints.map((text) => (
-            <span key={text}>{text}</span>
-          ))}
+      {!ending && !sample && !level.challenge && (status || level.hints) && (
+        <footer className="hints" aria-live="polite">
+          {status ? <span>{status}</span> : level.hints?.map((text) => <span key={text}>{text}</span>)}
         </footer>
       )}
       <Toast message={toast} />
@@ -330,12 +328,8 @@ function Run({
       {sample && started && !result && (
         <footer className="hints sample-status" aria-live="polite">
           <span>
-            {hud.busy
-              ? hud.walking
-                ? '正在前往路面'
-                : (motionNotice?.text ?? '建筑正在移动')
-              : (motionNotice?.text ??
-                (hud.requiredCollected === hud.required ? '光已集齐，灯笼等待点亮' : '转轮转动桥臂 · 拉杆升降平台'))}
+            {status ??
+              (hud.requiredCollected === hud.required ? '光已集齐，灯笼等待点亮' : '转轮转动桥臂 · 拉杆升降平台')}
           </span>
         </footer>
       )}
@@ -373,4 +367,29 @@ function Run({
       )}
     </div>
   )
+}
+
+function blockedCopy(list: LevelList, level: LevelDef, text: string): string {
+  if ((list !== 'main' && list !== 'sample') || !text.includes('换个角度')) return text
+  const adjustable = level.mechanisms.some((item) => item.type === 'rotator' || item.type === 'mover')
+  if (adjustable) return '这里还没连通，试试调整建筑'
+  if (level.mechanisms.length === 0) return '这里还没连通'
+  return text
+}
+
+function playStatus(
+  tactile: boolean,
+  hud: { busy: boolean; walking: boolean },
+  notice: { text: string; settled: boolean } | null,
+): string | null {
+  if (!tactile) return null
+  if (hud.busy) return hud.walking ? '正在前往路面' : (notice?.text ?? '建筑正在移动')
+  return notice?.text ?? null
+}
+
+function mechanismNotice(level: LevelDef, id: string, settled: boolean): { text: string; settled: boolean } {
+  const mechanism = level.mechanisms.find((item) => item.id === id)
+  // 当前非转盘机关只有竖向平移台，到位文案与样段共用，不另起一套名称。
+  const name = mechanism?.type === 'rotator' ? '桥臂' : '升降台'
+  return { text: settled ? `${name}已到位` : `${name}${name === '桥臂' ? '转动' : '移动'}中`, settled }
 }

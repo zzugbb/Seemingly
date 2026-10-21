@@ -544,13 +544,13 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 
 `DecorDef.lanterns` 与 builder 的 `lamp` 只添加装饰坐标。场景复用灯笼组件，在通关后点亮、撤销后恢复，不生成路面或改变规则。
 
-T6.12n 样段操作反馈由游戏页通过 `Scene.tactile` 显式开启，正式关卡及标题默认关闭。`RenderFeedback.mechanisms` 记录模拟器启动、到位事件的时间戳；材质、把手缩放与标记透明度在 `useFrame` 更新 ref，不更改模拟器状态。撤销清空时间戳和目标圆圈；底部文字仅在事件或计时结束时更新。临时材质沿用 `useAnimatedMaterial` 的创建与释放，几何体复用现有缓存。
+T6.12n 先由样段通过 `Scene.tactile` 开启操作反馈。T6.12p 起，main 与 sample 游玩显式开启，标题不传该参数因而关闭，挑战关留待以后评估，不按关名判断。`RenderFeedback.mechanisms` 记录模拟器启动、到位事件的时间戳；材质、把手缩放与标记透明度在 `useFrame` 更新 ref，不更改模拟器状态。撤销清空时间戳和目标圆圈；底部文字仅在事件或计时结束时更新。临时材质沿用 `useAnimatedMaterial` 的创建与释放，几何体复用现有缓存。
 
 ## 前六关重排的实现边界（T6.12o／o1，待开发）
 
 设计与任务分解见 [opening-plan.md](opening-plan.md)。目标仍为六个主线 ID、两章各三关；新二至六关沿用现有 builder、规则、模拟器、求解器与存档格式，不新增关卡模式或迁移框架。参考实现尚未写进运行文件，按 T6.12q～t1 逐关同时替换数据与该关目标、修订、行为测试。
 
-T6.12p 只把现有 tactile 反馈扩大到 main 游玩，并按交接文档切换底部状态与不可达文案；正式 HUD、CompleteBanner、评价与下一关保持。样段独有的免评价、进入卡和完成卡仍按 list 分支，不按关名判断。正式第五关使用独立 id level-05 的完整定义，sample-01 仍留在 sampleLevels 且不写正式进度。T6.12t1 将第六关替换为回环、revision 4；不新增联动、镜头或存档格式。T6.12u 在 t3 后从新入口核对新第五、六关连续流程，不能沿用旧版第六关的验收。
+T6.12p 已把现有 tactile 反馈扩大到 main 游玩，并按交接文档切换底部状态与不可达文案；正式 HUD、CompleteBanner、评价与下一关保持。样段独有的免评价、进入卡和完成卡仍按 list 分支，不按关名判断。正式第五关仍待 T6.12t，使用独立 id level-05 的完整定义，sample-01 仍留在 sampleLevels 且不写正式进度。T6.12t1 将第六关替换为回环、revision 4；不新增联动、镜头或存档格式。T6.12u 在 t3 后从新入口核对新第五、六关连续流程，不能沿用旧版第六关的验收。
 
 ## 入口页面实现边界（T6.12o2，待开发）
 

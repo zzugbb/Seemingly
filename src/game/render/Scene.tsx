@@ -304,7 +304,7 @@ function Marker({
   })
   if (!marker) return null
   const [x, y, z] = marker.pos
-  // 样段圆圈须高于抬起 0.03 的悬停顶板，避免点击时被顶板盖住。
+  // 触觉反馈的目标圆圈须高于抬起 0.03 的悬停顶板，避免点击时被顶板盖住。
   return (
     <mesh
       ref={ref}
