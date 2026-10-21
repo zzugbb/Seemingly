@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { validateLevels } from '../core/validate'
 import { LevelSim } from '../core/sim'
 import { surfaceY } from '../core/iso'
+import { applyAction, initialState, legalActions, stateKey } from '../core/rules'
 import { analyze } from '../core/solver'
-import type { Vec3 } from './types'
+import type { LevelDef, Vec3 } from './types'
 import { mainLevels, challengeLevels } from './index'
 import { targets } from './targets'
 
@@ -21,12 +22,30 @@ const operate = (sim: LevelSim, mechanism: string) => {
   expect(sim.command({ type: 'operate', mechanism })).toBe('ok')
   return settle(sim)
 }
+const canWinWithoutRiding = (level: LevelDef) => {
+  const queue = [initialState(level)]
+  const seen = new Set([stateKey(queue[0])])
+  for (let index = 0; index < queue.length; index++) {
+    const state = queue[index]
+    if (state.won) return true
+    for (const action of legalActions(level, state)) {
+      if (action.type === 'operate' && state.at.startsWith(`${action.mechanism}#`)) continue
+      const next = applyAction(level, state, action)!.state
+      const key = stateKey(next)
+      if (!seen.has(key)) {
+        seen.add(key)
+        queue.push(next)
+      }
+    }
+  }
+  return false
+}
 
 describe('第 1～2 章', () => {
   it('按顺序提供六关，两章各三关，每关都有设计者给定的难度目标', () => {
     expect(mainLevels.map((level) => level.id)).toEqual(Array.from({ length: 6 }, (_, index) => `level-0${index + 1}`))
     expect(mainLevels.map((level) => level.chapter)).toEqual([1, 1, 1, 2, 2, 2])
-    expect(mainLevels.map((level) => level.title)).toEqual(['启程', '看似', '错位', '转动', '乘风', '两难'])
+    expect(mainLevels.map((level) => level.title)).toEqual(['启程', '转动', '错位', '转动', '乘风', '两难'])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
@@ -68,19 +87,44 @@ describe('第 1～2 章', () => {
     expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'won' })
     expect(sim.steps()).toBe(3)
   })
-  it('看似：经过三级回廊收光，撤销恢复高处光点，再跨回低廊点灯', () => {
-    const sim = new LevelSim(mainLevels[1])
-    expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'goal-locked', missing: 2 })
-    expect(sim.undo()).toBe(true)
-    expect(walk(sim, [6, 3, 5])).toContainEqual({ type: 'step', tileId: '6,3,4' })
-    expect(walk(sim, [9, 4, 6])).toContainEqual({ type: 'step', tileId: '9,4,5' })
-    expect(sim.orbProgress().collected).toBe(2)
-    expect(sim.undo()).toBe(true)
+  it('转动：站在中心静台取光再转向灯笼，三步通关', () => {
+    const level = mainLevels[1]
+    const metrics = analyze(level)
+    expect(metrics).toMatchObject({ minActions: 3, minActionsAll: 3, reachableStates: 34, deadEndStates: 0 })
+    const sim = new LevelSim(level)
+    expect(sim.command({ type: 'walk', tileId: sim.tileAt(level.goal)!.id })).toBe('unreachable')
+    walk(sim, [3, 1, 3])
     expect(sim.orbProgress().collected).toBe(1)
-    walk(sim, [9, 4, 6])
-    expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'step', tileId: '6,1,1' })
-    expect(sim.status).toBe('won')
+    expect(sim.state().at).toBe('3,1,3')
+    const before = structuredClone(sim.state())
+    expect(sim.undo()).toBe(true)
+    expect(sim.orbProgress().collected).toBe(0)
+    expect(sim.state()).toEqual({ ...before, orbs: [], at: level.start.join(',') })
+    walk(sim, [3, 1, 3])
+    operate(sim, 'bridge')
+    expect(walk(sim, level.goal)).toContainEqual({ type: 'won' })
     expect(sim.steps()).toBe(3)
+  })
+  it('转动：入口先转会断开，转回或撤销都能恢复，且不必乘坐', () => {
+    const sim = new LevelSim(mainLevels[1])
+    const center = sim.tileAt([3, 1, 3])!.id
+    operate(sim, 'bridge')
+    expect(sim.command({ type: 'walk', tileId: center })).toBe('unreachable')
+    expect(sim.undo()).toBe(true)
+    expect(sim.command({ type: 'walk', tileId: center })).toBe('ok')
+    const again = new LevelSim(mainLevels[1])
+    operate(again, 'bridge')
+    operate(again, 'bridge')
+    operate(again, 'bridge')
+    operate(again, 'bridge')
+    expect(again.command({ type: 'walk', tileId: center })).toBe('ok')
+    expect(canWinWithoutRiding(mainLevels[1])).toBe(true)
+  })
+  it('转动：禁用把手后无解', () => {
+    const level = structuredClone(mainLevels[1])
+    const bridge = level.mechanisms.find((mechanism) => mechanism.id === 'bridge')!
+    if (bridge.type === 'rotator') bridge.handle = undefined
+    expect(analyze(level).minActions).toBeNull()
   })
   it('错位：岔路没有捷径，跨到远塔不会自动收齐中层侧廊的光点', () => {
     const sim = new LevelSim(mainLevels[2])

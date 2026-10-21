@@ -2,52 +2,35 @@ import { defineLevel } from './builders'
 
 export default defineLevel({
   id: 'level-02',
-  title: '看似',
+  title: '转动',
   chapter: 1,
-  revision: 2,
+  revision: 3,
   soundtrack: 'courtyard',
-  hints: ['看起来连着，就能走过去'],
+  hints: ['点击金色转轮，观察路面怎样连接'],
   build: (b) => {
-    b.island({ x: [-1, 3], z: [-1, 3], y: -1 })
+    b.island({ x: [-1, 1], z: [1, 3], y: -1, depth: 2 })
     b.path([0, 0, 2], 'terracotta')
-    b.path([0, 0, 1], 'terracotta')
-    b.path([1, 0, 1], 'terracotta')
-    b.path([2, 0, 1], 'terracotta')
-
-    b.island({ x: [5, 10], z: [3, 7], y: -1, depth: 4 })
-    b.column({ x: 6, z: 4, from: 0, to: 2 }, 'rose')
-    b.column({ x: 7, z: 4, from: 0, to: 2 }, 'rose')
-    b.column({ x: 6, z: 5, from: 0, to: 2 }, 'rose')
-    b.path([6, 3, 4], 'rose')
-    b.path([7, 3, 4], 'rose')
-    b.path([6, 3, 5], 'rose')
-    b.orb({ tile: [6, 3, 5] })
-    for (const z of [5, 6]) {
-      b.column({ x: 9, z, from: 0, to: 3 }, 'rose')
-      b.path([9, 4, z], 'rose')
-    }
-    b.orb({ tile: [9, 4, 6] })
-
-    b.island({ x: [4, 8], z: [0, 1], y: -1 })
-    b.column({ x: 5, z: 1, from: 0, to: 0 }, 'terracotta')
-    b.column({ x: 6, z: 1, from: 0, to: 0 }, 'terracotta')
-    b.column({ x: 7, z: 1, from: 0, to: 0 }, 'terracotta')
-    b.path([5, 1, 1], 'terracotta')
-    b.path([6, 1, 1], 'terracotta')
-    b.path([7, 1, 1], 'terracotta')
-
+    b.island({ x: [2, 5], z: [0, 4], y: -1, depth: 2.5 })
+    b.column({ x: 3, z: 3, from: 0, to: 0 }, 'rose')
+    b.path([3, 1, 3], 'rose')
+    b.orb({ tile: [3, 1, 3] })
+    b.solid([4, 0, 4], 'terracotta')
+    b.rotator({
+      id: 'bridge',
+      pivot: [3, 1, 3],
+      blocks: [{ offset: [-1, 0, 0] }, { offset: [1, 0, 0] }],
+      handle: { block: [4, 0, 4], face: 'z' },
+    })
+    b.path([2, 0, 0], 'terracotta')
     b.tree([-1, -1, 3])
-    b.flower([10, -1, 7])
-    b.window({ pos: [9, 2, 6], face: 'z' })
-    b.window({ pos: [6, 1, 5], face: 'z' })
-    b.window({ pos: [7, 1, 4], face: 'x' })
-
+    b.flower([5, -1, 0])
+    b.window({ pos: [3, 0, 3], face: 'z' })
     b.start([0, 0, 2])
-    b.goal([7, 1, 1])
+    b.goal([2, 0, 0])
   },
   solution: [
-    { type: 'walk', to: [6, 3, 5] },
-    { type: 'walk', to: [9, 4, 6] },
-    { type: 'walk', to: [7, 1, 1] },
+    { type: 'walk', to: [3, 1, 3] },
+    { type: 'operate', mechanism: 'bridge' },
+    { type: 'walk', to: [2, 0, 0] },
   ],
 })
