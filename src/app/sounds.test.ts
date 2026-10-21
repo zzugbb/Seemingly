@@ -67,11 +67,13 @@ describe('模拟器音效接入', () => {
     expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(1)
     expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
   })
-  it('空庭：运动和到位分开发声，两座转盘使用不同音区', () => {
+  it('回环：运动和到位分开发声，两座转盘仍按原顺序使用不同音区', () => {
     const sounds = solveWithSound(5)
-    expect(sounds.filter((sound) => sound === 'turn')).toHaveLength(7)
+    expect(sounds.filter((sound) => sound === 'turn')).toHaveLength(6)
     const turns = vi.mocked(playSound).mock.calls.filter(([sound]) => sound === 'turn')
-    expect(turns.filter(([, options]) => options?.register === 0)).toHaveLength(5)
-    expect(turns.filter(([, options]) => options?.register === 7)).toHaveLength(2)
+    expect(turns.filter(([, options]) => options?.register === 0)).toHaveLength(3)
+    expect(turns.filter(([, options]) => options?.register === 7)).toHaveLength(3)
+    expect(sounds.filter((sound) => sound === 'orb')).toHaveLength(2)
+    expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
   })
 })

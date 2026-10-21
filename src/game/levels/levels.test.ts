@@ -39,12 +39,36 @@ const canWinWithoutRiding = (level: LevelDef) => {
   }
   return false
 }
+const noSouthDockWin = (all: boolean) => {
+  const level = mainLevels[5]
+  const start = initialState(level)
+  const queue = [{ state: start, depth: 0 }]
+  const seen = new Set([stateKey(start)])
+  for (let index = 0; index < queue.length; index++) {
+    const item = queue[index]
+    if (!item) continue
+    const { state, depth } = item
+    if (state.won && (!all || state.orbs.length === level.orbs.length)) return depth
+    for (const action of legalActions(level, state)) {
+      const transition = applyAction(level, state, action)
+      if (!transition) continue
+      if (action.type === 'walk' && state.rotator.east === 1 && transition.route.includes('east#0')) continue
+      const next = transition.state
+      const key = stateKey(next)
+      if (!seen.has(key)) {
+        seen.add(key)
+        queue.push({ state: next, depth: depth + 1 })
+      }
+    }
+  }
+  return null
+}
 
 describe('第 1～2 章', () => {
   it('按顺序提供六关，两章各三关，每关都有设计者给定的难度目标', () => {
     expect(mainLevels.map((level) => level.id)).toEqual(Array.from({ length: 6 }, (_, index) => `level-0${index + 1}`))
     expect(mainLevels.map((level) => level.chapter)).toEqual([1, 1, 1, 2, 2, 2])
-    expect(mainLevels.map((level) => level.title)).toEqual(['启程', '转动', '随行', '换乘', '叠庭', '两难'])
+    expect(mainLevels.map((level) => level.title)).toEqual(['启程', '转动', '随行', '换乘', '叠庭', '回环'])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
@@ -216,45 +240,133 @@ describe('第 1～2 章', () => {
     if (ferry.type === 'rotator') ferry.blocks[1].kind = 'solid'
     expect(analyze(level).minActions).toBeNull()
   })
-  it('两难：借东桥换乘西高台，退开东桥找到低处光点，全收集十五步完成', () => {
-    const sim = new LevelSim(mainLevels[5])
-    walk(sim, [3, 2, 4])
+  it('回环：借东桥取两处必需光点，选外角返回西高台，十二步点灯', () => {
+    const level = mainLevels[5]
+    expect(analyze(level)).toMatchObject({ minActions: 12, minActionsAll: 14, reachableStates: 536, deadEndStates: 0 })
+    expect(level.decor.lanterns).toHaveLength(3)
+    const sim = new LevelSim(level)
+    walk(sim, [4, 2, 5])
+    expect(sim.state().at).toBe('west#0')
     operate(sim, 'west')
-    operate(sim, 'west')
-    operate(sim, 'east')
-    walk(sim, [5, 1, 1])
     walk(sim, [6, 2, 3])
     expect(sim.state().at).toBe('east#1')
-    operate(sim, 'west')
-    operate(sim, 'west')
+    expect(sim.orbProgress().requiredCollected).toBe(1)
     operate(sim, 'east')
-    walk(sim, [8, 4, 8])
-    expect(sim.orbProgress().collected).toBe(1)
-    expect(sim.command({ type: 'walk', tileId: 'west#2' })).toBe('unreachable')
     operate(sim, 'east')
-    walk(sim, [5, 1, 4])
-    expect(sim.state().at).toBe('west#2')
-    expect(sim.orbProgress().collected).toBe(2)
+    walk(sim, [9, 2, 5])
+    expect(sim.orbProgress().requiredCollected).toBe(2)
+    walk(sim, [8, 2, 5])
+    expect(sim.state().at).toBe('east#1')
+    const beforeReturn = structuredClone(sim.state())
+    expect(sim.command({ type: 'operate', mechanism: 'east' })).toBe('ok')
+    expect(sim.undo()).toBe(false)
+    expect(sim.command({ type: 'walk', tileId: '9,2,5' })).toBe('busy')
+    sim.update(1 / 30)
+    const ridingEast = [...sim.characterPose().position]
+    settle(sim)
+    expect(sim.state().at).toBe('east#1')
+    expect(sim.state().rotator.east).toBe(3)
+    expect(sim.characterPose().position).not.toEqual(ridingEast)
     expect(sim.undo()).toBe(true)
-    expect(sim.orbProgress().collected).toBe(1)
-    walk(sim, [5, 1, 4])
-    walk(sim, [8, 4, 8])
+    expect(sim.state()).toEqual(beforeReturn)
+    operate(sim, 'east')
+    operate(sim, 'west')
+    walk(sim, [10, 3, 4])
     expect(sim.state().at).toBe('west#1')
-    const before = structuredClone(sim.state())
-    operate(sim, 'west')
+    const beforeLift = structuredClone(sim.state())
+    expect(sim.command({ type: 'operate', mechanism: 'west' })).toBe('ok')
+    expect(sim.undo()).toBe(false)
+    expect(sim.command({ type: 'walk', tileId: level.goal.join(',') })).toBe('busy')
+    sim.update(1 / 30)
+    const ridingWest = [...sim.characterPose().position]
+    settle(sim)
+    expect(sim.state().at).toBe('west#1')
+    expect(sim.state().rotator.west).toBe(0)
+    expect(sim.characterPose().position).not.toEqual(ridingWest)
     expect(sim.undo()).toBe(true)
-    expect(sim.state()).toEqual(before)
+    expect(sim.state()).toEqual(beforeLift)
     operate(sim, 'west')
-    walk(sim, [6, 2, -3])
-    expect(sim.status).toBe('won')
+    expect(walk(sim, level.goal)).toContainEqual({ type: 'won' })
+    expect(sim.steps()).toBe(12)
     expect(sim.orbProgress().collected).toBe(2)
-    expect(sim.steps()).toBe(targets['level-06'].minActionsAll)
+    expect(sim.undo()).toBe(true)
+    expect(sim.status).toBe('playing')
+    expect(sim.orbProgress().collected).toBe(2)
   })
-  it('两难：东桥必须参与中转，单独循环西转盘不能通关', () => {
-    const level = structuredClone(mainLevels[5])
-    const east = level.mechanisms.find((mechanism) => mechanism.id === 'east')!
-    if (east.type === 'rotator') east.handle = undefined
-    expect(analyze(level).minActions).toBeNull()
+  it('回环：不经东庭不能点灯，内端返程落点接不上西高台', () => {
+    const skipped = new LevelSim(mainLevels[5])
+    walk(skipped, [4, 2, 5])
+    operate(skipped, 'west')
+    walk(skipped, [6, 2, 3])
+    operate(skipped, 'east')
+    operate(skipped, 'east')
+    operate(skipped, 'east')
+    operate(skipped, 'west')
+    walk(skipped, [10, 3, 4])
+    operate(skipped, 'west')
+    expect(walk(skipped, skipped.level.goal)).toContainEqual({ type: 'goal-locked', missing: 1 })
+    expect(skipped.status).toBe('playing')
+    const inner = new LevelSim(mainLevels[5])
+    walk(inner, [4, 2, 5])
+    operate(inner, 'west')
+    walk(inner, [6, 2, 3])
+    operate(inner, 'east')
+    operate(inner, 'east')
+    walk(inner, [9, 2, 5])
+    walk(inner, [8, 2, 4])
+    expect(inner.state().at).toBe('east#0')
+    operate(inner, 'east')
+    expect(inner.state().at).toBe('east#0')
+    expect(inner.tileAt([7, 2, 3])?.id).toBe('east#0')
+    expect(inner.command({ type: 'walk', tileId: 'west#1' })).toBe('unreachable')
+    walk(inner, [8, 2, 3])
+    expect(inner.state().at).toBe('east#1')
+    operate(inner, 'west')
+    walk(inner, [10, 3, 4])
+    operate(inner, 'west')
+    expect(walk(inner, inner.level.goal)).toContainEqual({ type: 'won' })
+  })
+  it('回环：中途经内端停靠南庭，十四步收齐三处光点', () => {
+    const sim = new LevelSim(mainLevels[5])
+    walk(sim, [4, 2, 5])
+    operate(sim, 'west')
+    walk(sim, [6, 2, 4])
+    expect(sim.state().at).toBe('east#0')
+    operate(sim, 'west')
+    operate(sim, 'east')
+    walk(sim, [7, 2, 6])
+    expect(sim.orbProgress().collected).toBe(1)
+    expect(sim.undo()).toBe(true)
+    expect(sim.orbProgress().collected).toBe(0)
+    walk(sim, [7, 2, 6])
+    walk(sim, [7, 2, 5])
+    expect(sim.state().at).toBe('east#0')
+    operate(sim, 'east')
+    walk(sim, [9, 2, 5])
+    expect(sim.orbProgress().collected).toBe(3)
+    walk(sim, [8, 2, 5])
+    expect(sim.state().at).toBe('east#1')
+    operate(sim, 'east')
+    walk(sim, [10, 3, 4])
+    operate(sim, 'west')
+    expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'won' })
+    expect(sim.steps()).toBe(14)
+    expect(sim.orbProgress().collected).toBe(3)
+  })
+  it('回环：两把手、西高台和乘坐都不能绕过，南庭不是主线必经', () => {
+    for (const id of ['west', 'east']) {
+      const level = structuredClone(mainLevels[5])
+      const mechanism = level.mechanisms.find((item) => item.id === id)!
+      if (mechanism.type === 'rotator') mechanism.handle = undefined
+      expect(analyze(level).minActions).toBeNull()
+    }
+    const blockedHigh = structuredClone(mainLevels[5])
+    const west = blockedHigh.mechanisms.find((item) => item.id === 'west')!
+    if (west.type === 'rotator') west.blocks[1]!.kind = 'solid'
+    expect(analyze(blockedHigh).minActions).toBeNull()
+    expect(canWinWithoutRiding(mainLevels[5])).toBe(false)
+    expect(noSouthDockWin(false)).toBe(12)
+    expect(noSouthDockWin(true)).toBeNull()
   })
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
     const broken = structuredClone(mainLevels[0])
