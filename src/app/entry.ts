@@ -1,7 +1,7 @@
 import { mainLevels } from '../game/levels'
 import type { LevelDef } from '../game/levels/types'
 import type { SaveData } from './save'
-import { firstPlayableIndex } from './store'
+import { firstPlayableIndex, isUnlocked } from './store'
 
 export interface CampaignStats {
   mainDone: number
@@ -56,4 +56,46 @@ export function journeyChoice(save: SaveData, main: readonly LevelDef[] = mainLe
     }
   }
   return { mode: 'revisit', label: '重访旅程', caption: '当前开放的关卡已全部抵达', index }
+}
+
+export const levelThemes: Readonly<Record<string, string>> = {
+  'level-01': '第一束光',
+  'level-02': '改变连接',
+  'level-03': '随建筑移动',
+  'level-04': '庭院之间',
+  'level-05': '层叠的庭院',
+  'level-06': '两座桥的回程',
+}
+
+export type SelectStatus = 'locked' | 'done' | 'next' | 'open'
+
+export function selectStatus(
+  save: SaveData,
+  index: number,
+  main: readonly LevelDef[] = mainLevels,
+): { status: SelectStatus; label: string } {
+  const level = main[index]
+  if (!level) return { status: 'locked', label: '' }
+  const unlocked = isUnlocked(save, 'main', index)
+  const done = Boolean(save.levels[level.id]?.done)
+  const finished = main.every((item) => save.levels[item.id]?.done)
+  if (!unlocked) {
+    const reason = `先通过第 ${index} 关`
+    return { status: 'locked', label: done ? `已抵达 · ${reason}` : reason }
+  }
+  if (done) return { status: 'done', label: '已抵达' }
+  if (!finished && index === firstPlayableIndex(save)) return { status: 'next', label: '下一站' }
+  return { status: 'open', label: '可探索' }
+}
+
+export function initialPreviewIndex(save: SaveData): number {
+  const preferred = firstPlayableIndex(save)
+  if (isUnlocked(save, 'main', preferred)) return preferred
+  const fallback = mainLevels.findIndex((_, index) => isUnlocked(save, 'main', index))
+  return Math.max(0, fallback)
+}
+
+export function chapterArrival(save: SaveData, chapter: number, main: readonly LevelDef[] = mainLevels) {
+  const levels = main.filter((level) => level.chapter === chapter)
+  return { done: levels.filter((level) => save.levels[level.id]?.done).length, total: levels.length }
 }

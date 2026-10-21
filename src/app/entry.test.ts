@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { challengeLevels, mainLevels } from '../game/levels'
 import { emptySave, type LevelRecord, type SaveData } from './save'
-import { campaignStats, journeyChoice } from './entry'
+import { campaignStats, chapterArrival, initialPreviewIndex, journeyChoice, selectStatus } from './entry'
 
 const record = (steps: number, allOrbs = true, parMet = true): LevelRecord => ({
   done: true,
@@ -88,5 +88,51 @@ describe('标题入口', () => {
       showProgress: false,
     })
     expect(journeyChoice(save, mainLevels).mode).toBe('start')
+  })
+})
+
+describe('选关状态', () => {
+  it('空进度只有第一关是下一站', () => {
+    expect(selectStatus(emptySave(), 0)).toEqual({ status: 'next', label: '下一站' })
+    expect(selectStatus(emptySave(), 1)).toEqual({ status: 'locked', label: '先通过第 1 关' })
+    expect(selectStatus(emptySave(), 5).status).toBe('locked')
+    expect(initialPreviewIndex(emptySave())).toBe(0)
+    expect(chapterArrival(emptySave(), 1)).toEqual({ done: 0, total: 3 })
+  })
+
+  it('完成前三关后下一站是第四关，后两关锁定', () => {
+    const save = saveWith({
+      'level-01': record(3),
+      'level-02': record(3),
+      'level-03': record(4),
+    })
+    expect(chapterArrival(save, 1)).toEqual({ done: 3, total: 3 })
+    expect(chapterArrival(save, 2)).toEqual({ done: 0, total: 3 })
+    expect(selectStatus(save, 3)).toEqual({ status: 'next', label: '下一站' })
+    expect(selectStatus(save, 4)).toEqual({ status: 'locked', label: '先通过第 4 关' })
+    expect(selectStatus(save, 5)).toEqual({ status: 'locked', label: '先通过第 5 关' })
+    expect(initialPreviewIndex(save)).toBe(3)
+  })
+
+  it('全部抵达时没有下一站，预览停在最后一关', () => {
+    const save = saveWith(Object.fromEntries(mainLevels.map((level) => [level.id, record(3)])))
+    expect(mainLevels.every((_, index) => selectStatus(save, index).status === 'done')).toBe(true)
+    expect(initialPreviewIndex(save)).toBe(mainLevels.length - 1)
+  })
+
+  it('修订缺口仍按原解锁规则暂锁，并保留已抵达记录', () => {
+    const save = saveWith({
+      'level-01': record(3),
+      'level-03': record(4),
+      'level-04': record(8),
+      'level-06': record(12),
+    })
+    expect(selectStatus(save, 1)).toEqual({ status: 'next', label: '下一站' })
+    expect(selectStatus(save, 2)).toEqual({ status: 'locked', label: '已抵达 · 先通过第 2 关' })
+    expect(selectStatus(save, 3)).toEqual({ status: 'done', label: '已抵达' })
+    expect(selectStatus(save, 4)).toEqual({ status: 'open', label: '可探索' })
+    expect(selectStatus(save, 5)).toEqual({ status: 'locked', label: '已抵达 · 先通过第 5 关' })
+    expect(save.levels['level-03']?.done).toBe(true)
+    expect(save.levels['level-06']?.done).toBe(true)
   })
 })
