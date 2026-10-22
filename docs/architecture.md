@@ -501,9 +501,9 @@ SaveData增加可选tutorials（walk／collect／rotate／ride／lift）；缺�
 - T6.12i：第五关 `revision: 2`，第二章主题；一个转盘含短臂、长臂登船位与高平台，中心是实心。长臂下方折形梁不可行走，静态南侧与北台提供两种换乘路线；规则层与渲染无特例。
 - T6.12j：标题读取主线第一关的章节与 `soundtrack`，选关读取当前关卡配置；同章返回选关沿用音乐层，跨章与返回标题沿用三秒交叉淡化。前六关已全部接入章节主题，省略 `soundtrack` 的后续关卡仍使用生成式音乐，不更改播放器、合成音色或混音。
 
-### T6.12v6 接线与生命周期（实现待试听）
+### T6.12v6 接线与生命周期
 
-最新声音目标以[声音设计](design.md#音乐推进与成功反馈t612v6待本轮试听)为准；上方b～j保留历史记录。courtyard的96秒和声结构保持，旋律改为51音；`courtyardNote`与`courtyardPulse`给出纯数据，后者按0.75秒拍长、半拍错位，`pulseActive`与`pulseLevel`定义探索／收集／待点灯／完成层。`MusicPlayer.setProgress`只改变律动密度、强度和完成时的背景让位，不重启乐句。`musicStage`仅接收模拟器已显示的收光计数及won，不查询解法或判断机关连接。
+2026-10-22用户已确认本轮声音试听，v6已勾选，整体T6.12仍待单独确认。最新声音目标以[声音设计](design.md#音乐推进与成功反馈t612v6)为准；上方b～j保留历史记录。courtyard的96秒和声结构保持，旋律改为51音；`courtyardNote`与`courtyardPulse`给出纯数据，后者按0.75秒拍长、半拍错位，`pulseActive`与`pulseLevel`定义探索／收集／待点灯／完成层。`MusicPlayer.setProgress`只改变律动密度、强度和完成时的背景让位，不重启乐句。`musicStage`仅接收模拟器已显示的收光计数及won，不查询解法或判断机关连接。
 
 `instruments.pluckedBuffer`按上下文缓存最多12个0.9秒短拨弦，与felt／silk缓存独立；新增律动使用240Hz高通，主旋律也高通180Hz，原铺底0.08／180Hz与主混音参数保持。`renderCourtyardNote`、`renderCourtyardPad`及`sfx.renderSound`可供临时OfflineAudioContext导出调用，复用实际合成代码，不向站点增加音频文件。AudioBus.context使用BaseAudioContext，实际引擎仍只建立一个AudioContext。
 
