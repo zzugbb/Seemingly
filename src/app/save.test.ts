@@ -121,7 +121,7 @@ describe('v2 存档', () => {
     writeSave(loaded)
     expect(loadSave()).toEqual(loaded)
   })
-  it('第三关当前修订 3 保留评价，修订 2 清除且不牵连其他关', () => {
+  it('第三关当前修订 4 保留评价，旧修订只清除第三关且保留教学与静音', () => {
     storage()
     const record = { done: true, allOrbs: true, bestSteps: 4, parMet: true }
     memory.set(
@@ -131,7 +131,7 @@ describe('v2 存档', () => {
         campaign: 'remake',
         muted: true,
         levels: { 'level-01': record, 'level-02': record, 'level-03': record, 'level-06': record },
-        revisions: { 'level-01': 2, 'level-02': 3, 'level-03': 3, 'level-06': 4 },
+        revisions: { 'level-01': 2, 'level-02': 3, 'level-03': 4, 'level-06': 4 },
       }),
     )
     const kept = loadSave()
@@ -144,17 +144,23 @@ describe('v2 存档', () => {
     expect(kept.muted).toBe(true)
     writeSave(kept)
     expect(loadSave()).toEqual(kept)
-    memory.set(
-      'seemingly:save:v2',
-      JSON.stringify({
-        version: 2,
-        campaign: 'remake',
-        muted: true,
-        levels: { 'level-01': record, 'level-02': record, 'level-03': record, 'level-06': record },
-        revisions: { 'level-01': 2, 'level-02': 3, 'level-03': 2, 'level-06': 4 },
-      }),
-    )
-    expect(loadSave().levels).toEqual({ 'level-01': record, 'level-02': record, 'level-06': record })
+    for (const revision of [undefined, 1, 2, 3]) {
+      memory.set(
+        'seemingly:save:v2',
+        JSON.stringify({
+          version: 2,
+          campaign: 'remake',
+          muted: true,
+          tutorials: ['walk', 'collect', 'rotate', 'ride'],
+          levels: { 'level-01': record, 'level-02': record, 'level-03': record, 'level-06': record },
+          revisions: { 'level-01': 2, 'level-02': 3, 'level-03': revision, 'level-06': 4 },
+        }),
+      )
+      const loaded = loadSave()
+      expect(loaded.levels).toEqual({ 'level-01': record, 'level-02': record, 'level-06': record })
+      expect(loaded.muted).toBe(true)
+      expect(loaded.tutorials).toEqual(['walk', 'collect', 'rotate', 'ride'])
+    }
   })
   it('第四关当前修订 3 保留评价，修订 2 清除且不搬用第五关', () => {
     storage()
@@ -167,7 +173,7 @@ describe('v2 存档', () => {
         campaign: 'remake',
         muted: false,
         levels: { 'level-03': record, 'level-04': older, 'level-05': record, 'level-06': record },
-        revisions: { 'level-03': 3, 'level-04': 2, 'level-05': 2, 'level-06': 4 },
+        revisions: { 'level-03': 4, 'level-04': 2, 'level-05': 2, 'level-06': 4 },
       }),
     )
     expect(loadSave().levels).toEqual({ 'level-03': record, 'level-06': record })
@@ -179,7 +185,7 @@ describe('v2 存档', () => {
         campaign: 'remake',
         muted: false,
         levels: { 'level-03': record, 'level-04': record, 'level-05': record },
-        revisions: { 'level-03': 3, 'level-04': 3, 'level-05': 3 },
+        revisions: { 'level-03': 4, 'level-04': 3, 'level-05': 3 },
       }),
     )
     const kept = loadSave()

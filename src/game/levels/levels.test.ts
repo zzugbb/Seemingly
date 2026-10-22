@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { validateLevels } from '../core/validate'
 import { LevelSim } from '../core/sim'
 import { applyAction, initialState, legalActions, stateKey } from '../core/rules'
-import { analyze } from '../core/solver'
+import { analyze, buildPolicy, reachableStates } from '../core/solver'
 import type { LevelDef, Vec3 } from './types'
 import { mainLevels, challengeLevels } from './index'
 import { targets } from './targets'
@@ -149,18 +149,14 @@ describe('第 1～2 章', () => {
     if (bridge.type === 'rotator') bridge.handle = undefined
     expect(analyze(level).minActions).toBeNull()
   })
-  it('随行：必须乘坐乘台两次才能登塔，四步通关', () => {
+  it('随行：乘到南岸后离台取光，四步点灯', () => {
     const level = mainLevels[2]
-    expect(analyze(level)).toMatchObject({ minActions: 4, minActionsAll: 4, reachableStates: 17, deadEndStates: 0 })
+    expect(analyze(level)).toMatchObject({ minActions: 4, minActionsAll: 4, reachableStates: 52, deadEndStates: 0 })
     const sim = new LevelSim(level)
     walk(sim, [2, 1, 3])
     expect(sim.state().at).toBe('ferry#0')
-    expect(sim.orbProgress().collected).toBe(1)
-    const collected = structuredClone(sim.state())
-    expect(sim.undo()).toBe(true)
     expect(sim.orbProgress().collected).toBe(0)
-    expect(sim.state().at).toBe(level.start.join(','))
-    walk(sim, [2, 1, 3])
+    const boarded = structuredClone(sim.state())
     expect(sim.command({ type: 'operate', mechanism: 'ferry' })).toBe('ok')
     expect(sim.undo()).toBe(false)
     sim.update(1 / 30)
@@ -171,23 +167,66 @@ describe('第 1～2 章', () => {
     expect(sim.state().rotator.ferry).toBe(1)
     expect(sim.characterPose().position[0]).not.toBe(mid[0])
     expect(sim.undo()).toBe(true)
-    expect(sim.state()).toEqual(collected)
+    expect(sim.state()).toEqual(boarded)
     operate(sim, 'ferry')
-    operate(sim, 'ferry')
-    expect(walk(sim, level.goal)).toContainEqual({ type: 'won' })
+    walk(sim, [4, 2, 7])
+    expect(sim.state().at).toBe('4,2,7')
+    expect(sim.orbProgress().collected).toBe(1)
+    expect(sim.undo()).toBe(true)
+    expect(sim.state().at).toBe('ferry#0')
+    expect(sim.orbProgress().collected).toBe(0)
+    walk(sim, [4, 2, 7])
+    const events = walk(sim, level.goal)
+    expect(events).toContainEqual({ type: 'step', tileId: '4,2,6' })
+    expect(events).toContainEqual({ type: 'step', tileId: '5,2,6' })
+    expect(events).toContainEqual({ type: 'won' })
     expect(sim.steps()).toBe(4)
   })
-  it('随行：南台可以往返，回到同一乘台后仍能通关', () => {
+  it('随行：直接点灯不会顺路收光，离台后转动不会带走岸上角色', () => {
     const sim = new LevelSim(mainLevels[2])
     walk(sim, [2, 1, 3])
     operate(sim, 'ferry')
-    walk(sim, [4, 2, 6])
-    expect(sim.state().at).toBe('4,2,6')
-    walk(sim, [3, 1, 4])
+    expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'goal-locked', missing: 1 })
+    expect(sim.orbProgress().collected).toBe(0)
+    expect(sim.undo()).toBe(true)
+    walk(sim, [4, 2, 7])
+    const ashore = sim.characterPose().position
+    operate(sim, 'ferry')
+    expect(sim.characterPose().position).toEqual(ashore)
+    expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'won' })
+  })
+  it('随行：错过南岸后可在空高台往返，再乘回南岸恢复', () => {
+    const sim = new LevelSim(mainLevels[2])
+    walk(sim, [2, 1, 3])
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
+    expect(sim.command({ type: 'walk', tileId: '4,2,7' })).toBe('unreachable')
+    expect(sim.command({ type: 'walk', tileId: sim.level.goal.join(',') })).toBe('unreachable')
+    walk(sim, [6, 2, 4])
+    walk(sim, [4, 1, 3])
     expect(sim.state().at).toBe('ferry#0')
     operate(sim, 'ferry')
+    operate(sim, 'ferry')
+    operate(sim, 'ferry')
+    walk(sim, [4, 2, 7])
     expect(walk(sim, sim.level.goal)).toContainEqual({ type: 'won' })
-    expect(sim.status).toBe('won')
+  })
+  it('随行：每个可达未完成状态的提示都合法且最终通关', () => {
+    const level = mainLevels[2]
+    const policy = buildPolicy(level)
+    for (const start of reachableStates(level)) {
+      let state = start
+      const seen = new Set<string>()
+      while (!state.won) {
+        const key = stateKey(state)
+        expect(seen.has(key)).toBe(false)
+        seen.add(key)
+        const action = policy.get(key)
+        expect(action).toBeTruthy()
+        expect(legalActions(level, state)).toContainEqual(action)
+        state = applyAction(level, state, action!)!.state
+      }
+    }
   })
   it('随行：禁用把手或禁止乘坐都不能通关', () => {
     const level = structuredClone(mainLevels[2])
