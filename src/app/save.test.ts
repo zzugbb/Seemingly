@@ -11,6 +11,24 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 describe('v2 存档', () => {
+  it('教学记录独立读写，不修改原成绩或静音；脏教学数据不丢弃进度', () => {
+    storage()
+    const save = {
+      ...emptySave(),
+      muted: true,
+      tutorials: ['walk', 'collect'] as const,
+      levels: { 'level-01': { done: true, allOrbs: true, parMet: true, bestSteps: 3 } },
+    }
+    writeSave({ ...save, tutorials: [...save.tutorials] })
+    expect(loadSave()).toEqual(save)
+    const raw = JSON.parse(memory.get('seemingly:save:v2')!) as Record<string, unknown>
+    raw.tutorials = ['walk', 'walk', 'unknown', 3]
+    memory.set('seemingly:save:v2', JSON.stringify(raw))
+    expect(loadSave()).toEqual({ ...save, tutorials: ['walk'] })
+    raw.tutorials = { walk: true }
+    memory.set('seemingly:save:v2', JSON.stringify(raw))
+    expect(loadSave()).toEqual({ version: 2, muted: true, levels: save.levels })
+  })
   it('v1 只保留静音，不迁移通关进度', () => {
     storage()
     memory.set('seemingly:save:v1', JSON.stringify({ version: 1, muted: true, completed: ['level-01'] }))

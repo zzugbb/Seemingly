@@ -3,6 +3,7 @@ import { challengeLevels, mainLevels, sampleLevels, type LevelDef } from '../gam
 import { targets } from '../game/levels/targets'
 import { detectQuality } from '../game/render/quality'
 import { loadSave, writeSave, type SaveData } from './save'
+import { learnedTutorials, tutorialIds, type TutorialId } from './tutorials'
 
 export type Screen = 'title' | 'select' | 'play' | 'ending'
 export type LevelList = 'main' | 'challenge' | 'sample'
@@ -21,6 +22,7 @@ interface AppState {
   play: (list: LevelList, index: number) => void
   completeLevel: (id: string, result: { steps: number; allOrbs: boolean; usedHint: boolean }) => void
   toggleMute: () => void
+  learnTutorials: (skills: readonly TutorialId[]) => void
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -52,6 +54,15 @@ export const useApp = create<AppState>((set, get) => ({
         },
       },
     }
+    writeSave(next)
+    set({ save: next })
+  },
+  learnTutorials: (skills) => {
+    if (skills.length === 0 || get().current.list !== 'main') return
+    const save = get().save
+    const known = learnedTutorials(save)
+    if (!skills.some((skill) => !known.includes(skill))) return
+    const next = { ...save, tutorials: tutorialIds.filter((id) => known.includes(id) || skills.includes(id)) }
     writeSave(next)
     set({ save: next })
   },

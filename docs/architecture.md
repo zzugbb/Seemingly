@@ -444,6 +444,7 @@ interface SaveData {
   version: 2
   levels: Record<string, LevelRecord>
   muted: boolean
+  tutorials?: ('walk' | 'collect' | 'rotate' | 'ride' | 'lift')[] // T6.12v4：已学能力
 }
 
 interface AppState {
@@ -468,6 +469,12 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 - T6.11 开发版主线为前两章六关，`mainLevels` 与 `levels` 指向同一列表，`challengeLevels` 为空；第六关完成后显示「后续章节即将开放」。全部关卡使用设计稿给定的 `targets`，通关保存不在主线程搜索状态图。
 - 存储的 v2 对象额外记录 `campaign: 'remake'`，区分 T6.8～T6.9 兼容期的同名旧关卡；没有该标记的旧记录仅保留静音。内存中的 `SaveData` 接口与存储键名不变，后续章节沿用该标记，不重复清理重制关卡进度。
 - T6.12a：保存对象增加 `revisions`（关卡编号到修订号）；`levels/index.ts` 从关卡的 `revision ?? 1` 导出版本表。读取旧记录时缺省修订号为 1，不匹配的关卡仅清除自身记录。第六关 T6.12a 升级为 2，T6.12b 升级为 3，前五关和静音保留；新评价保存后刷新不再清除。`soundtrack` 与 `revision` 均由 builder 透传，不参与规则状态。
+
+## 首次教学（T6.12v4）
+
+`app/tutorials.ts`仅处理文案和已学能力，不计算动作合法性或路线。PlayScreen消费模拟器实际事件：step、orb、mechanism-end，机关到位且角色格号属于该机关时记录乘坐。只有主线写入教学状态，内部样段和挑战不写。底部优先显示原运动／到位反馈，再显示当前关尚未完成的一句教学；完成后不挂载空底栏，通关不显示底栏。
+
+SaveData增加可选tutorials（walk／collect／rotate／ride／lift）；缺省为空，读档过滤未知值、去重，不使旧进度失效。只在首次学会新能力时写入，撤销／重开不清除；旧成绩推断已完成关卡证明的能力，不清理评价、静音或修订。该字段不参与规则、求解器、步数或usedHint。
 
 ## 音频
 

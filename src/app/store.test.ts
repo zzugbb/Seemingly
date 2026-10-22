@@ -7,6 +7,27 @@ import { firstPlayableIndex, isUnlocked, useApp } from './store'
 beforeEach(() => useApp.setState({ screen: 'title', current: { list: 'main', index: 0 }, save: emptySave() }))
 afterEach(() => vi.unstubAllGlobals())
 describe('进度与评价', () => {
+  it('已学教学跨重进与刷新保留、重复事件不写档，不写样段或影响评价', () => {
+    const memory = new Map<string, string>()
+    const setItem = vi.fn((key: string, value: string) => memory.set(key, value))
+    vi.stubGlobal('localStorage', { getItem: (key: string) => memory.get(key) ?? null, setItem })
+    const app = useApp.getState()
+    app.learnTutorials(['walk', 'collect'])
+    expect(useApp.getState().save.levels).toEqual({})
+    expect(useApp.getState().save.muted).toBe(false)
+    app.goSelect()
+    app.play('main', 0)
+    expect(useApp.getState().save.tutorials).toEqual(['walk', 'collect'])
+    expect(loadSave().tutorials).toEqual(['walk', 'collect'])
+    app.learnTutorials(['walk'])
+    expect(setItem).toHaveBeenCalledTimes(1)
+    app.completeLevel('level-01', { steps: 3, allOrbs: true, usedHint: false })
+    expect(useApp.getState().save.levels['level-01'].parMet).toBe(true)
+    app.play('sample', 0)
+    const before = useApp.getState().save
+    app.learnTutorials(['lift', 'ride'])
+    expect(useApp.getState().save).toBe(before)
+  })
   it('15/18 重玩分次补评，提示局次与较差成绩不回退历史，刷新保留', () => {
     const memory = new Map<string, string>()
     vi.stubGlobal('localStorage', {

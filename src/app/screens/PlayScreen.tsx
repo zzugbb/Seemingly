@@ -16,6 +16,7 @@ import { Toast } from '../hud/Toast'
 import { isUnlocked, levelLists, useApp, type LevelList } from '../store'
 import { playSimEvent } from '../sounds'
 import { prepareHints } from '../hints'
+import { nextTutorial, tutorialsFromEvent } from '../tutorials'
 
 export function PlayScreen() {
   const current = useApp((state) => state.current)
@@ -66,6 +67,8 @@ function Run({
   const toggleMute = useApp((state) => state.toggleMute)
   const muted = useApp((state) => state.save.muted)
   const quality = useApp((state) => state.quality)
+  const tutorial = useApp((state) => nextTutorial(level.id, state.save))
+  const learnTutorials = useApp((state) => state.learnTutorials)
   const settings = useMemo(() => qualitySettings(quality), [quality])
   const reducedMotion = prefersReducedMotion()
   const sim = useMemo(() => new LevelSim(level), [level])
@@ -208,6 +211,7 @@ function Run({
 
   const onEvent = (event: SimEvent) => {
     playSimEvent(event, level)
+    if (list === 'main') learnTutorials(tutorialsFromEvent(level, event, sim.state().at))
     refresh()
     if (tactile) {
       if (event.type === 'walk-start' || event.type === 'undo') setMotionNotice(null)
@@ -247,6 +251,7 @@ function Run({
   }
   const hasNext = index + 1 < levelLists[list].length
   const status = playStatus(tactile, hud, motionNotice)
+  const footer = !result && sim.status !== 'won' ? (status ?? tutorial) : null
   const label = sample ? '独立体验' : list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
   const message =
     !hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined
@@ -299,9 +304,9 @@ function Run({
           }
         />
       )}
-      {!ending && !sample && !level.challenge && (status || level.hints) && (
+      {!ending && list === 'main' && footer && (
         <footer className="hints" aria-live="polite">
-          {status ? <span>{status}</span> : level.hints?.map((text) => <span key={text}>{text}</span>)}
+          <span>{footer}</span>
         </footer>
       )}
       <Toast message={toast} />

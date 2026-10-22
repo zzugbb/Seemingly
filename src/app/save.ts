@@ -1,4 +1,5 @@
 import { levelRevisions } from '../game/levels'
+import { readTutorials, type TutorialId } from './tutorials'
 
 export interface LevelRecord {
   done: boolean
@@ -11,6 +12,7 @@ export interface SaveData {
   version: 2
   levels: Record<string, LevelRecord>
   muted: boolean
+  tutorials?: TutorialId[]
 }
 
 const KEY = 'seemingly:save:v2'
@@ -50,7 +52,13 @@ export function loadSave(): SaveData {
         writable: true,
       })
     }
-    return { version: 2, levels: data.campaign === CAMPAIGN ? levels : {}, muted: data.muted }
+    const tutorials = data.campaign === CAMPAIGN ? readTutorials(data.tutorials) : []
+    return {
+      version: 2,
+      levels: data.campaign === CAMPAIGN ? levels : {},
+      muted: data.muted,
+      ...(tutorials.length ? { tutorials } : {}),
+    }
   } catch {
     return emptySave()
   }
