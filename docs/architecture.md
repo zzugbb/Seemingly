@@ -503,7 +503,7 @@ SaveData增加可选tutorials（walk／collect／rotate／ride／lift）；缺�
 
 ### T6.12v6 接线与生命周期
 
-2026-10-22用户已确认本轮声音试听，v6已勾选，整体T6.12仍待单独确认。最新声音目标以[声音设计](design.md#音乐推进与成功反馈t612v6)为准；上方b～j保留历史记录。courtyard的96秒和声结构保持，旋律改为51音；`courtyardNote`与`courtyardPulse`给出纯数据，后者按0.75秒拍长、半拍错位，`pulseActive`与`pulseLevel`定义探索／收集／待点灯／完成层。`MusicPlayer.setProgress`只改变律动密度、强度和完成时的背景让位，不重启乐句。`musicStage`仅接收模拟器已显示的收光计数及won，不查询解法或判断机关连接。
+2026-10-22用户已确认本轮声音试听，v6已勾选；随后用户明确确认前六关整体体验，T6.12已通过，下一项为T6.13设计。最新声音目标以[声音设计](design.md#音乐推进与成功反馈t612v6)为准；上方b～j保留历史记录。courtyard的96秒和声结构保持，旋律改为51音；`courtyardNote`与`courtyardPulse`给出纯数据，后者按0.75秒拍长、半拍错位，`pulseActive`与`pulseLevel`定义探索／收集／待点灯／完成层。`MusicPlayer.setProgress`只改变律动密度、强度和完成时的背景让位，不重启乐句。`musicStage`仅接收模拟器已显示的收光计数及won，不查询解法或判断机关连接。
 
 `instruments.pluckedBuffer`按上下文缓存最多12个0.9秒短拨弦，与felt／silk缓存独立；新增律动使用240Hz高通，主旋律也高通180Hz，原铺底0.08／180Hz与主混音参数保持。`renderCourtyardNote`、`renderCourtyardPad`及`sfx.renderSound`可供临时OfflineAudioContext导出调用，复用实际合成代码，不向站点增加音频文件。AudioBus.context使用BaseAudioContext，实际引擎仍只建立一个AudioContext。
 
