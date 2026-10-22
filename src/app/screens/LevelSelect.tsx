@@ -139,12 +139,6 @@ export function LevelSelect() {
                 </div>
               </section>
             )}
-            <div className="entry-legend">
-              <p>三项评价按历史分别累计，重玩补齐新条件会增加总数，旧成绩不会回退。</p>
-              <p>抵达：集齐必需光点后点灯。全收集：收齐全部光点（含选做）后点灯。</p>
-              <p>最少步数：不用提示，在该关最少步数内点灯；只要求必需光点。全收集与最少步数可以分两次获得。</p>
-              <p>本局用提示只影响本局的最少步数评价，不影响抵达、全收集或已获的历史评价。</p>
-            </div>
           </div>
           {wide && (
             <aside className="entry-preview">

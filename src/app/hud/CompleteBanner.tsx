@@ -35,15 +35,12 @@ export function CompleteBanner({
           <Ratings value={ratings} animate />
           <p>
             本次步数 {steps} / 最少 {minimum ?? '—'}
+            {usedHint ? ' · 已用提示' : ''}
           </p>
-          {usedHint && <p>本局用过提示，未获本次最少步数评价。</p>}
         </section>
-        <section className="result-ratings" aria-label="历史成绩">
-          <h3>历史成绩 · 累计 {ratingCount(history)}/3</h3>
-          <Ratings value={history} />
-          <p>历史最少 {history.bestSteps ?? '—'} 步（含使用提示的局次）</p>
-          <p>三项分别累计，可分次补齐，旧成绩不回退。</p>
-        </section>
+        <p className="result-history" aria-label="历史成绩">
+          历史评价 {ratingCount(history)}/3
+        </p>
         {message && <p>{message}</p>}
         {unlocked && <p>{unlocked}</p>}
         <div className="result-actions">

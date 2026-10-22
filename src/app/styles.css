@@ -942,15 +942,13 @@ button:disabled:hover {
 .entry-chapter-head span,
 .entry-card-theme,
 .entry-card-status,
-.entry-legend,
 .entry-preview-copy p:last-child {
   color: #5b4569;
 }
 
 .entry-chapter-head span,
 .entry-card-theme,
-.entry-card-status,
-.entry-legend {
+.entry-card-status {
   font-size: 12px;
   line-height: 1.6;
 }
@@ -1027,11 +1025,6 @@ button:disabled:hover {
   background: rgba(255, 217, 138, 0.6);
   border-radius: 999px;
   filter: none;
-}
-
-.entry-legend {
-  margin: 24px 0 0;
-  line-height: 1.75;
 }
 
 .entry-preview {
@@ -1128,7 +1121,7 @@ button:disabled:hover {
   }
 }
 
-/* 评价名称与获得状态始终可见，触屏与键盘无需悬停。 */
+/* 评价保留名称，用符号区分状态，无需悬停。 */
 .rating-item {
   display: flex;
   align-items: center;
@@ -1141,10 +1134,10 @@ button:disabled:hover {
   flex: 0 0 auto;
 }
 
-.rating-state {
+.rating-check {
   margin-left: auto;
   color: #5b4569;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .entry-select .ratings {
@@ -1174,10 +1167,6 @@ button:disabled:hover {
   margin-top: 4px;
 }
 
-.entry-legend p {
-  margin: 0 0 8px;
-}
-
 .result {
   width: min(440px, calc(100% - 24px));
   max-height: calc(100svh - 112px - env(safe-area-inset-bottom));
@@ -1202,11 +1191,6 @@ button:disabled:hover {
   text-align: center;
 }
 
-.result-ratings + .result-ratings {
-  padding-top: 12px;
-  border-top: 1px solid rgba(74, 58, 82, 0.18);
-}
-
 .result-ratings h3 {
   margin: 0 0 8px;
   font-size: 13px;
@@ -1225,9 +1209,19 @@ button:disabled:hover {
   justify-content: center;
 }
 
-.result-ratings .rating-state {
-  width: 100%;
-  margin: 0;
+.result-ratings .rating-check {
+  margin-left: 0;
+}
+
+.result-ratings .rating.earned {
+  color: #5b4569;
+  background: rgba(255, 217, 138, 0.6);
+  border-radius: 999px;
+  filter: none;
+}
+
+.result-card .result-history {
+  font-size: 12px;
 }
 
 .result .result-actions {

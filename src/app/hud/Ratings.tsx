@@ -36,7 +36,9 @@ export function Ratings({ value, animate = false }: { value?: RatingsValue; anim
             />
           </svg>
           <span>{item.label}</span>
-          <span className="rating-state">{value?.[item.key] ? '已获' : '待补'}</span>
+          <span className="rating-check" aria-hidden="true">
+            {value?.[item.key] ? '✓' : '—'}
+          </span>
         </span>
       ))}
     </span>
