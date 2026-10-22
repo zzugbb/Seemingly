@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { Ratings } from './Ratings'
 import { CompleteBanner } from './CompleteBanner'
 
-describe('评价含义与本次／历史区分', () => {
+describe('精简评价呈现', () => {
   it('缺项与名称在正文可读，空记录也显示三个未获条件', () => {
     const missing = renderToStaticMarkup(<Ratings />)
     for (const name of ['抵达', '全收集', '最少步数']) {
@@ -15,14 +15,16 @@ describe('评价含义与本次／历史区分', () => {
     expect(partial).toContain('aria-label="全收集：未获得"')
     expect(partial).not.toContain('已获</')
     expect(partial).not.toContain('<title>')
+    const target = renderToStaticMarkup(<Ratings minimum={8} value={{ done: true, allOrbs: false, parMet: true }} />)
+    expect(target).toContain('aria-label="最少 8 步：已获得"')
+    expect(target).not.toContain('不用提示')
   })
 
-  it('使用提示的本次 2/3 与历史 3/3 同时展示，不把历史最少当成步数评价', () => {
+  it('完成卡只显示本次评价，提示使用只保留简短标记', () => {
     const markup = renderToStaticMarkup(
       <CompleteBanner
         title="换乘"
         ratings={{ done: true, allOrbs: true, parMet: false }}
-        history={{ done: true, allOrbs: true, parMet: true, bestSteps: 8 }}
         usedHint
         steps={12}
         minimum={8}
@@ -32,12 +34,11 @@ describe('评价含义与本次／历史区分', () => {
         onRetry={() => undefined}
       />,
     )
-    const [current, history] = markup.split('aria-label="历史成绩"')
-    expect(current).toContain('本次结果 · 2/3')
-    expect(current).toContain('本次步数 12 / 最少 8')
-    expect(current).toContain('已用提示')
-    expect(current).toContain('aria-label="最少步数：未获得"')
-    expect(history).toContain('历史评价 3/3')
+    expect(markup).toContain('本次结果 · 2/3')
+    expect(markup).toContain('本次步数 12 / 最少 8')
+    expect(markup).toContain('已用提示')
+    expect(markup).toContain('aria-label="最少步数：未获得"')
+    expect(markup).not.toContain('历史评价')
     expect(markup).not.toContain('可分次补齐')
     expect(markup).not.toContain('历史最少')
   })

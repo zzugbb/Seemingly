@@ -1,7 +1,15 @@
 import type { LevelRecord } from '../save'
 
 export type RatingsValue = Pick<LevelRecord, 'done' | 'allOrbs' | 'parMet'>
-export function Ratings({ value, animate = false }: { value?: RatingsValue; animate?: boolean }) {
+export function Ratings({
+  value,
+  animate = false,
+  minimum,
+}: {
+  value?: RatingsValue
+  animate?: boolean
+  minimum?: number
+}) {
   const items = [
     { key: 'done', label: '抵达', path: 'M8 3h8M12 3v3M7 7h10v12H7zM9 21h6M10 10v6M14 10v6' },
     {
@@ -9,7 +17,11 @@ export function Ratings({ value, animate = false }: { value?: RatingsValue; anim
       label: '全收集',
       path: 'M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18',
     },
-    { key: 'parMet', label: '最少步数', path: 'M7 3c-3 0-3 9 0 9s3-9 0-9M7 15v5M17 6c-3 0-3 9 0 9s3-9 0-9M17 18v3' },
+    {
+      key: 'parMet',
+      label: minimum === undefined ? '最少步数' : `最少 ${minimum} 步`,
+      path: 'M7 3c-3 0-3 9 0 9s3-9 0-9M7 15v5M17 6c-3 0-3 9 0 9s3-9 0-9M17 18v3',
+    },
   ] as const
   return (
     <span className={`ratings${animate ? ' ratings-animate' : ''}`}>

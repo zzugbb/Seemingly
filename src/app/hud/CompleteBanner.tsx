@@ -1,10 +1,8 @@
 import { Ratings, type RatingsValue } from './Ratings'
-import type { LevelRecord } from '../save'
 import { ratingCount } from '../entry'
 export function CompleteBanner({
   title,
   ratings,
-  history,
   usedHint,
   steps,
   minimum,
@@ -16,7 +14,6 @@ export function CompleteBanner({
 }: {
   title: string
   ratings: RatingsValue
-  history: LevelRecord
   usedHint: boolean
   steps: number
   minimum: number | null
@@ -38,9 +35,6 @@ export function CompleteBanner({
             {usedHint ? ' · 已用提示' : ''}
           </p>
         </section>
-        <p className="result-history" aria-label="历史成绩">
-          历史评价 {ratingCount(history)}/3
-        </p>
         {message && <p>{message}</p>}
         {unlocked && <p>{unlocked}</p>}
         <div className="result-actions">

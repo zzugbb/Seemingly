@@ -89,15 +89,19 @@ export function LevelSelect() {
                           onFocus={() => show(index)}
                           onClick={() => play('main', index)}
                         >
-                          <span className="entry-card-index">{String(index + 1).padStart(2, '0')}</span>
+                          <span className="entry-card-heading">
+                            <span className="entry-card-index">{String(index + 1).padStart(2, '0')}</span>
+                            <span
+                              className="entry-card-count"
+                              aria-label={`已获评价 ${ratingCount(save.levels[level.id])}/3`}
+                            >
+                              {ratingCount(save.levels[level.id])}/3
+                            </span>
+                          </span>
                           <span className="entry-card-name">{level.title}</span>
                           {theme && <span className="entry-card-theme">{theme}</span>}
-                          <span className="entry-card-count">已获评价 {ratingCount(save.levels[level.id])}/3</span>
-                          <Ratings value={save.levels[level.id]} />
-                          <span className="entry-card-target">
-                            最少 {targets[level.id]?.minActions ?? '—'} 步 · 不用提示
-                          </span>
-                          <span className="entry-card-status">{status.label}</span>
+                          <Ratings value={save.levels[level.id]} minimum={targets[level.id]?.minActions} />
+                          {status.status !== 'done' && <span className="entry-card-status">{status.label}</span>}
                         </button>
                       )
                     })}
@@ -121,13 +125,17 @@ export function LevelSelect() {
                         disabled={!unlocked}
                         onClick={() => play('challenge', index)}
                       >
-                        <span className="entry-card-index">挑战 {level.chapter}</span>
-                        <span className="entry-card-name">{level.title}</span>
-                        <span className="entry-card-count">已获评价 {ratingCount(save.levels[level.id])}/3</span>
-                        <Ratings value={save.levels[level.id]} />
-                        <span className="entry-card-target">
-                          最少 {targets[level.id]?.minActions ?? '—'} 步 · 不用提示
+                        <span className="entry-card-heading">
+                          <span className="entry-card-index">挑战 {level.chapter}</span>
+                          <span
+                            className="entry-card-count"
+                            aria-label={`已获评价 ${ratingCount(save.levels[level.id])}/3`}
+                          >
+                            {ratingCount(save.levels[level.id])}/3
+                          </span>
                         </span>
+                        <span className="entry-card-name">{level.title}</span>
+                        <Ratings value={save.levels[level.id]} minimum={targets[level.id]?.minActions} />
                         {!unlocked && (
                           <span className="entry-card-status">
                             {level.chapter === 1 ? '通关第一章' : `集齐第${numerals[level.chapter - 1]}章选做光点`}
