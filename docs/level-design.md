@@ -64,7 +64,7 @@
 
 实现者把设计稿转成 `src/game/levels/level-XX.ts`，把预期指标写进 `src/game/levels/targets.ts`。实现时不得修改谜题本身；如果校验或指标不通过，停下来反馈，不要自己改布局或改目标。
 
-T6.13第7～12关还未进入运行数据时，可用`node docs/levels/check-designs.mjs`直接验证文档内的完整TypeScript和自动验证基准。该工具不修改targets或正式入口；检查范围、离散运动采样的限制及实现交接见[第三、四章](levels/chapter-3-4.md)。
+T6.13a第二稿的第7～12关还未进入运行数据时，可用`node docs/levels/check-designs.mjs`直接验证文档内的完整TypeScript和自动验证基准。该工具还检查中途箱位的选做时机、第九关经过压板不触发、第十二关所有首次合法动作仍可恢复及章节谱面；不修改targets或正式入口。状态数／最优步数不代替发现深度，选做应明确是在探索、站位、时机还是资源上增加取舍，不能一律顺手多走一格或转满一圈。检查范围、离散运动采样的限制及实现交接见[第三、四章](levels/chapter-3-4.md)。
 
 ## 关卡文件
 

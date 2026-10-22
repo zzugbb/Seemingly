@@ -6,6 +6,29 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
+import { chapterScore, chapterSeal } from './chapter-scores.mjs'
+
+for (const chapter of [3, 4]) {
+  const score = chapterScore(chapter)
+  const pitchClasses = new Set(score.scale.map((n) => n % 12))
+  assert.equal(score.notes.length, 51, '每章乐句完整')
+  assert.equal(score.chords.length, 8)
+  assert.equal(score.seconds, score.beat * 128)
+  assert.equal(score.chordSeconds, score.beat * 16)
+  for (const sequence of score.onsets) {
+    assert(sequence.every((beat, i) => beat >= 0 && beat < 16 && (!i || beat > sequence[i - 1])))
+  }
+  for (const note of [...score.notes, ...chapterSeal(chapter)]) {
+    assert(pitchClasses.has(note.note % 12), '旋律及章末音列遵守章节调式')
+    assert(note.at >= 0 && note.at < score.seconds && note.duration > 0)
+    assert(note.velocity > 0 && note.velocity <= 1 && Math.abs(note.pan) <= 1)
+  }
+  for (const chord of score.chords) assert(chord.notes.every((n) => pitchClasses.has(n % 12)))
+}
+assert(chapterScore(4).bpm > chapterScore(3).bpm && chapterScore(3).bpm > 80)
+assert.notDeepEqual(chapterScore(3).onsets, chapterScore(4).onsets, '两章分别写节奏，不只移调')
+const intervals = (notes) => notes.slice(1).map((note, i) => note.note - notes[i].note)
+assert.notDeepEqual(intervals(chapterScore(3).notes), intervals(chapterScore(4).notes), '两章旋律轮廓分别展开')
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const sources = new Map()
@@ -81,9 +104,13 @@ try {
   for (const [id, expected] of baselines) {
     const { default: level } = await server.ssrLoadModule(`design:${id}`)
     assert(level.decor.islands.length >= 2 && level.decor.islands.length <= 4, `${id} 岛屿数量`)
-    const ornaments = level.decor.trees.length + level.decor.flowers.length + level.decor.windows.length
+    const ornaments =
+      level.decor.trees.length +
+      level.decor.flowers.length +
+      level.decor.windows.length +
+      (level.decor.lanterns?.length ?? 0)
     assert(ornaments >= 3 && ornaments <= 6, `${id} 装饰数量`)
-    for (const pos of [...level.decor.trees, ...level.decor.flowers])
+    for (const pos of [...level.decor.trees, ...level.decor.flowers, ...(level.decor.lanterns ?? [])])
       assert(
         level.decor.islands.some(
           (island) =>
@@ -107,6 +134,7 @@ try {
     assert.deepEqual(measureLevel(level, target.randomWin.steps), expected.metrics, `${id} 指标漂移`)
     assert.equal(expected.all.length, target.minActionsAll, `${id} 全收集解法必须最优`)
     assert.deepEqual(validateLevel({ ...level, solution: expected.all }), [], `${id} 全收集校验`)
+    const trace = []
     const replay = (steps) => {
       let state = rules.initialState(level)
       for (const step of steps) {
@@ -117,30 +145,75 @@ try {
         const action = step.type === 'walk' ? { type: 'walk', tileId: tile?.id } : step
         const transition = rules.applyAction(level, state, action)
         assert(transition, `${id} 无效动作 ${JSON.stringify(step)}`)
+        trace.push({ before: state, action, transition })
         state = transition.state
       }
       return state
     }
     const all = replay(expected.all)
     assert(all.won && all.orbs.length === level.orbs.length, `${id} 未全收集通关`)
+    if (id === 'level-07') {
+      assert.equal(trace.filter((t) => t.action.type === 'operate' && t.action.mechanism === 'swing').length, 2)
+    }
+    if (id === 'level-09') {
+      assert.equal(trace.filter((t) => t.transition.plate === 'call-north').length, 2, '选做必须召高台再恢复归路')
+      let state = rules.initialState(level)
+      for (const action of [
+        { type: 'walk', tileId: 'swing#0' },
+        { type: 'operate', mechanism: 'swing' },
+        { type: 'walk', tileId: '4,2,8' },
+      ])
+        state = rules.applyAction(level, state, action).state
+      assert.equal(state.mover.receiver.stopIndex, 1, '经过压板不召台')
+      assert.equal(state.gates.door, false)
+      state = rules.applyAction(level, state, { type: 'walk', tileId: '4,2,7' }).state
+      assert.equal(state.mover.receiver.stopIndex, 0, '停住才召台')
+      assert.equal(state.gates.door, true)
+    }
+    if (id === 'level-11' || id === 'level-12') {
+      const corner = id === 'level-11' ? '6,2,7' : '8,2,4'
+      const optional = `orb-${level.orbs.findIndex((o) => o.optional)}`
+      const collected = trace.find((t) => t.transition.collected.includes(optional))
+      assert.equal(collected?.before.crates['crate-0'], corner, `${id} 选做须在中途停箱时取得`)
+    }
     const policy = solver.buildPolicy(level)
+    if (id === 'level-12') {
+      const start = rules.initialState(level)
+      for (const action of rules.legalActions(level, start)) {
+        const next = rules.applyAction(level, start, action).state
+        assert(next.won || policy.has(rules.stateKey(next)), '第十二关首次合法尝试必须仍有解')
+      }
+      let state = rules.applyAction(level, start, { type: 'operate', mechanism: 'freight' }).state
+      let count = 1
+      while (!state.won && count <= 20) {
+        const hint = policy.get(rules.stateKey(state))
+        assert(hint, '首次空人运箱后必须可追台完成')
+        state = rules.applyAction(level, state, hint).state
+        count++
+      }
+      assert(state.won && count === 10, '追台路线仍以十步完成，无需撤销')
+    }
     for (const state of solver.reachableStates(level)) {
       const hint = policy.get(rules.stateKey(state))
       if (hint) assert(rules.applyAction(level, state, hint), `${id} 提示动作无效`)
     }
-    const canWin = (allow) => {
+    const canWin = (allow, allOrbs = false, limit = Infinity) => {
       const start = rules.initialState(level),
         queue = [start],
-        seen = new Set([rules.stateKey(start)])
+        seen = new Set([rules.stateKey(start)]),
+        depths = new Map([[rules.stateKey(start), 0]])
       for (let i = 0; i < queue.length; i++) {
         const state = queue[i]
-        if (state.won) return true
+        if (state.won && (!allOrbs || state.orbs.length === level.orbs.length)) return true
+        const depth = depths.get(rules.stateKey(state))
+        if (depth >= limit) continue
         for (const action of rules.legalActions(level, state)) {
           const tr = rules.applyAction(level, state, action)
           if (!allow(state, action, tr)) continue
           const key = rules.stateKey(tr.state)
           if (!seen.has(key)) {
             seen.add(key)
+            depths.set(key, depth + 1)
             queue.push(tr.state)
           }
         }
@@ -152,6 +225,22 @@ try {
       false,
       `${id} 必须乘坐`,
     )
+    if (id === 'level-09') {
+      assert.equal(
+        canWin((_state, _action, tr) => tr.plate !== 'call-north', true, expected.metrics.minActionsAll),
+        false,
+        '最优全收集必须调用北庭；不禁止更长的南庭往返',
+      )
+    }
+    if (id === 'level-11' || id === 'level-12') {
+      const corner = id === 'level-11' ? '6,2,7' : '8,2,4'
+      const optional = `orb-${level.orbs.findIndex((o) => o.optional)}`
+      assert.equal(
+        canWin((state, _action, tr) => !(tr.collected.includes(optional) && state.crates['crate-0'] === corner), true),
+        false,
+        `${id} 不存在避开中途停箱时机的全收集捷径`,
+      )
+    }
     if (level.crates.length) {
       assert.equal(
         canWin(
