@@ -20,7 +20,7 @@ export interface JourneyChoice {
   index: number
 }
 
-const ratingCount = (record: SaveData['levels'][string] | undefined) =>
+export const ratingCount = (record: Pick<SaveData['levels'][string], 'done' | 'allOrbs' | 'parMet'> | undefined) =>
   Number(Boolean(record?.done)) + Number(Boolean(record?.allOrbs)) + Number(Boolean(record?.parMet))
 
 export function campaignStats(

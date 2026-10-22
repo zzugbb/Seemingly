@@ -1,10 +1,43 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mainLevels, sampleLevels, levelRevisions, type LevelDef } from '../game/levels'
 import { targets } from '../game/levels/targets'
-import { emptySave } from './save'
+import { emptySave, loadSave } from './save'
+import { campaignStats, ratingCount } from './entry'
 import { firstPlayableIndex, isUnlocked, useApp } from './store'
 beforeEach(() => useApp.setState({ screen: 'title', current: { list: 'main', index: 0 }, save: emptySave() }))
+afterEach(() => vi.unstubAllGlobals())
 describe('进度与评价', () => {
+  it('15/18 重玩分次补评，提示局次与较差成绩不回退历史，刷新保留', () => {
+    const memory = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => memory.set(key, value),
+    })
+    const save = emptySave()
+    for (const [index, level] of mainLevels.entries()) {
+      save.levels[level.id] = {
+        done: true,
+        allOrbs: true,
+        parMet: index < 3,
+        bestSteps: targets[level.id].minActionsAll,
+      }
+    }
+    useApp.setState({ save })
+    const complete = useApp.getState().completeLevel
+    expect(campaignStats(save).earned).toBe(15)
+    const id = 'level-04'
+    complete(id, { steps: 8, allOrbs: false, usedHint: true })
+    expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: true, parMet: false, bestSteps: 8 })
+    expect(campaignStats(useApp.getState().save).earned).toBe(15)
+    complete(id, { steps: 8, allOrbs: false, usedHint: false })
+    expect(campaignStats(useApp.getState().save).earned).toBe(16)
+    expect(ratingCount(useApp.getState().save.levels[id])).toBe(3)
+    complete(id, { steps: 16, allOrbs: false, usedHint: true })
+    expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: true, parMet: true, bestSteps: 8 })
+    expect(loadSave()).toEqual(useApp.getState().save)
+    expect(campaignStats(loadSave()).earned).toBe(16)
+    expect(isUnlocked(loadSave(), 'main', 5)).toBe(true)
+  })
   it('独立样段随时可进入，通关不写入主线评价、修订或解锁', () => {
     const before = useApp.getState().save
     useApp.getState().play('sample', 0)

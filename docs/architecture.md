@@ -461,6 +461,7 @@ interface AppState {
 function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): boolean
 ```
 
+- T6.12v3：选关常显已获数量、三项名称与状态及步数目标；CompleteBanner分别接收本次ratings、usedHint和保存后的历史LevelRecord，区分本次结果与历史累计。bestSteps含提示局次，仅作数字展示，不能由它推导parMet。ratingCount只汇总三个既有布尔值，不新增判定、存档字段或修订。
 - `completeLevel`：`done = true`；`allOrbs ||= result.allOrbs`；`bestSteps` 取较小值；`parMet ||= !usedHint && steps <= targets[id].minActions`。
 - `isUnlocked`：主线第 1 关始终解锁，第 N+1 关在第 N 关 `done` 后解锁；挑战关 N 的规则见[设计稿](design.md#挑战章)——第 1 章挑战在第 1 章全部 `done` 后解锁，第 2～5 章挑战在该章所有关卡 `allOrbs` 后解锁。挑战关的解锁只看存档记录，不依赖当前会话。
 - 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。本地存储不可用时仍保留当前会话进度。

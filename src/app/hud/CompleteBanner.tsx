@@ -1,7 +1,11 @@
 import { Ratings, type RatingsValue } from './Ratings'
+import type { LevelRecord } from '../save'
+import { ratingCount } from '../entry'
 export function CompleteBanner({
   title,
   ratings,
+  history,
+  usedHint,
   steps,
   minimum,
   message,
@@ -12,6 +16,8 @@ export function CompleteBanner({
 }: {
   title: string
   ratings: RatingsValue
+  history: LevelRecord
+  usedHint: boolean
   steps: number
   minimum: number | null
   message?: string
@@ -24,10 +30,20 @@ export function CompleteBanner({
     <div className="result">
       <div className="result-card">
         <h2>抵达 · {title}</h2>
-        <Ratings value={ratings} animate />
-        <p>
-          步数 {steps} / 最少 {minimum ?? '—'}
-        </p>
+        <section className="result-ratings" aria-label="本次结果">
+          <h3>本次结果 · {ratingCount(ratings)}/3</h3>
+          <Ratings value={ratings} animate />
+          <p>
+            本次步数 {steps} / 最少 {minimum ?? '—'}
+          </p>
+          {usedHint && <p>本局用过提示，未获本次最少步数评价。</p>}
+        </section>
+        <section className="result-ratings" aria-label="历史成绩">
+          <h3>历史成绩 · 累计 {ratingCount(history)}/3</h3>
+          <Ratings value={history} />
+          <p>历史最少 {history.bestSteps ?? '—'} 步（含使用提示的局次）</p>
+          <p>三项分别累计，可分次补齐，旧成绩不回退。</p>
+        </section>
         {message && <p>{message}</p>}
         {unlocked && <p>{unlocked}</p>}
         <div className="result-actions">

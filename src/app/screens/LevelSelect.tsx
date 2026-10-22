@@ -5,7 +5,8 @@ import { LevelSim } from '../../game/core/sim'
 import { Scene } from '../../game/render/Scene'
 import { prefersReducedMotion, qualitySettings } from '../../game/render/quality'
 import { Ratings } from '../hud/Ratings'
-import { campaignStats, chapterArrival, initialPreviewIndex, levelThemes, selectStatus } from '../entry'
+import { campaignStats, chapterArrival, initialPreviewIndex, levelThemes, ratingCount, selectStatus } from '../entry'
+import { targets } from '../../game/levels/targets'
 import { isUnlocked, useApp } from '../store'
 
 const chapterNames = ['看似', '转动', '升起', '推动', '遮挡']
@@ -91,7 +92,11 @@ export function LevelSelect() {
                           <span className="entry-card-index">{String(index + 1).padStart(2, '0')}</span>
                           <span className="entry-card-name">{level.title}</span>
                           {theme && <span className="entry-card-theme">{theme}</span>}
+                          <span className="entry-card-count">已获评价 {ratingCount(save.levels[level.id])}/3</span>
                           <Ratings value={save.levels[level.id]} />
+                          <span className="entry-card-target">
+                            最少 {targets[level.id]?.minActions ?? '—'} 步 · 不用提示
+                          </span>
                           <span className="entry-card-status">{status.label}</span>
                         </button>
                       )
@@ -118,7 +123,11 @@ export function LevelSelect() {
                       >
                         <span className="entry-card-index">挑战 {level.chapter}</span>
                         <span className="entry-card-name">{level.title}</span>
+                        <span className="entry-card-count">已获评价 {ratingCount(save.levels[level.id])}/3</span>
                         <Ratings value={save.levels[level.id]} />
+                        <span className="entry-card-target">
+                          最少 {targets[level.id]?.minActions ?? '—'} 步 · 不用提示
+                        </span>
                         {!unlocked && (
                           <span className="entry-card-status">
                             {level.chapter === 1 ? '通关第一章' : `集齐第${numerals[level.chapter - 1]}章选做光点`}
@@ -130,7 +139,12 @@ export function LevelSelect() {
                 </div>
               </section>
             )}
-            <p className="entry-legend">三项评价：抵达 · 全收集 · 最少步数</p>
+            <div className="entry-legend">
+              <p>三项评价按历史分别累计，重玩补齐新条件会增加总数，旧成绩不会回退。</p>
+              <p>抵达：集齐必需光点后点灯。全收集：收齐全部光点（含选做）后点灯。</p>
+              <p>最少步数：不用提示，在该关最少步数内点灯；只要求必需光点。全收集与最少步数可以分两次获得。</p>
+              <p>本局用提示只影响本局的最少步数评价，不影响抵达、全收集或已获的历史评价。</p>
+            </div>
           </div>
           {wide && (
             <aside className="entry-preview">

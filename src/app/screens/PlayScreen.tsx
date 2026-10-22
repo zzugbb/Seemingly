@@ -66,6 +66,7 @@ function Run({
   const toggleMute = useApp((state) => state.toggleMute)
   const muted = useApp((state) => state.save.muted)
   const quality = useApp((state) => state.quality)
+  const history = useApp((state) => state.save.levels[level.id])
   const settings = useMemo(() => qualitySettings(quality), [quality])
   const reducedMotion = prefersReducedMotion()
   const sim = useMemo(() => new LevelSim(level), [level])
@@ -352,10 +353,12 @@ function Run({
         </section>
       )}
       {ending && endingReady && <Ending />}
-      {result && !sample && !ending && !level.ending && (
+      {result && history && !sample && !ending && !level.ending && (
         <CompleteBanner
           title={level.title}
           ratings={{ ...result.ratings, parMet: !usedHint.current && minimum !== null && result.steps <= minimum }}
+          history={history}
+          usedHint={usedHint.current}
           steps={result.steps}
           minimum={minimum}
           unlocked={result.unlocked}
