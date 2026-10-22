@@ -89,6 +89,8 @@ src/
 
 ## 关卡数据
 
+T6.13的第7～12关当前仅存在于[设计稿](levels/chapter-3-4.md)，正式mainLevels、targets和revision表仍为六关。设计验证器`docs/levels/check-designs.mjs`在隔离的Vite SSR进程读取Markdown参考实现，调用既有规则与几何辅助函数，不参与游戏运行；T6.14才按稿加入正式关卡、首次能力与新章节乐句。
+
 `src/game/levels/types.ts`。注释中「T6.2」「T6.6」表示已实现，「T6.16」表示后续任务中新增：
 
 ```ts

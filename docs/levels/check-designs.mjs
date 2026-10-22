@@ -1,0 +1,329 @@
+import assert from 'node:assert/strict'
+import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
+import { createServer } from 'vite'
+
+const root = fileURLToPath(new URL('../../', import.meta.url))
+const sources = new Map()
+const baselines = new Map()
+for (let n = 7; n <= 12; n++) {
+  const id = `level-${String(n).padStart(2, '0')}`
+  const text = await readFile(new URL(`./${id}.md`, import.meta.url), 'utf8')
+  const code = text.match(/## 完整参考实现\s+```ts\n([\s\S]*?)\n```/)?.[1]
+  const baseline = text.match(/## 自动验证基准\s+```json\n([\s\S]*?)\n```/)?.[1]
+  assert(code && baseline, `${id} 缺少完整参考实现或验证基准`)
+  sources.set(`\0design:${id}`, code.replace("'./builders'", "'/src/game/levels/builders.ts'"))
+  baselines.set(id, JSON.parse(baseline))
+}
+
+const temporary = await mkdtemp(join(tmpdir(), 'seemingly-designs-'))
+try {
+  const files = []
+  for (const [id, code] of sources) {
+    const file = join(temporary, `${id.slice(id.indexOf(':') + 1)}.ts`)
+    await writeFile(
+      file,
+      code.replace("'/src/game/levels/builders.ts'", JSON.stringify(`${root}src/game/levels/builders`)),
+    )
+    files.push(file)
+  }
+  await promisify(execFile)(`${root}node_modules/.bin/tsc`, [
+    '--ignoreConfig',
+    '--noEmit',
+    '--strict',
+    '--noUnusedLocals',
+    '--noUnusedParameters',
+    '--isolatedModules',
+    '--module',
+    'ESNext',
+    '--moduleResolution',
+    'bundler',
+    '--target',
+    'ES2022',
+    '--skipLibCheck',
+    ...files,
+  ])
+} finally {
+  await rm(temporary, { recursive: true, force: true })
+}
+
+// 只在本验证进程中导出已有几何辅助方法；不改写源码，不进入正式构建。
+const geometryExports = ['parts', 'settledParts', 'movingParts', 'intersects', 'bearingContact', 'actorIntersects']
+const server = await createServer({
+  root,
+  configFile: false,
+  server: { middlewareMode: true, ws: false },
+  appType: 'custom',
+  plugins: [
+    {
+      name: 'documented-level-designs',
+      resolveId: (id) => (id.startsWith('design:') ? `\0${id}` : null),
+      load: (id) => sources.get(id),
+      transform: (code, id) =>
+        id === `${root}src/game/core/clearance.ts` ? `${code}\nexport { ${geometryExports.join(', ')} }` : null,
+    },
+  ],
+})
+
+try {
+  const rules = await server.ssrLoadModule('/src/game/core/rules.ts')
+  const solver = await server.ssrLoadModule('/src/game/core/solver.ts')
+  const { validateLevel } = await server.ssrLoadModule('/src/game/core/validate.ts')
+  const { measureLevel } = await server.ssrLoadModule('/src/game/core/metrics.ts')
+  const geometry = await server.ssrLoadModule('/src/game/core/clearance.ts')
+  const shapes = await server.ssrLoadModule('/src/game/core/shapes.ts')
+  const { surfaceY } = await server.ssrLoadModule('/src/game/core/iso.ts')
+  const ids = new Set()
+  for (const [id, expected] of baselines) {
+    const { default: level } = await server.ssrLoadModule(`design:${id}`)
+    assert(level.decor.islands.length >= 2 && level.decor.islands.length <= 4, `${id} 岛屿数量`)
+    const ornaments = level.decor.trees.length + level.decor.flowers.length + level.decor.windows.length
+    assert(ornaments >= 3 && ornaments <= 6, `${id} 装饰数量`)
+    for (const pos of [...level.decor.trees, ...level.decor.flowers])
+      assert(
+        level.decor.islands.some(
+          (island) =>
+            island.y === pos[1] &&
+            island.x[0] <= pos[0] &&
+            pos[0] <= island.x[1] &&
+            island.z[0] <= pos[2] &&
+            pos[2] <= island.z[1],
+        ),
+        `${id} 地面装饰须在岛上`,
+      )
+    const target = {
+      minActions: expected.metrics.minActions,
+      minActionsAll: expected.metrics.minActionsAll,
+      reachableStatesMin: level.chapter === 3 ? 40 : 60,
+      randomWin: { steps: level.chapter === 3 ? 40 : 50, maxRate: level.chapter === 3 ? 0.35 : 0.25 },
+      illusionsMin: 2,
+      tradeoffsMin: 1,
+    }
+    assert.deepEqual(validateLevel(level, ids, target), [], `${id} 主线校验`)
+    assert.deepEqual(measureLevel(level, target.randomWin.steps), expected.metrics, `${id} 指标漂移`)
+    assert.equal(expected.all.length, target.minActionsAll, `${id} 全收集解法必须最优`)
+    assert.deepEqual(validateLevel({ ...level, solution: expected.all }), [], `${id} 全收集校验`)
+    const replay = (steps) => {
+      let state = rules.initialState(level)
+      for (const step of steps) {
+        const tile =
+          step.type === 'walk'
+            ? [...rules.tilesOf(level, state).values()].find((t) => t.pos.every((v, i) => v === step.to[i]))
+            : null
+        const action = step.type === 'walk' ? { type: 'walk', tileId: tile?.id } : step
+        const transition = rules.applyAction(level, state, action)
+        assert(transition, `${id} 无效动作 ${JSON.stringify(step)}`)
+        state = transition.state
+      }
+      return state
+    }
+    const all = replay(expected.all)
+    assert(all.won && all.orbs.length === level.orbs.length, `${id} 未全收集通关`)
+    const policy = solver.buildPolicy(level)
+    for (const state of solver.reachableStates(level)) {
+      const hint = policy.get(rules.stateKey(state))
+      if (hint) assert(rules.applyAction(level, state, hint), `${id} 提示动作无效`)
+    }
+    const canWin = (allow) => {
+      const start = rules.initialState(level),
+        queue = [start],
+        seen = new Set([rules.stateKey(start)])
+      for (let i = 0; i < queue.length; i++) {
+        const state = queue[i]
+        if (state.won) return true
+        for (const action of rules.legalActions(level, state)) {
+          const tr = rules.applyAction(level, state, action)
+          if (!allow(state, action, tr)) continue
+          const key = rules.stateKey(tr.state)
+          if (!seen.has(key)) {
+            seen.add(key)
+            queue.push(tr.state)
+          }
+        }
+      }
+      return false
+    }
+    assert.equal(
+      canWin((state, _action, tr) => !tr.moved.some((id) => state.at.startsWith(`${id}#`))),
+      false,
+      `${id} 必须乘坐`,
+    )
+    if (level.crates.length) {
+      assert.equal(
+        canWin(
+          (state, _action, tr) =>
+            !tr.moved.some((id) => Object.values(state.crates).some((at) => at.startsWith(`${id}#`))),
+        ),
+        false,
+        `${id} 箱子必须乘坐`,
+      )
+      assert.equal(
+        canWin((state, _action, tr) => {
+          if (!tr.pushed) return true
+          const tiles = rules.tilesOf(level, state),
+            from = tiles.get(tr.pushed.from).pos,
+            to = tiles.get(tr.pushed.to).pos
+          return from.reduce((sum, v, i) => sum + Math.abs(v - to[i]), 0) === 1
+        }),
+        false,
+        `${id} 必须跨错觉推箱`,
+      )
+    }
+    const report = checkBuildings(level, { rules, solver, geometry, shapes, surfaceY })
+    assert.deepEqual(report.issues, [], `${id} 运动实体相交`)
+    assert.deepEqual(report, expected.clearance, `${id} 运动覆盖变化`)
+    console.log(
+      `${id} ${level.title}：${target.minActions}/${target.minActionsAll}步，${expected.metrics.reachableStates}状态，主线／全收集／提示／181姿态净空通过`,
+    )
+  }
+} finally {
+  await server.close()
+}
+
+function checkBuildings(level, { rules, solver, geometry, shapes, surfaceY }) {
+  const { parts, settledParts, movingParts, intersects, bearingContact, actorIntersects } = geometry
+  const { islandLayers, CHARACTER_HEIGHT, advanceBrace, braceScale } = shapes
+  const { applyAction, legalActions, tilesOf, gatesOf } = rules
+  const mechanisms = level.mechanisms.filter((m) => m.type === 'rotator' || m.type === 'mover')
+  const staticParts = level.blocks.flatMap((b) =>
+    parts(b.pos.join(','), b.pos, b.kind === 'path').map((p) => ({ ...p, staticBlock: true })),
+  )
+  const rocks = level.decor.islands.flatMap((island, i) =>
+    islandLayers(island).map((layer, j) => ({
+      id: `island-${i}#${j}`,
+      pos: layer.position,
+      angle: 0,
+      half: layer.size.map((v) => v / 2 - 0.08),
+      radius: 0.08,
+    })),
+  )
+  const bases = mechanisms
+    .filter((m) => m.type === 'rotator')
+    .map((m) => ({
+      id: `${m.id}/base`,
+      pos: [m.pivot[0], m.pivot[1] - 0.55, m.pivot[2]],
+      angle: 0,
+      half: [1.214, 0.034, 1.214],
+      radius: 0.001,
+    }))
+  // 0.76高包络含箱子上角饰；箱子本体保持世界朝向，与现有cratePose一致。
+  const crateBox = (id, pos) => ({
+    id,
+    pos: [pos[0], surfaceY(pos[1]) + 0.38, pos[2]],
+    angle: 0,
+    half: [0.3, 0.32, 0.3],
+    radius: 0.06,
+  })
+  const gateBoxes = (state) =>
+    level.mechanisms.flatMap((g) => {
+      if (g.type !== 'gate') return []
+      const y = surfaceY(g.tile[1]) - (gatesOf(level, state)[g.id] ? 0.62 : 0)
+      const box = (suffix, pos, half, radius) => ({ id: `${g.id}/${suffix}`, pos, half, radius, angle: 0 })
+      return [
+        box('post-a', [g.tile[0] - 0.3, y + 0.275, g.tile[2]], [0.035, 0.275, 0.035], 0.001),
+        box('post-b', [g.tile[0] + 0.3, y + 0.275, g.tile[2]], [0.035, 0.275, 0.035], 0.001),
+        box('bar', [g.tile[0], y + 0.48, g.tile[2]], [0.315, 0.04, 0.015], 0.025),
+        ...(g.mode === 'hold'
+          ? [box('dot', [g.tile[0], y + 0.48, g.tile[2] + 0.05], [0.001, 0.001, 0.001], 0.04)]
+          : []),
+      ]
+    })
+  const structural = new Set(),
+    characters = new Set(),
+    issues = []
+  const samples = 181
+  for (const state of solver.reachableStates(level))
+    for (const action of legalActions(level, state)) {
+      const transition = applyAction(level, state, action)
+      const active = mechanisms.filter((m) => transition.moved.includes(m.id))
+      if (!active.length) continue
+      assert(active.length === 1 || active.every((m) => m.type === 'rotator'), '本设计采样只支持等时联动转盘')
+      const next = transition.state
+      assert(
+        active.every((m) => m.type !== 'rotator' || (next.rotator[m.id] - state.rotator[m.id] + 4) % 4 === 1),
+        '反转须扩展实际角度采样',
+      )
+      const activeIds = new Set(active.map((m) => m.id))
+      const key = JSON.stringify([state.rotator, state.mover, state.crates, gatesOf(level, state), [...activeIds]])
+      const actorKey = `${key}/${next.at}`
+      const structure = !structural.has(key),
+        actor = !characters.has(actorKey)
+      if (!structure && !actor) continue
+      structural.add(key)
+      characters.add(actorKey)
+      const tiles = tilesOf(level, state),
+        nextTiles = tilesOf(level, next)
+      const fixed = [
+        ...staticParts,
+        ...rocks,
+        ...bases,
+        ...mechanisms.filter((m) => !activeIds.has(m.id)).flatMap((m) => settledParts(m, state)),
+        ...gateBoxes(next),
+      ]
+      const ridingCrates = Object.entries(state.crates).filter(([, at]) =>
+        active.some((m) => at.startsWith(`${m.id}#`)),
+      )
+      for (const [id, at] of Object.entries(state.crates))
+        if (!ridingCrates.some(([cid]) => cid === id)) fixed.push(crateBox(id, tiles.get(at).pos))
+      let structureHit = false,
+        actorHit = false
+      for (let i = 0; i < samples; i++) {
+        const fraction = i / (samples - 1)
+        const groups = active.map((m) => ({ m, boxes: movingParts(m, state, next, fraction) }))
+        const moving = groups.flatMap((p) => p.boxes)
+        const crates = ridingCrates.map(([id, at]) => crateBox(id, moving.find((b) => b.id === at).pos))
+        const issue = (object, obstacle) =>
+          issues.push({ mechanism: [...activeIds].join('+'), fraction, object, obstacle })
+        if (structure && !structureHit) {
+          for (const { m, boxes } of groups) {
+            for (const box of boxes) {
+              const hit = [
+                ...fixed.filter((b) => b.id !== `${m.id}/base`),
+                ...groups.filter((p) => p.m !== m).flatMap((p) => p.boxes),
+              ].find((b) => !bearingContact(m, box, b) && intersects(box, b))
+              if (hit) {
+                issue(box.id, hit.id)
+                structureHit = true
+                break
+              }
+            }
+            if (structureHit) break
+          }
+          for (const box of crates) {
+            const hit = [...fixed, ...moving, ...crates.filter((c) => c !== box)].find((b) => intersects(box, b))
+            if (hit) {
+              issue(box.id, hit.id)
+              structureHit = true
+              break
+            }
+          }
+        }
+        if (actor && !actorHit) {
+          const ride = active.find((m) => next.at.startsWith(`${m.id}#`))
+          const pos = ride ? moving.find((b) => b.id === next.at).pos : nextTiles.get(next.at).pos
+          const duration = Math.max(
+            ...active.map((m) =>
+              m.type === 'rotator'
+                ? 0.9
+                : Math.abs(m.stops[next.mover[m.id].stopIndex] - m.stops[state.mover[m.id].stopIndex]) * 0.45,
+            ),
+          )
+          const elapsed = (fraction < 0.5 ? Math.cbrt(fraction / 4) : 1 - Math.cbrt((1 - fraction) / 4)) * duration
+          const height = CHARACTER_HEIGHT * (i === samples - 1 ? 1 : braceScale(advanceBrace(0, true, elapsed)))
+          const obstacles = ride
+            ? [...fixed, ...moving.filter((b) => b.id !== next.at && b.id !== `${next.at}/slab`), ...crates]
+            : [...moving, ...crates]
+          const hit = obstacles.find((b) => actorIntersects(pos, height, b))
+          if (hit) {
+            issue(`character@${next.at}`, hit.id)
+            actorHit = true
+          }
+        }
+      }
+    }
+  return { structuralTransitions: structural.size, characterTransitions: characters.size, samples, issues }
+}

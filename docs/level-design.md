@@ -64,6 +64,8 @@
 
 实现者把设计稿转成 `src/game/levels/level-XX.ts`，把预期指标写进 `src/game/levels/targets.ts`。实现时不得修改谜题本身；如果校验或指标不通过，停下来反馈，不要自己改布局或改目标。
 
+T6.13第7～12关还未进入运行数据时，可用`node docs/levels/check-designs.mjs`直接验证文档内的完整TypeScript和自动验证基准。该工具不修改targets或正式入口；检查范围、离散运动采样的限制及实现交接见[第三、四章](levels/chapter-3-4.md)。
+
 ## 关卡文件
 
 - 每关一个文件：主线 `src/game/levels/level-01.ts` 到 `level-15.ts`，挑战关 `challenge-1.ts` 到 `challenge-5.ts`；在 `levels/index.ts` 中分别按顺序导出主线列表和挑战列表。
