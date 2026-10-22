@@ -31,5 +31,8 @@ export function playSimEvent(event: SimEvent, level: LevelDef, progress?: OrbPro
   if (event.type === 'undo') playSound('undo')
   if (event.type === 'push') playSound('push')
   if (event.type === 'gate') playSound('gate', { open: event.open })
-  if (event.type === 'won') playSound('lantern')
+  if (event.type === 'won') {
+    playSound('lantern')
+    if (level.id === 'level-09' || level.id === 'level-12') playSound('seal', { chapter: level.chapter === 4 ? 4 : 3 })
+  }
 }

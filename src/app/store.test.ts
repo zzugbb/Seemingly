@@ -35,7 +35,7 @@ describe('进度与评价', () => {
       setItem: (key: string, value: string) => memory.set(key, value),
     })
     const save = emptySave()
-    for (const [index, level] of mainLevels.entries()) {
+    for (const [index, level] of mainLevels.slice(0, 6).entries()) {
       save.levels[level.id] = {
         done: true,
         allOrbs: true,
@@ -46,6 +46,8 @@ describe('进度与评价', () => {
     useApp.setState({ save })
     const complete = useApp.getState().completeLevel
     expect(campaignStats(save).earned).toBe(15)
+    expect(campaignStats(save).ratingMax).toBe(36)
+    expect(isUnlocked(save, 'main', 6)).toBe(true)
     const id = 'level-04'
     complete(id, { steps: 8, allOrbs: false, usedHint: true })
     expect(useApp.getState().save.levels[id]).toEqual({ done: true, allOrbs: true, parMet: false, bestSteps: 8 })

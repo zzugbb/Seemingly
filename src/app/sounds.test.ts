@@ -79,6 +79,18 @@ describe('模拟器音效接入', () => {
     expect(sounds.filter((sound) => sound === 'ready')).toHaveLength(1)
     expect(sounds.filter((sound) => sound === 'lantern')).toHaveLength(1)
   })
+  it('只有第九和十二关通关排程章末四音，前六关点灯不追加', () => {
+    playSimEvent({ type: 'won' }, levels[5])
+    playSimEvent({ type: 'won' }, levels[8])
+    playSimEvent({ type: 'won' }, levels[11])
+    expect(vi.mocked(playSound).mock.calls).toEqual([
+      ['lantern'],
+      ['lantern'],
+      ['seal', { chapter: 3 }],
+      ['lantern'],
+      ['seal', { chapter: 4 }],
+    ])
+  })
   it('必需集齐用ready替代普通收光，后收选做不会重发ready', () => {
     const level = levels[5]
     const progress = { required: 2, requiredCollected: 2, collected: 2 }

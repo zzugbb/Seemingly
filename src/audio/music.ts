@@ -3,17 +3,14 @@ import {
   chapterScale,
   chordAt,
   chordDuration,
+  courtyardClock,
   courtyardNote,
   courtyardPulse,
   pulseActive,
   pulseLevel,
-  COURTYARD_BEAT_SECONDS,
   type MusicStage,
   type ScoreNote,
   courtyardChordAt,
-  COURTYARD_CHORD_SECONDS,
-  COURTYARD_SECONDS,
-  COURTYARD_NOTE_COUNT,
   COURTYARD_GAIN,
   COURTYARD_PAD_GAIN,
   COURTYARD_PAD_HIGHPASS,
@@ -219,9 +216,9 @@ export class MusicPlayer {
       challenge,
       expression,
       pulse,
-      nextPulse: Math.ceil(elapsed / COURTYARD_BEAT_SECONDS),
+      nextPulse: Math.ceil(elapsed / courtyardClock(chapter).beatSeconds),
       soundtrack: this.soundtrack,
-      nextNote: Math.floor(elapsed / COURTYARD_SECONDS) * COURTYARD_NOTE_COUNT,
+      nextNote: Math.floor(elapsed / courtyardClock(chapter).seconds) * courtyardClock(chapter).noteCount,
       epoch: at - elapsed,
       nextChord: at + 0.01,
       nextBox: at + 1.5,
@@ -279,7 +276,8 @@ export class MusicPlayer {
     while (layer.nextChord < horizon) {
       const at = layer.nextChord,
         elapsed = Math.max(0, at - layer.epoch),
-        duration = layer.soundtrack === 'courtyard' ? COURTYARD_CHORD_SECONDS : chordDuration(layer.challenge)
+        duration =
+          layer.soundtrack === 'courtyard' ? courtyardClock(layer.chapter).chordSeconds : chordDuration(layer.challenge)
       const index = Math.floor((elapsed + 0.000001) / duration)
       const remaining = Math.max(0.001, layer.epoch + (index + 1) * duration - at)
       const courtyard = layer.soundtrack === 'courtyard'
@@ -316,10 +314,8 @@ export class MusicPlayer {
       layer.nextChord = at + remaining
     }
     if (layer.soundtrack === 'courtyard') {
-      layer.nextNote = Math.max(
-        layer.nextNote,
-        Math.floor((now - layer.epoch) / COURTYARD_SECONDS) * COURTYARD_NOTE_COUNT,
-      )
+      const clock = courtyardClock(layer.chapter)
+      layer.nextNote = Math.max(layer.nextNote, Math.floor((now - layer.epoch) / clock.seconds) * clock.noteCount)
       for (;;) {
         const note = courtyardNote(layer.nextNote, layer.chapter)
         const at = layer.epoch + note.at
@@ -328,7 +324,7 @@ export class MusicPlayer {
         if (at < now) continue
         renderCourtyardNote(this.busFor(layer, layer.expression), note, at)
       }
-      layer.nextPulse = Math.max(layer.nextPulse, Math.floor((now - layer.epoch) / COURTYARD_BEAT_SECONDS))
+      layer.nextPulse = Math.max(layer.nextPulse, Math.floor((now - layer.epoch) / clock.beatSeconds))
       for (;;) {
         const note = courtyardPulse(layer.nextPulse, layer.chapter)
         const at = layer.epoch + note.at

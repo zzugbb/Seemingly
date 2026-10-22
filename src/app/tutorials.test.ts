@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { mainLevels } from '../game/levels'
 import { LevelSim } from '../game/core/sim'
 import { emptySave } from './save'
-import { learnedTutorials, nextTutorial, readTutorials, tutorialIds, tutorialsFromEvent } from './tutorials'
+import {
+  createTutorialSession,
+  learnedTutorials,
+  nextTutorial,
+  openingTutorialIds,
+  readTutorials,
+  tutorialsFromEvent,
+  type TutorialId,
+} from './tutorials'
 
 describe('首次教学', () => {
   it('一次一句，按对应操作收起，第四和第六关不重复教学', () => {
@@ -33,7 +41,28 @@ describe('首次教学', () => {
     save.levels['level-06'] = done
     expect(learnedTutorials(save)).not.toContain('lift')
     save.levels['level-05'] = done
-    expect(learnedTutorials(save)).toEqual(tutorialIds)
+    expect(learnedTutorials(save)).toEqual([...openingTutorialIds])
+    expect(learnedTutorials(save)).not.toContain('link')
+    expect(learnedTutorials(save)).not.toContain('push')
+  })
+
+  it('旧前六关全通不会推断新机制，已学的新项刷新后仍在', () => {
+    const save = emptySave()
+    const done = { done: true, allOrbs: true, parMet: true, bestSteps: 8 }
+    for (const level of mainLevels.slice(0, 6)) save.levels[level.id] = done
+    expect(learnedTutorials(save)).toEqual([...openingTutorialIds])
+    expect(nextTutorial('level-02', save)).toBeNull()
+    expect(nextTutorial('level-05', save)).toBeNull()
+    expect(nextTutorial('level-08', save)).toBe('一个转轮，也会带动另一座桥')
+    expect(nextTutorial('level-09', save)).toBe('停在单框压板上，召来远处的平台')
+    expect(nextTutorial('level-10', save)).toBe('站到箱子旁，点击箱子向前推一格')
+    expect(nextTutorial('level-11', save)).toBe('顺着箭头进入路面')
+    expect(nextTutorial('level-12', save)).toBe('亮点是剩余次数，撤销可恢复')
+    save.tutorials = ['link', 'plate']
+    expect(nextTutorial('level-08', save)).toBeNull()
+    expect(nextTutorial('level-09', save)).toBeNull()
+    expect(nextTutorial('level-10', save)).toContain('向前推')
+    expect(learnedTutorials(save)).toEqual([...openingTutorialIds, 'link', 'plate'])
   })
 
   it('无操作、开始运动及撤销不标记学会；到位只为实际乘客记录乘坐', () => {
@@ -74,5 +103,53 @@ describe('首次教学', () => {
   it('读档只接受已知教学标识并去重', () => {
     expect(readTutorials(['lift', 'rotate', 'rotate', 'made-up', 1, null])).toEqual(['rotate', 'lift'])
     expect(readTutorials({ walk: true })).toEqual([])
+    expect(readTutorials(['link', 'push', 'limited'])).toEqual(['link', 'push', 'limited'])
+  })
+
+  it('新教学等动作提交后才记下，推动开始、经过和拒绝都不算学会', () => {
+    const learned = new Set<TutorialId>()
+    const play = (index: number) => {
+      const level = mainLevels[index]
+      const sim = new LevelSim(level)
+      const session = createTutorialSession()
+      const known = () => [...learned]
+      for (const step of level.solution) {
+        const command = step.type === 'walk' ? { type: 'walk' as const, tileId: sim.tileAt(step.to)!.id } : step
+        expect(sim.command(command)).toBe('ok')
+        for (let frame = 0; frame < 800 && !sim.isIdle(); frame++) {
+          for (const event of sim.update(1 / 30)) {
+            const skills = session.observe(level, event, sim.state())
+            if (event.type === 'push') expect(skills).not.toContain('push')
+            if (event.type === 'mechanism-start') expect(skills).not.toContain('link')
+            if (event.type === 'plate') expect(skills).not.toContain('plate')
+            for (const skill of skills) learned.add(skill)
+          }
+        }
+        expect(sim.isIdle()).toBe(true)
+        for (const skill of session.confirm(level, sim.state(), known())) learned.add(skill)
+      }
+      expect(sim.status).toBe('won')
+    }
+    play(7)
+    expect(learned.has('link')).toBe(true)
+    expect(learned.has('plate')).toBe(false)
+    play(8)
+    expect(learned.has('plate')).toBe(true)
+    const beforeHold = learned.has('hold')
+    play(9)
+    expect(learned.has('push')).toBe(true)
+    expect(beforeHold).toBe(false)
+    expect(learned.has('hold')).toBe(true)
+    play(10)
+    expect(learned.has('oneway')).toBe(true)
+    play(11)
+    expect(learned.has('limited')).toBe(true)
+    const kept = [...learned]
+    const level = mainLevels[9]
+    const sim = new LevelSim(level)
+    const session = createTutorialSession()
+    expect(sim.command({ type: 'push', crate: 'missing' })).not.toBe('ok')
+    expect(session.observe(level, { type: 'undo' }, sim.state())).toEqual([])
+    expect(session.confirm(level, sim.state(), kept)).not.toContain('push')
   })
 })

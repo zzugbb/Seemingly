@@ -89,9 +89,9 @@ src/
 
 ## 关卡数据
 
-T6.13a第二稿的第7～12关当前仅存在于[设计稿](levels/chapter-3-4.md)，正式mainLevels、targets和revision表仍为六关。设计验证器`docs/levels/check-designs.mjs`在隔离的Vite SSR进程读取Markdown参考实现，调用既有规则与几何辅助函数，不参与游戏运行；T6.14才按稿加入正式关卡、首次能力与新章节乐句。新章精确谱面在docs/levels/chapter-scores.mjs，仅供设计验证，正式模块不导入docs；接入须参数化循环／和弦时长及拍点（第三章88 BPM、第四章96 BPM），保留前两章80 BPM／96秒。第9、12关需在原12源／8音乐预算内排程章末音列，并与撤销、静音和换关清理共用生命周期，新听感仍待试听。
+T6.14已按[第二稿](levels/chapter-3-4.md)把第7～12关写入正式mainLevels和targets。设计验证器`docs/levels/check-designs.mjs`仍可单独核对文档；`--runtime`比对12关顺序、前六关revision、新六关完整定义与targets，再对正式对象复跑规则和净空。新章谱面数据写在`audio/theory.ts`，正式模块不导入docs。循环、和弦时长、拍点和调度一起读取章节速度：前两章保持80 BPM／96秒，第三章88 BPM，第四章96 BPM。第9、12关的章末四音走音效总线，撤销、静音、重开和换关沿用既有清理。新听感仍待试听。
 
-T6.13b开发前核对补充：设计检查器的`--runtime`模式仅供T6.14正式12关接入验收，比对完整关卡定义、targets、顺序及前六关revision后，用正式对象重跑规则与净空。默认模式仍仅验证文档。新教学不能直接扩大第五关原有`provenSkills`引用；推箱开始事件不等于动作结束，能力记忆须在实际状态提交后更新，详见[开发前复核](levels/chapter-3-4.md#开发前复核t613b)。
+第五关已学集合固定为walk、collect、rotate、ride、lift，不随后来追加的教学标识扩张。推箱开始事件只记候选；联动、召台、推动、按住和限次在模拟器空闲且状态已经提交后才写入。单向格在成功踏入箭头格时记录。详见[开发前复核](levels/chapter-3-4.md#开发前复核t613b)。
 
 `src/game/levels/types.ts`。注释中「T6.2」「T6.6」表示已实现，「T6.16」表示后续任务中新增：
 
@@ -478,7 +478,7 @@ function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): 
 
 `app/tutorials.ts`仅处理文案和已学能力，不计算动作合法性或路线。PlayScreen消费模拟器实际事件：step、orb、mechanism-end，机关到位且角色格号属于该机关时记录乘坐。只有主线写入教学状态，内部样段和挑战不写。底部优先显示原运动／到位反馈，再显示当前关尚未完成的一句教学；完成后不挂载空底栏，通关不显示底栏。
 
-SaveData增加可选tutorials（walk／collect／rotate／ride／lift）；缺省为空，读档过滤未知值、去重，不使旧进度失效。只在首次学会新能力时写入，撤销／重开不清除；旧成绩推断已完成关卡证明的能力，不清理评价、静音或修订。该字段不参与规则、求解器、步数或usedHint。
+SaveData增加可选tutorials；缺省为空，读档过滤未知值、去重，不使旧进度失效。T6.14在原有walk／collect／rotate／ride／lift之外增加link／plate／push／hold／oneway／limited。第五关通关只证明前五项。推动要等箱子位置提交，按住要等推箱教学已经记下且箱子静压开门，联动和召台要等到相关机关全部到位，限次把手要等该次操作到位，单向格只在踏入箭头格时记下。只在首次学会新能力时写入，撤销／重开不清除；旧成绩推断已完成关卡证明的能力，不清理评价、静音或修订。该字段不参与规则、求解器、步数或usedHint。
 
 ## 音频
 

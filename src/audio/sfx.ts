@@ -1,6 +1,6 @@
 import { audioEngine, type AudioBus } from './engine'
 import { music } from './music'
-import { midiFrequency, stepNote, successNotes, type Chord } from './theory'
+import { chapterSealNotes, midiFrequency, stepNote, successNotes, type Chord } from './theory'
 import { feltBuffer, woodBuffer } from './instruments'
 
 export type Sound =
@@ -18,10 +18,12 @@ export type Sound =
   | 'push'
   | 'gate'
   | 'patrol'
+  | 'seal'
 interface SoundOptions {
   open?: boolean
   register?: number
   count?: number
+  chapter?: 3 | 4
 }
 const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>()
 let previousChord = ''
@@ -101,8 +103,17 @@ export function renderSound(
 ): void {
   const { chord, scale, courtyard } = harmony
   const root = chord.notes[0]
-  if (sound === 'orb' || sound === 'optionalOrb' || sound === 'ready' || sound === 'lantern' || sound === 'rating') {
-    for (const note of successNotes(sound, chord, options.count)) {
+  if (
+    sound === 'orb' ||
+    sound === 'optionalOrb' ||
+    sound === 'ready' ||
+    sound === 'lantern' ||
+    sound === 'rating' ||
+    sound === 'seal'
+  ) {
+    const notes =
+      sound === 'seal' ? chapterSealNotes(options.chapter === 4 ? 4 : 3) : successNotes(sound, chord, options.count)
+    for (const note of notes) {
       if (courtyard) {
         const source = bus.context.createBufferSource()
         source.buffer = feltBuffer(bus.context, note.note)

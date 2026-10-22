@@ -20,11 +20,27 @@ const fixture = (build: (b: LevelBuilder) => void) =>
     },
   })
 
+const supportedByBasicSweep = (level: { crates?: unknown[]; mechanisms: { type: string; links?: unknown[] }[] }) =>
+  !level.crates?.length &&
+  level.mechanisms.every(
+    (mechanism) => (mechanism.type === 'rotator' || mechanism.type === 'mover') && !mechanism.links?.length,
+  )
+
 describe('建筑运动净空', () => {
-  it.each([...mainLevels, sample])('$id：可达姿态全扫掠，结构、顶板、底座和角色不相交', (level) => {
-    const report = checkMotionClearance(level)
-    expect(report.issues).toEqual([])
-    if (level.mechanisms.length) expect(report.characterTransitions).toBeGreaterThan(0)
+  it.each([...mainLevels, sample].filter(supportedByBasicSweep))(
+    '$id：可达姿态全扫掠，结构、顶板、底座和角色不相交',
+    (level) => {
+      const report = checkMotionClearance(level)
+      expect(report.issues).toEqual([])
+      if (level.mechanisms.length) expect(report.characterTransitions).toBeGreaterThan(0)
+    },
+    180_000,
+  )
+
+  it('联动、压板、门和箱子不交给只覆盖独立机关的检查器', () => {
+    const extended = mainLevels.filter((level) => !supportedByBasicSweep(level))
+    expect(extended.map((level) => level.id)).toEqual(['level-08', 'level-09', 'level-10', 'level-11', 'level-12'])
+    for (const level of extended) expect(() => checkMotionClearance(level)).toThrow(/另行建模/)
   })
 
   it('能抓到端点都不重叠的转盘中间碰撞', () => {

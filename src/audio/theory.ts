@@ -85,12 +85,120 @@ export function pulseActive(index: number, stage: MusicStage): boolean {
 }
 export const pulseLevel = (stage: MusicStage) => ({ explore: 0.55, gather: 0.8, ready: 1, complete: 0 })[stage]
 
+export interface CourtyardClock {
+  bpm: number
+  seconds: number
+  chordSeconds: number
+  beatSeconds: number
+  noteCount: number
+}
+const openingClock: CourtyardClock = {
+  bpm: 80,
+  seconds: COURTYARD_SECONDS,
+  chordSeconds: COURTYARD_CHORD_SECONDS,
+  beatSeconds: COURTYARD_BEAT_SECONDS,
+  noteCount: COURTYARD_NOTE_COUNT,
+}
+export function courtyardClock(chapter: Chapter): CourtyardClock {
+  if (chapter !== 3 && chapter !== 4) return openingClock
+  const bpm = chapter === 3 ? 88 : 96
+  const beatSeconds = 60 / bpm
+  return { bpm, beatSeconds, seconds: beatSeconds * 128, chordSeconds: beatSeconds * 16, noteCount: 51 }
+}
+
+const risePhrases = [
+  [74, 77, 81, 79, 76, 74],
+  [76, 79, 83, 81, 79, 76],
+  [72, 76, 79, 83, 81, 79, 76, 74],
+  [76, 79, 81, 79, 76, 72],
+  [76, 79, 83, 86, 84, 83, 79, 76],
+  [79, 83, 86, 84, 83, 79],
+  [81, 84, 83, 81, 77, 76],
+  [81, 77, 76, 72, 74],
+]
+const weightPhrases = [
+  [75, 79, 82, 79, 77, 75],
+  [77, 82, 86, 84, 82, 79],
+  [79, 82, 87, 86, 84, 82, 79, 75],
+  [80, 84, 87, 84, 82, 80],
+  [77, 80, 84, 87, 89, 87, 84, 80],
+  [79, 82, 87, 86, 82, 79],
+  [77, 82, 86, 84, 82, 77],
+  [82, 79, 77, 79, 75],
+]
+const riseOnsets = [
+  [0.5, 2, 4, 7, 9, 12],
+  [1, 3, 5.5, 8, 10, 13],
+  [0.5, 2, 3.5, 5, 7.5, 9, 11, 13],
+  [1, 3, 6, 8, 11, 13],
+  [0, 1.5, 3, 5, 7, 9.5, 11, 13],
+  [1, 3, 5.5, 8, 10, 13],
+  [0.5, 3, 5, 7, 10, 12],
+  [0.5, 3, 6, 9, 12],
+]
+const weightOnsets = [
+  [0, 1.5, 3, 6, 8, 11],
+  [0.5, 2, 4.5, 6, 9, 12],
+  [0, 1.5, 3, 4.5, 6, 8, 10.5, 13],
+  [0, 2, 4.5, 7, 9, 12],
+  [0.5, 2, 3.5, 5, 7.5, 9, 11, 13],
+  [0, 1.5, 4, 6, 9, 12],
+  [0.5, 2, 4.5, 7, 9, 12],
+  [0, 2, 5, 8, 12],
+]
+const riseChords: readonly Chord[] = [
+  { name: 'Dm(add9)', notes: [50, 57, 60, 64] },
+  { name: 'G6', notes: [43, 55, 59, 64] },
+  { name: 'Cmaj7', notes: [48, 55, 59, 64] },
+  { name: 'Am7', notes: [45, 55, 60, 64] },
+  { name: 'Em7', notes: [52, 59, 62, 67] },
+  { name: 'Gadd9', notes: [43, 57, 59, 62] },
+  { name: 'Dm9', notes: [50, 57, 60, 64] },
+  { name: 'Dsus2', notes: [50, 57, 64, 69] },
+]
+const weightChords: readonly Chord[] = [
+  { name: 'Ebadd9', notes: [51, 58, 65, 67] },
+  { name: 'Bb6', notes: [46, 58, 62, 67] },
+  { name: 'Cm7', notes: [48, 58, 63, 67] },
+  { name: 'Abmaj7', notes: [44, 55, 60, 63] },
+  { name: 'Fm9', notes: [53, 60, 63, 67] },
+  { name: 'Eb/G', notes: [55, 58, 63, 67] },
+  { name: 'Bbadd9', notes: [46, 58, 60, 65] },
+  { name: 'Ebadd9', notes: [51, 58, 65, 67] },
+]
+const chapterPhrases = (chapter: 3 | 4) => {
+  const phrases = chapter === 3 ? risePhrases : weightPhrases
+  const onsets = chapter === 3 ? riseOnsets : weightOnsets
+  const beat = courtyardClock(chapter).beatSeconds
+  return phrases.flatMap((phrase, section) =>
+    phrase.map((note, index) => ({
+      at: (section * 16 + onsets[section][index]) * beat,
+      note,
+      duration: (index === phrase.length - 1 ? 4.6 : 3) * beat,
+      velocity: (chapter === 3 ? 0.61 : 0.65) + (index % 3 === 0 ? 0.1 : 0),
+      pan: (section % 2 === 0 ? -1 : 1) * 0.18,
+    })),
+  )
+}
+const riseNotes = chapterPhrases(3)
+const weightNotes = chapterPhrases(4)
+
 export function courtyardChordAt(seconds: number, chapter: Chapter = 2): Chord {
+  const time = Math.max(0, seconds)
+  if (chapter === 3 || chapter === 4) {
+    const chords = chapter === 3 ? riseChords : weightChords
+    return chords[Math.floor(time / courtyardClock(chapter).chordSeconds) % chords.length]
+  }
   const chords = chapter === 1 ? dawnChords : courtyardChords
-  return chords[Math.floor(Math.max(0, seconds) / COURTYARD_CHORD_SECONDS) % chords.length]
+  return chords[Math.floor(time / COURTYARD_CHORD_SECONDS) % chords.length]
 }
 export function courtyardNote(index: number, chapter: Chapter = 2): ScoreNote {
   const count = Math.max(0, Math.floor(index))
+  if (chapter === 3 || chapter === 4) {
+    const clock = courtyardClock(chapter)
+    const note = (chapter === 3 ? riseNotes : weightNotes)[count % clock.noteCount]
+    return { ...note, at: note.at + Math.floor(count / clock.noteCount) * clock.seconds }
+  }
   const entry = melody[count % COURTYARD_NOTE_COUNT]
   const { section, index: slot } = entry
   return {
@@ -103,11 +211,22 @@ export function courtyardNote(index: number, chapter: Chapter = 2): ScoreNote {
 }
 export function courtyardPulse(index: number, chapter: Chapter = 2): ScoreNote {
   const count = Math.max(0, Math.floor(index))
-  const at = count * COURTYARD_BEAT_SECONDS + COURTYARD_BEAT_SECONDS / 2
+  const beat = courtyardClock(chapter).beatSeconds
+  const at = count * beat + beat / 2
   const chord = courtyardChordAt(at, chapter)
   let note = chord.notes[[1, 2, 3, 2, 0, 2, 1, 3][count % 8]]
   while (note < 60) note += 12
   return { at, note, duration: 0.7, velocity: count % 4 === 0 ? 1 : 0.76, pan: count % 2 === 0 ? -0.3 : 0.3 }
+}
+export function chapterSealNotes(chapter: 3 | 4): ScoreNote[] {
+  const root = chapter === 3 ? 62 : 63
+  return [24, 31, chapter === 3 ? 39 : 40, 36].map((interval, i) => ({
+    at: [2.1, 2.34, 2.58, 3.05][i],
+    note: root + interval - 12,
+    duration: i === 3 ? 2.3 : 1.4,
+    velocity: [0.36, 0.32, 0.3, 0.38][i],
+    pan: i % 2 === 0 ? -0.12 : 0.12,
+  }))
 }
 export type SuccessSound = 'orb' | 'optionalOrb' | 'ready' | 'lantern' | 'rating'
 export function successNotes(sound: SuccessSound, chord: Chord, count = 1): ScoreNote[] {

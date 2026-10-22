@@ -64,16 +64,33 @@ const noSouthDockWin = (all: boolean) => {
   return null
 }
 
-describe('第 1～2 章', () => {
-  it('按顺序提供六关，两章各三关，每关都有设计者给定的难度目标', () => {
-    expect(mainLevels.map((level) => level.id)).toEqual(Array.from({ length: 6 }, (_, index) => `level-0${index + 1}`))
-    expect(mainLevels.map((level) => level.chapter)).toEqual([1, 1, 1, 2, 2, 2])
-    expect(mainLevels.map((level) => level.title)).toEqual(['启程', '转动', '随行', '换乘', '叠庭', '回环'])
+describe('第 1～4 章', () => {
+  it('按顺序提供十二关，前四章各三关，每关都有设计者给定的难度目标', () => {
+    expect(mainLevels.map((level) => level.id)).toEqual(
+      Array.from({ length: 12 }, (_, index) => `level-${String(index + 1).padStart(2, '0')}`),
+    )
+    expect(mainLevels.map((level) => level.chapter)).toEqual([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4])
+    expect(mainLevels.map((level) => level.title)).toEqual([
+      '启程',
+      '转动',
+      '随行',
+      '换乘',
+      '叠庭',
+      '回环',
+      '停靠',
+      '联动',
+      '牵引',
+      '推动',
+      '越界',
+      '重量',
+    ])
+    expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
+    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 1, 1, 1, 1, 1])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
   })
-  it('六关通过全部结构、安全、解法、可见性、规模与难度校验', () => {
+  it('十二关通过全部结构、安全、解法、可见性、规模与难度校验', () => {
     expect(validateLevels(mainLevels, targets)).toEqual([])
   })
   it('启程：先去灯笼会提示缺光点，撤销可恢复到出发前', () => {

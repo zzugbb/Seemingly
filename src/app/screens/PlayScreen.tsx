@@ -19,7 +19,7 @@ import { Toast } from '../hud/Toast'
 import { isUnlocked, levelLists, useApp, type LevelList } from '../store'
 import { playNewRatings, playSimEvent } from '../sounds'
 import { prepareHints } from '../hints'
-import { nextTutorial, tutorialsFromEvent } from '../tutorials'
+import { createTutorialSession, learnedTutorials, nextTutorial } from '../tutorials'
 
 export function PlayScreen() {
   const current = useApp((state) => state.current)
@@ -72,6 +72,9 @@ function Run({
   const quality = useApp((state) => state.quality)
   const tutorial = useApp((state) => nextTutorial(level.id, state.save))
   const learnTutorials = useApp((state) => state.learnTutorials)
+  const lessons = useRef(createTutorialSession())
+  const chapterPause = !sample && (level.id === 'level-09' || level.id === 'level-12')
+  const [showChapterResult, setShowChapterResult] = useState(false)
   const settings = useMemo(() => qualitySettings(quality), [quality])
   const reducedMotion = prefersReducedMotion()
   const sim = useMemo(() => new LevelSim(level), [level])
@@ -154,6 +157,15 @@ function Run({
     return () => window.clearTimeout(timer)
   }, [sample, result, reducedMotion])
 
+  useEffect(() => {
+    if (!chapterPause || !result) {
+      setShowChapterResult(false)
+      return
+    }
+    const timer = window.setTimeout(() => setShowChapterResult(true), reducedMotion ? 200 : 2200)
+    return () => window.clearTimeout(timer)
+  }, [chapterPause, result, reducedMotion])
+
   const undo = useCallback(() => {
     if (!sim.undo()) return
     audioEngine.stopEffects()
@@ -227,7 +239,7 @@ function Run({
     playSimEvent(event, level, progress)
     if (event.type === 'orb' || event.type === 'undo' || event.type === 'won')
       music.setProgress(musicStage(progress, sim.status === 'won'))
-    if (list === 'main') learnTutorials(tutorialsFromEvent(level, event, sim.state().at))
+    if (list === 'main') learnTutorials(lessons.current.observe(level, event, sim.state()))
     refresh()
     if (tactile) {
       if (event.type === 'walk-start' || event.type === 'undo') setMotionNotice(null)
@@ -293,7 +305,11 @@ function Run({
           hint={hint}
           onEndingReady={() => setEndingReady(true)}
           onEvent={onEvent}
-          onStateChange={refresh}
+          onStateChange={() => {
+            refresh()
+            if (list === 'main' && sim.isIdle())
+              learnTutorials(lessons.current.confirm(level, sim.state(), learnedTutorials(useApp.getState().save)))
+          }}
           onUnreachable={() => playSound('unreachable')}
           onLanternLit={() => playSound('lantern')}
           onWon={won}
@@ -374,7 +390,7 @@ function Run({
         </section>
       )}
       {ending && endingReady && <Ending />}
-      {result && !sample && !ending && !level.ending && (
+      {result && !sample && !ending && !level.ending && (!chapterPause || showChapterResult) && (
         <CompleteBanner
           title={level.title}
           ratings={{ ...result.ratings, parMet: !usedHint.current && minimum !== null && result.steps <= minimum }}

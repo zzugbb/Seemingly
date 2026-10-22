@@ -32,7 +32,7 @@ describe('标题入口', () => {
     })
     expect(campaignStats(save, mainLevels, challengeLevels)).toMatchObject({
       mainDone: 3,
-      mainCount: 6,
+      mainCount: mainLevels.length,
       earned: 8,
       showProgress: true,
     })
@@ -44,21 +44,32 @@ describe('标题入口', () => {
     })
   })
 
-  it('六关抵达但评价未满时重访选关，评价上限按实际列表计算', () => {
+  it('当前开放关卡全部抵达但评价未满时重访选关，评价上限按实际列表计算', () => {
     const levels = Object.fromEntries(mainLevels.map((level) => [level.id, record(level.solution.length, true, false)]))
     const save = saveWith(levels)
     const stats = campaignStats(save, mainLevels, challengeLevels)
-    expect(stats.mainDone).toBe(6)
-    expect(stats.earned).toBe(12)
+    expect(stats.mainDone).toBe(mainLevels.length)
+    expect(stats.earned).toBe(mainLevels.length * 2)
     expect(stats.ratingMax).toBe([...mainLevels, ...challengeLevels].length * 3)
     expect(journeyChoice(save, mainLevels).mode).toBe('revisit')
     expect(journeyChoice(save, mainLevels).label).toBe('重访旅程')
   })
 
-  it('六关评价齐全仍是重访，不增加第七关', () => {
+  it('前六关完成后继续第七关，十二关评价齐全才重访', () => {
+    const six = saveWith(Object.fromEntries(mainLevels.slice(0, 6).map((level) => [level.id, record(3)])))
+    expect(campaignStats(six, mainLevels, challengeLevels)).toMatchObject({
+      mainDone: 6,
+      mainCount: 12,
+      earned: 18,
+      ratingMax: 36,
+    })
+    expect(journeyChoice(six, mainLevels)).toMatchObject({
+      mode: 'continue',
+      caption: '前往 第 7 关 · 停靠',
+      index: 6,
+    })
     const save = saveWith(Object.fromEntries(mainLevels.map((level) => [level.id, record(3)])))
-    const stats = campaignStats(save, mainLevels, challengeLevels)
-    expect(stats).toMatchObject({ mainDone: 6, earned: 18, ratingMax: 18 })
+    expect(campaignStats(save, mainLevels, challengeLevels)).toMatchObject({ mainDone: 12, earned: 36, ratingMax: 36 })
     expect(journeyChoice(save, mainLevels)).toMatchObject({ mode: 'revisit', caption: '当前开放的关卡已全部抵达' })
   })
 
@@ -98,6 +109,9 @@ describe('选关状态', () => {
     expect(selectStatus(emptySave(), 5).status).toBe('locked')
     expect(initialPreviewIndex(emptySave())).toBe(0)
     expect(chapterArrival(emptySave(), 1)).toEqual({ done: 0, total: 3 })
+    expect(chapterArrival(emptySave(), 3)).toEqual({ done: 0, total: 3 })
+    expect(chapterArrival(emptySave(), 4)).toEqual({ done: 0, total: 3 })
+    expect(selectStatus(emptySave(), 6)).toEqual({ status: 'locked', label: '先通过第 6 关' })
   })
 
   it('完成前三关后下一站是第四关，后两关锁定', () => {

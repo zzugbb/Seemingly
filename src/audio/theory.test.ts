@@ -3,6 +3,8 @@ import {
   chapterScale,
   chordAt,
   chordDuration,
+  chapterSealNotes,
+  courtyardClock,
   courtyardNote,
   courtyardPulse,
   COURTYARD_PULSE_COUNT,
@@ -103,6 +105,77 @@ describe('启程声景乐句', () => {
     }
     expect(courtyardNote(0, 1).note).not.toBe(courtyardNote(0, 2).note)
     expect(courtyardNote(0)).toEqual(courtyardNote(0, 2))
+  })
+})
+
+describe('第三、四章乐句', () => {
+  it('循环、和弦和拍点跟随章节速度，前两章仍是八十拍与九十六秒', () => {
+    expect(courtyardClock(1)).toEqual(courtyardClock(2))
+    expect(courtyardClock(2)).toMatchObject({
+      bpm: 80,
+      seconds: 96,
+      chordSeconds: 12,
+      beatSeconds: 0.75,
+      noteCount: 51,
+    })
+    expect(courtyardClock(3).bpm).toBe(88)
+    expect(courtyardClock(4).bpm).toBe(96)
+    for (const chapter of [3, 4] as const) {
+      const clock = courtyardClock(chapter)
+      expect(clock.seconds).toBeCloseTo(clock.beatSeconds * 128)
+      expect(clock.chordSeconds).toBeCloseTo(clock.beatSeconds * 16)
+      expect(clock.noteCount).toBe(51)
+      expect(clock.seconds).not.toBe(96)
+    }
+  })
+
+  it('两章分别写旋律、起音和调式，跨循环接上同一句', () => {
+    for (const chapter of [3, 4] as const) {
+      const clock = courtyardClock(chapter)
+      const mode = new Set(chapter === 3 ? [0, 2, 4, 5, 7, 9, 11] : [0, 2, 3, 5, 7, 8, 10])
+      for (let index = 0; index < clock.noteCount; index++) {
+        const note = courtyardNote(index, chapter)
+        expect(mode.has(note.note % 12)).toBe(true)
+        expect(note.at).toBeGreaterThanOrEqual(0)
+        expect(note.at).toBeLessThan(clock.seconds)
+        expect(note.duration).toBeGreaterThan(0)
+        const next = courtyardNote(index + clock.noteCount, chapter)
+        expect(next.at).toBeCloseTo(note.at + clock.seconds)
+        expect(next.note).toBe(note.note)
+      }
+      expect(courtyardChordAt(clock.seconds, chapter)).toEqual(courtyardChordAt(0, chapter))
+      expect(courtyardChordAt(-1, chapter)).toEqual(courtyardChordAt(0, chapter))
+      expect(courtyardChordAt(clock.chordSeconds, chapter)).not.toEqual(courtyardChordAt(0, chapter))
+    }
+    expect(courtyardNote(0, 3).note).not.toBe(courtyardNote(0, 4).note)
+    expect(courtyardNote(0, 3).at).not.toBe(courtyardNote(0, 2).at)
+    const intervals = (chapter: 3 | 4) =>
+      Array.from({ length: 51 }, (_, index) => courtyardNote(index, chapter).note).map((note, index, notes) =>
+        index === 0 ? 0 : note - notes[index - 1],
+      )
+    expect(intervals(3)).not.toEqual(intervals(4))
+  })
+
+  it('分解音按章节拍长循环，章末四音晚于评价声', () => {
+    for (const chapter of [3, 4] as const) {
+      const clock = courtyardClock(chapter)
+      const pulses = Math.round(clock.seconds / clock.beatSeconds)
+      for (let index = 0; index < pulses; index++) {
+        const note = courtyardPulse(index, chapter)
+        const chord = courtyardChordAt(note.at, chapter)
+        expect(chord.notes.some((pitch) => pitch % 12 === note.note % 12)).toBe(true)
+        expect(courtyardPulse(index + pulses, chapter).at).toBeCloseTo(note.at + clock.seconds)
+      }
+      const seal = chapterSealNotes(chapter)
+      expect(seal.map((note) => note.at)).toEqual([2.1, 2.34, 2.58, 3.05])
+      expect(seal[0].at).toBeGreaterThan(0.85)
+      expect(seal.every((note) => note.velocity < 0.65)).toBe(true)
+      const mode = new Set(
+        (chapter === 3 ? [62, 64, 65, 67, 69, 71, 72] : [63, 65, 67, 68, 70, 72, 74]).map((note) => note % 12),
+      )
+      expect(seal.every((note) => mode.has(note.note % 12))).toBe(true)
+    }
+    expect(chapterSealNotes(3).map((note) => note.note)).not.toEqual(chapterSealNotes(4).map((note) => note.note))
   })
 })
 
