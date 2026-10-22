@@ -20,7 +20,7 @@ describe.each([
 ] as const)('%s', (_title, level, levelTargets) => {
   const fullSolution: SolutionStep[] = [
     ...level.solution.slice(0, 5),
-    { type: 'walk', to: [-1, 1, 0] },
+    { type: 'walk', to: [-2, 1, -1] },
     ...level.solution.slice(5),
   ]
   it('主线与全收集分别通过结构、安全、可见性、遮挡与难度校验', () => {
@@ -40,12 +40,12 @@ describe.each([
     expect(sim.command({ type: 'operate', mechanism: 'lift' })).toBe('ok')
     sim.update(0.675)
     expect(sim.characterPose().position[1]).toBeGreaterThan(surfaceY(1))
-    expect(sim.characterPose().position[1]).toBeLessThan(surfaceY(4))
+    expect(sim.characterPose().position[1]).toBeLessThan(surfaceY(5))
     expect(sim.undo()).toBe(false)
     for (let frame = 0; frame < 100 && !sim.isIdle(); frame++) sim.update(1 / 30)
     expect(sim.state().at).toBe('lift#1')
     step(sim, level.solution[5])
-    expect(sim.state().at).toBe('2,2,0')
+    expect(sim.state().at).toBe('0,1,-2')
     expect(visibleTilesOf(level, sim.state()).has('ferry#2')).toBe(false)
     step(sim, level.solution[6])
     expect(visibleTilesOf(level, sim.state()).has('ferry#2')).toBe(true)

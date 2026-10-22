@@ -16,10 +16,11 @@ import {
 } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { SLAB_HEIGHT } from '../core/iso'
+import { BLOCK_SIZE, BLOCK_RADIUS, SLAB_WIDTH, SLAB_RADIUS } from '../core/shapes'
 import { palette } from './palette'
 
-export const blockGeometry = new RoundedBoxGeometry(0.98, 0.98, 0.98, 3, 0.07)
-export const slabGeometry = new RoundedBoxGeometry(0.84, SLAB_HEIGHT * 2, 0.84, 2, 0.03)
+export const blockGeometry = new RoundedBoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 3, BLOCK_RADIUS)
+export const slabGeometry = new RoundedBoxGeometry(SLAB_WIDTH, SLAB_HEIGHT * 2, SLAB_WIDTH, 2, SLAB_RADIUS)
 export const orbGeometry = new SphereGeometry(0.09, 16, 12)
 export const orbRingGeometry = new TorusGeometry(0.16, 0.012, 6, 32)
 export const orbSparkGeometry = new SphereGeometry(0.018, 6, 4)

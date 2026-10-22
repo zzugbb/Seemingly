@@ -4,38 +4,29 @@ import { Sparkles } from '@react-three/drei'
 import type { Group } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { DecorDef, IslandDef, Vec3 } from '../levels/types'
+import { islandLayers } from '../core/shapes'
 import { material } from './materials'
 import { palette } from './palette'
 import type { QualitySettings } from './quality'
 
 const STRATA = ['#dcae84', '#cf9372', '#b77a73', '#93677d', '#735479', '#5d4569']
-const LAYER_HEIGHT = 0.62
 
 function Island({ island }: { island: IslandDef }) {
-  const w = island.x[1] - island.x[0] + 1
-  const d = island.z[1] - island.z[0] + 1
-  const cx = (island.x[0] + island.x[1]) / 2
-  const cz = (island.z[0] + island.z[1]) / 2
-  const top = island.y - 0.5
-
   const layers = useMemo(() => {
-    const count = Math.max(2, Math.round(island.depth / LAYER_HEIGHT))
-    return Array.from({ length: count }, (_, i) => {
-      const t = (i + 1) / (count + 0.6)
-      const lw = Math.max(0.5, w * (1 - t) + 0.1)
-      const ld = Math.max(0.5, d * (1 - t) + 0.1)
-      const sway = ((i * 37) % 5) / 10 - 0.2
+    const shapes = islandLayers(island)
+    const count = shapes.length
+    return shapes.map(({ size, position }, i) => {
       const color = STRATA[Math.min(STRATA.length - 1, Math.round((i / Math.max(1, count - 1)) * (STRATA.length - 1)))]
       return {
-        geometry: new RoundedBoxGeometry(lw, LAYER_HEIGHT, ld, 2, 0.08),
-        position: [sway * (1 - t), -LAYER_HEIGHT * (i + 0.5) + 0.02, -sway * 0.6 * (1 - t)] as Vec3,
+        geometry: new RoundedBoxGeometry(...size, 2, 0.08),
+        position,
         color,
       }
     })
-  }, [island.depth, w, d])
+  }, [island])
 
   return (
-    <group position={[cx, top, cz]}>
+    <group>
       {layers.map((layer, i) => (
         <mesh
           key={i}

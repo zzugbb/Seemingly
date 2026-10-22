@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import type { Group, Mesh } from 'three'
 import { cellId, surfaceY } from '../core/iso'
 import { visibleTilesOf } from '../core/rules'
+import { advanceBrace, braceScale } from '../core/shapes'
 import type { LevelSim, SimEvent } from '../core/sim'
 import type { LevelDef, Vec3 } from '../levels/types'
 import { Blocks } from './Blocks'
@@ -70,7 +71,7 @@ export function Scene({
     mechanisms: new Map(),
   })
   const view = useRef({ state: sim.state(), visible: visibleTilesOf(level, sim.state()) })
-  const motion = useRef({ heading: 0, phase: 0, wasWalking: false, arrive: 0 })
+  const motion = useRef({ heading: 0, phase: 0, wasWalking: false, arrive: 0, brace: 0 })
   const plateTiles = useMemo(
     () =>
       new Set(level.mechanisms.flatMap((mechanism) => (mechanism.type === 'plate' ? [cellId(mechanism.tile)] : []))),
@@ -103,6 +104,7 @@ export function Scene({
         feedback.current.mechanisms.clear()
         if (tactile) setMarker(null)
         motion.current.heading = sim.characterPose().heading
+        motion.current.brace = 0
       }
       if (event.type === 'won') {
         setWon(true)
@@ -160,6 +162,8 @@ export function Scene({
       body.position.y = 0
       body.scale.y = 1 + Math.sin(clock.elapsedTime * 1.6) * 0.02
     }
+    anim.brace = advanceBrace(anim.brace, !sim.isIdle() && !pose.walking, Math.min(delta, 1 / 30))
+    body.scale.y *= braceScale(anim.brace)
     anim.wasWalking = pose.walking
   }, -1)
 
