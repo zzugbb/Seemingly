@@ -26,6 +26,7 @@ export function App() {
       const chapter = level?.chapter ?? 1
       const challenge = (state.screen === 'play' || state.screen === 'ending') && state.current.list === 'challenge'
       const soundtrack = level?.soundtrack
+      if (state.screen !== 'play' && state.screen !== 'ending') music.setProgress('explore')
       audioEngine.setMuted(state.save.muted)
       if (state.save.muted) music.stop()
       else music.start(chapter, challenge, soundtrack ?? 'generative')
@@ -36,8 +37,11 @@ export function App() {
         state.save.muted !== previous.save.muted ||
         state.current !== previous.current ||
         state.screen !== previous.screen
-      )
+      ) {
+        if (state.current !== previous.current || (state.screen !== previous.screen && state.screen !== 'ending'))
+          audioEngine.stopEffects()
         sync()
+      }
     })
     const unlock = (event: Event) => {
       if (event.isTrusted) {

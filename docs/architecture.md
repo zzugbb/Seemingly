@@ -501,6 +501,18 @@ SaveData增加可选tutorials（walk／collect／rotate／ride／lift）；缺�
 - T6.12i：第五关 `revision: 2`，第二章主题；一个转盘含短臂、长臂登船位与高平台，中心是实心。长臂下方折形梁不可行走，静态南侧与北台提供两种换乘路线；规则层与渲染无特例。
 - T6.12j：标题读取主线第一关的章节与 `soundtrack`，选关读取当前关卡配置；同章返回选关沿用音乐层，跨章与返回标题沿用三秒交叉淡化。前六关已全部接入章节主题，省略 `soundtrack` 的后续关卡仍使用生成式音乐，不更改播放器、合成音色或混音。
 
+### T6.12v6 接线与生命周期（实现待试听）
+
+最新声音目标以[声音设计](design.md#音乐推进与成功反馈t612v6待本轮试听)为准；上方b～j保留历史记录。courtyard的96秒和声结构保持，旋律改为51音；`courtyardNote`与`courtyardPulse`给出纯数据，后者按0.75秒拍长、半拍错位，`pulseActive`与`pulseLevel`定义探索／收集／待点灯／完成层。`MusicPlayer.setProgress`只改变律动密度、强度和完成时的背景让位，不重启乐句。`musicStage`仅接收模拟器已显示的收光计数及won，不查询解法或判断机关连接。
+
+`instruments.pluckedBuffer`按上下文缓存最多12个0.9秒短拨弦，与felt／silk缓存独立；新增律动使用240Hz高通，主旋律也高通180Hz，原铺底0.08／180Hz与主混音参数保持。`renderCourtyardNote`、`renderCourtyardPad`及`sfx.renderSound`可供临时OfflineAudioContext导出调用，复用实际合成代码，不向站点增加音频文件。AudioBus.context使用BaseAudioContext，实际引擎仍只建立一个AudioContext。
+
+`PlayScreen`在实际orb／undo／won事件后更新音乐层；撤销先调用`AudioEngine.stopEffects`取消排程，再以已恢复的收光数回退进度，undo事件播放简短撤销音。Run卸载清理音效并重置探索层，覆盖重开与换关；App导航重置音效，标题／选关重置探索层，原章节和配置同步保持。音乐未解锁或静音时仍保留进度层状态，恢复只安排未来乐句，不补播效果音。
+
+`sounds.orbSound`将普通必需／最后必需／选做映射为orb／ready／optionalOrb，最后必需用ready替代orb。`successNotes`定义三类收光、lantern及rating的实际音序与力度。正式won保存前后比较done／allOrbs／parMet独立新增条件，`playNewRatings`只在新增时发1～3音，约0.85秒后接在点灯琶音之后；重复通关和较差提示局不重复奖励，sample不触发正式评价。
+
+引擎仍登记包括未来排程在内最多12个音源，音乐最多8个；音效在满额时替换最晚排程的音乐音。登记项含总线与排程时间，取消、结束、静音及上下文重建均删除并释放；stopEffects只清理音效，不重启同章音乐。静音将主音量立即归零并停止所有音源，混响自然尾音也不会输出；撤销／换关允许短暂自然混响尾音消散，但不保留未来音效。
+
 ## 结尾
 
 最终关（第 15 关）在 `ending` 中列出 15 盏灯笼与塔的静态积木位置，其余时序沿用首版：终点灯笼先亮，其余每隔 0.45 秒点亮；全部亮后 0.6 秒照亮塔，再过 0.9 秒显示「谢谢游玩」和「回到标题」。阶段一版本没有第 15 关，第 12 关通关后按设计稿显示「第五章即将开放」。

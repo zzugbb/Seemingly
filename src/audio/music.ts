@@ -4,6 +4,12 @@ import {
   chordAt,
   chordDuration,
   courtyardNote,
+  courtyardPulse,
+  pulseActive,
+  pulseLevel,
+  COURTYARD_BEAT_SECONDS,
+  type MusicStage,
+  type ScoreNote,
   courtyardChordAt,
   COURTYARD_CHORD_SECONDS,
   COURTYARD_SECONDS,
@@ -17,13 +23,16 @@ import {
   type Chord,
   type Soundtrack,
 } from './theory'
-import { feltBuffer, silkBuffer } from './instruments'
+import { feltBuffer, pluckedBuffer, silkBuffer } from './instruments'
 
 interface Layer {
   chapter: Chapter
   challenge: boolean
   soundtrack: Soundtrack
   nextNote: number
+  nextPulse: number
+  expression: GainNode
+  pulse: GainNode
   epoch: number
   nextChord: number
   nextBox: number
@@ -59,6 +68,58 @@ function padBuffer(context: BaseAudioContext, chord: Chord): AudioBuffer {
   return buffer
 }
 
+export function renderCourtyardNote(bus: AudioBus, note: ScoreNote, at: number, pulse = false): void {
+  const { context } = bus
+  const source = context.createBufferSource()
+  source.buffer = pulse ? pluckedBuffer(context, note.note) : feltBuffer(context, note.note)
+  const envelope = context.createGain()
+  envelope.gain.setValueAtTime(0, at)
+  envelope.gain.linearRampToValueAtTime((pulse ? 0.18 : COURTYARD_MELODY_GAIN) * note.velocity, at + 0.015)
+  envelope.gain.exponentialRampToValueAtTime(0.0001, at + note.duration)
+  const pan = context.createStereoPanner()
+  pan.pan.value = note.pan
+  const highpass = context.createBiquadFilter()
+  highpass.type = 'highpass'
+  highpass.frequency.value = pulse ? 240 : 180
+  source.connect(highpass)
+  highpass.connect(envelope)
+  envelope.connect(pan)
+  pan.connect(bus.output)
+  bus.schedule(source, at, note.duration + 0.01, () => {
+    highpass.disconnect()
+    envelope.disconnect()
+    pan.disconnect()
+  })
+}
+
+export function renderCourtyardPad(bus: AudioBus, chord: Chord, at: number, remaining: number): void {
+  const { context } = bus
+  const source = context.createBufferSource()
+  source.buffer = silkBuffer(context, chord)
+  source.loop = true
+  const highpass = context.createBiquadFilter()
+  highpass.type = 'highpass'
+  highpass.frequency.value = COURTYARD_PAD_HIGHPASS
+  highpass.Q.value = 0.707
+  const lowpass = context.createBiquadFilter()
+  lowpass.type = 'lowpass'
+  lowpass.frequency.value = 900
+  const envelope = context.createGain()
+  envelope.gain.setValueAtTime(0, at)
+  envelope.gain.linearRampToValueAtTime(COURTYARD_PAD_GAIN, at + Math.min(4, remaining))
+  envelope.gain.setValueAtTime(COURTYARD_PAD_GAIN, at + remaining)
+  envelope.gain.linearRampToValueAtTime(0, at + remaining + 5)
+  source.connect(highpass)
+  highpass.connect(lowpass)
+  lowpass.connect(envelope)
+  envelope.connect(bus.output)
+  bus.schedule(source, at, remaining + 5, () => {
+    highpass.disconnect()
+    lowpass.disconnect()
+    envelope.disconnect()
+  })
+}
+
 export class MusicPlayer {
   private bus: AudioBus | undefined
   private layer: Layer | undefined
@@ -68,6 +129,7 @@ export class MusicPlayer {
   private challenge = false
   private soundtrack: Soundtrack = 'generative'
   private paused = 0
+  private stage: MusicStage = 'explore'
 
   start(chapter: Chapter = this.chapter, challenge = this.challenge, soundtrack = this.soundtrack): void {
     const bus = audioEngine.getBus('music')
@@ -114,6 +176,17 @@ export class MusicPlayer {
     this.retiring = undefined
     this.bus = undefined
   }
+  setProgress(stage: MusicStage): void {
+    if (this.stage === stage) return
+    this.stage = stage
+    if (!this.bus || !this.layer) return
+    const at = this.bus.context.currentTime
+    const { pulse, expression } = this.layer
+    pulse.gain.cancelScheduledValues(at)
+    pulse.gain.setTargetAtTime(pulseLevel(stage), at, 0.25)
+    expression.gain.cancelScheduledValues(at)
+    expression.gain.setTargetAtTime(stage === 'complete' ? 0.5 : 1, at, 0.2)
+  }
   currentChord(): Chord {
     return this.isCourtyard()
       ? courtyardChordAt(this.elapsed(), this.chapter)
@@ -135,9 +208,18 @@ export class MusicPlayer {
     gain.gain.setValueAtTime(0, at)
     gain.gain.linearRampToValueAtTime(this.isCourtyard() ? COURTYARD_GAIN : 1, at + 3)
     gain.connect(this.bus!.output)
+    const expression = context.createGain()
+    expression.gain.value = this.stage === 'complete' ? 0.5 : 1
+    expression.connect(gain)
+    const pulse = context.createGain()
+    pulse.gain.value = pulseLevel(this.stage)
+    pulse.connect(expression)
     return {
       chapter,
       challenge,
+      expression,
+      pulse,
+      nextPulse: Math.ceil(elapsed / COURTYARD_BEAT_SECONDS),
       soundtrack: this.soundtrack,
       nextNote: Math.floor(elapsed / COURTYARD_SECONDS) * COURTYARD_NOTE_COUNT,
       epoch: at - elapsed,
@@ -151,6 +233,23 @@ export class MusicPlayer {
     for (const source of layer.sources) this.bus?.cancel(source)
     layer.sources.clear()
     layer.gain.disconnect()
+    layer.expression.disconnect()
+    layer.pulse.disconnect()
+  }
+  private busFor(layer: Layer, output: GainNode): AudioBus {
+    const bus = this.bus!
+    return {
+      context: bus.context,
+      output,
+      cancel: bus.cancel,
+      schedule: (source, at, duration, cleanup) => {
+        layer.sources.add(source)
+        return bus.schedule(source, at, duration, () => {
+          layer.sources.delete(source)
+          cleanup()
+        })
+      },
+    }
   }
   private schedule(
     layer: Layer,
@@ -187,30 +286,23 @@ export class MusicPlayer {
       const chord = courtyard
         ? courtyardChordAt(elapsed + 0.000001, layer.chapter)
         : chordAt(layer.chapter, elapsed + 0.000001, layer.challenge)
+      layer.nextChord = at + remaining
+      if (courtyard) {
+        renderCourtyardPad(this.busFor(layer, layer.expression), chord, at, remaining)
+        continue
+      }
       const pad = context.createBufferSource()
-      pad.buffer = courtyard ? silkBuffer(context, chord) : padBuffer(context, chord)
+      pad.buffer = padBuffer(context, chord)
       pad.loop = true
       const filter = context.createBiquadFilter()
       filter.type = 'lowpass'
       filter.frequency.value = 900
       const envelope = context.createGain()
-      const padVolume = courtyard ? COURTYARD_PAD_GAIN : 0.5
-      const release = courtyard ? 5 : 3
       envelope.gain.setValueAtTime(0, at)
-      envelope.gain.linearRampToValueAtTime(padVolume, at + Math.min(courtyard ? 4 : 2, remaining))
-      envelope.gain.setValueAtTime(padVolume, at + remaining)
-      envelope.gain.linearRampToValueAtTime(0, at + remaining + release)
-      const nodes: AudioNode[] = [filter, envelope]
-      if (courtyard) {
-        const highpass = context.createBiquadFilter()
-        highpass.type = 'highpass'
-        highpass.frequency.value = COURTYARD_PAD_HIGHPASS
-        highpass.Q.value = 0.707
-        nodes.unshift(highpass)
-      }
-      this.schedule(layer, pad, nodes, at, remaining + release)
-      layer.nextChord = at + remaining
-      if (courtyard) continue
+      envelope.gain.linearRampToValueAtTime(0.5, at + Math.min(2, remaining))
+      envelope.gain.setValueAtTime(0.5, at + remaining)
+      envelope.gain.linearRampToValueAtTime(0, at + remaining + 3)
+      this.schedule(layer, pad, [filter, envelope], at, remaining + 3)
       const bass = context.createOscillator()
       bass.type = 'sine'
       bass.frequency.value = midiFrequency(chord.notes[0] - 12)
@@ -234,15 +326,16 @@ export class MusicPlayer {
         if (at >= horizon) break
         layer.nextNote++
         if (at < now) continue
-        const tone = context.createBufferSource()
-        tone.buffer = feltBuffer(context, note.note)
-        const pan = context.createStereoPanner()
-        pan.pan.value = note.pan
-        const envelope = context.createGain()
-        envelope.gain.setValueAtTime(0, at)
-        envelope.gain.linearRampToValueAtTime(COURTYARD_MELODY_GAIN * note.velocity, at + 0.02)
-        envelope.gain.exponentialRampToValueAtTime(0.0001, at + note.duration)
-        this.schedule(layer, tone, [envelope, pan], at, note.duration + 0.01)
+        renderCourtyardNote(this.busFor(layer, layer.expression), note, at)
+      }
+      layer.nextPulse = Math.max(layer.nextPulse, Math.floor((now - layer.epoch) / COURTYARD_BEAT_SECONDS))
+      for (;;) {
+        const note = courtyardPulse(layer.nextPulse, layer.chapter)
+        const at = layer.epoch + note.at
+        if (at >= horizon) break
+        const active = pulseActive(layer.nextPulse++, this.stage)
+        if (at < now || !active) continue
+        renderCourtyardNote(this.busFor(layer, layer.pulse), note, at, true)
       }
     } else
       while (layer.nextBox < horizon) {

@@ -3,6 +3,29 @@ import { midiFrequency, type Chord } from './theory'
 const felt = new WeakMap<BaseAudioContext, Map<number, AudioBuffer>>()
 const silk = new WeakMap<BaseAudioContext, Map<string, AudioBuffer>>()
 const wood = new WeakMap<BaseAudioContext, Map<boolean, AudioBuffer>>()
+const plucked = new WeakMap<BaseAudioContext, Map<number, AudioBuffer>>()
+
+export function pluckedBuffer(context: BaseAudioContext, note: number): AudioBuffer {
+  let cache = plucked.get(context)
+  if (!cache) plucked.set(context, (cache = new Map()))
+  const previous = cache.get(note)
+  if (previous) return previous
+  const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * 0.9), context.sampleRate)
+  const samples = buffer.getChannelData(0)
+  const frequency = midiFrequency(note)
+  for (let i = 0; i < samples.length; i++) {
+    const time = i / context.sampleRate
+    const phase = 2 * Math.PI * frequency * time
+    samples[i] =
+      (Math.sin(phase) + Math.sin(phase * 2) * 0.24 + Math.sin(phase * 3) * 0.08) *
+      Math.exp(-time * 7) *
+      (1 - Math.exp(-time * 240)) *
+      0.48
+  }
+  cache.set(note, buffer)
+  if (cache.size > 12) cache.delete(cache.keys().next().value!)
+  return buffer
+}
 
 export function feltBuffer(context: BaseAudioContext, note: number): AudioBuffer {
   let cache = felt.get(context)

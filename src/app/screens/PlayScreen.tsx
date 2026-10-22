@@ -1,6 +1,9 @@
 import { Canvas } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { playSound } from '../../audio/sfx'
+import { audioEngine } from '../../audio/engine'
+import { music } from '../../audio/music'
+import { musicStage } from '../../audio/theory'
 import { stateKey } from '../../game/core/rules'
 import { LevelSim, type SimEvent } from '../../game/core/sim'
 import { type LevelDef } from '../../game/levels'
@@ -14,7 +17,7 @@ import { Hud } from '../hud/Hud'
 import { Ending } from './Ending'
 import { Toast } from '../hud/Toast'
 import { isUnlocked, levelLists, useApp, type LevelList } from '../store'
-import { playSimEvent } from '../sounds'
+import { playNewRatings, playSimEvent } from '../sounds'
 import { prepareHints } from '../hints'
 import { nextTutorial, tutorialsFromEvent } from '../tutorials'
 
@@ -106,6 +109,14 @@ function Run({
   }
 
   useEffect(() => {
+    music.setProgress('explore')
+    return () => {
+      audioEngine.stopEffects()
+      music.setProgress('explore')
+    }
+  }, [sim])
+
+  useEffect(() => {
     let active = true
     let hints: ReturnType<typeof prepareHints>
     try {
@@ -145,6 +156,8 @@ function Run({
 
   const undo = useCallback(() => {
     if (!sim.undo()) return
+    audioEngine.stopEffects()
+    music.setProgress(musicStage(sim.orbProgress()))
     query.current++
     setHint(null)
     setResult(null)
@@ -210,7 +223,10 @@ function Run({
   }, [motionNotice])
 
   const onEvent = (event: SimEvent) => {
-    playSimEvent(event, level)
+    const progress = sim.orbProgress()
+    playSimEvent(event, level, progress)
+    if (event.type === 'orb' || event.type === 'undo' || event.type === 'won')
+      music.setProgress(musicStage(progress, sim.status === 'won'))
     if (list === 'main') learnTutorials(tutorialsFromEvent(level, event, sim.state().at))
     refresh()
     if (tactile) {
@@ -239,6 +255,7 @@ function Run({
     }
     completeLevel(level.id, { steps, allOrbs, usedHint: usedHint.current })
     const after = useApp.getState().save
+    playNewRatings(before.levels[level.id], after.levels[level.id])
     const newlyUnlocked = levelLists.challenge.flatMap((item, i) =>
       !isUnlocked(before, 'challenge', i) && isUnlocked(after, 'challenge', i) ? [`挑战 ${item.chapter}`] : [],
     )

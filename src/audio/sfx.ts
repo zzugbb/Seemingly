@@ -1,13 +1,27 @@
 import { audioEngine, type AudioBus } from './engine'
 import { music } from './music'
-import { midiFrequency, stepNote } from './theory'
+import { midiFrequency, stepNote, successNotes, type Chord } from './theory'
 import { feltBuffer, woodBuffer } from './instruments'
 
 export type Sound =
-  'step' | 'turn' | 'mechanism' | 'orb' | 'lantern' | 'unreachable' | 'undo' | 'goalLocked' | 'push' | 'gate' | 'patrol'
+  | 'step'
+  | 'turn'
+  | 'mechanism'
+  | 'orb'
+  | 'optionalOrb'
+  | 'ready'
+  | 'lantern'
+  | 'rating'
+  | 'unreachable'
+  | 'undo'
+  | 'goalLocked'
+  | 'push'
+  | 'gate'
+  | 'patrol'
 interface SoundOptions {
   open?: boolean
   register?: number
+  count?: number
 }
 const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>()
 let previousChord = ''
@@ -21,6 +35,7 @@ function voice(
   volume: number,
   attack: number,
   filter?: BiquadFilterNode,
+  pan?: number,
 ) {
   const gain = bus.context.createGain()
   gain.gain.setValueAtTime(0, at)
@@ -29,10 +44,14 @@ function voice(
   gain.gain.linearRampToValueAtTime(0, at + duration)
   source.connect(filter ?? gain)
   filter?.connect(gain)
-  gain.connect(bus.output)
+  const panner = pan === undefined ? undefined : bus.context.createStereoPanner()
+  if (panner) panner.pan.value = pan!
+  gain.connect(panner ?? bus.output)
+  panner?.connect(bus.output)
   bus.schedule(source, at, duration, () => {
     filter?.disconnect()
     gain.disconnect()
+    panner?.disconnect()
   })
 }
 function tone(
@@ -69,12 +88,30 @@ function friction(bus: AudioBus, at: number) {
   voice(bus, source, at, 0.16, 0.055, 0.015, filter)
 }
 
-export function renderSound(bus: AudioBus, sound: Sound, options: SoundOptions = {}): void {
-  const at = bus.context.currentTime,
-    chord = music.currentChord(),
-    scale = music.currentScale(),
-    root = chord.notes[0]
-  if (music.isCourtyard()) {
+export function renderSound(
+  bus: AudioBus,
+  sound: Sound,
+  options: SoundOptions = {},
+  at = bus.context.currentTime,
+  harmony: { chord: Chord; scale: readonly number[]; courtyard: boolean } = {
+    chord: music.currentChord(),
+    scale: music.currentScale(),
+    courtyard: music.isCourtyard(),
+  },
+): void {
+  const { chord, scale, courtyard } = harmony
+  const root = chord.notes[0]
+  if (sound === 'orb' || sound === 'optionalOrb' || sound === 'ready' || sound === 'lantern' || sound === 'rating') {
+    for (const note of successNotes(sound, chord, options.count)) {
+      if (courtyard) {
+        const source = bus.context.createBufferSource()
+        source.buffer = feltBuffer(bus.context, note.note)
+        voice(bus, source, at + note.at, note.duration, note.velocity, 0.008, undefined, note.pan)
+      } else tone(bus, note.note, at + note.at, note.duration, note.velocity * 0.22)
+    }
+    return
+  }
+  if (courtyard) {
     const felt = (note: number, time: number, duration: number, volume: number) => {
       const source = bus.context.createBufferSource()
       source.buffer = feltBuffer(bus.context, note)
@@ -90,21 +127,12 @@ export function renderSound(bus: AudioBus, sound: Sound, options: SoundOptions =
       return
     }
     if (sound === 'turn') {
-      grain(true, 0.17)
-      felt(root + 12 + (options.register ?? 0), at + 0.08, 0.8, 0.035)
+      grain(true, 0.22)
+      felt(root + 12 + (options.register ?? 0), at + 0.08, 0.45, 0.09)
       return
     }
     if (sound === 'mechanism') {
-      felt(root + 12 + (options.register ?? 0), at, 1, 0.065)
-      return
-    }
-    if (sound === 'orb') {
-      felt(root + 24, at, 3, 0.16)
-      felt(root + 31, at + 0.18, 3.5, 0.12)
-      return
-    }
-    if (sound === 'lantern') {
-      for (const [i, interval] of [12, 19, 24, 26].entries()) felt(root + interval, at + i * 0.18, 4, 0.14)
+      felt(root + 12 + (options.register ?? 0), at, 0.65, 0.19)
       return
     }
   }
@@ -117,11 +145,6 @@ export function renderSound(bus: AudioBus, sound: Sound, options: SoundOptions =
     tone(bus, stepNote(chord, footstep++), at, 0.13, 0.035, 'triangle')
   } else if (sound === 'mechanism') {
     for (const note of [root - 12, root - 5]) tone(bus, note, at, 0.2, 0.05, 'triangle')
-  } else if (sound === 'orb') {
-    const index = Math.floor(Math.random() * (scale.length - 1))
-    for (let i = 0; i < 2; i++) tone(bus, scale[index + i] + 12, at + i * 0.08, 0.35, 0.075)
-  } else if (sound === 'lantern') {
-    chord.notes.forEach((note, i) => tone(bus, note + 12, at + i * 0.12, 0.6, 0.09))
   } else if (sound === 'unreachable' || sound === 'goalLocked') {
     tone(bus, scale[1] - 24, at, 0.32, 0.065)
     if (sound === 'goalLocked') tone(bus, scale[1] - 12, at + 0.12, 0.25, 0.035)

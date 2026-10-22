@@ -4,6 +4,11 @@ import {
   chordAt,
   chordDuration,
   courtyardNote,
+  courtyardPulse,
+  COURTYARD_PULSE_COUNT,
+  musicStage,
+  pulseActive,
+  successNotes,
   courtyardChordAt,
   COURTYARD_NOTE_COUNT,
   COURTYARD_SECONDS,
@@ -57,7 +62,7 @@ describe('空庭声景乐句', () => {
   it('九十六秒乐句按时间前进，保留停顿且循环边界连续', () => {
     const notes = Array.from({ length: COURTYARD_NOTE_COUNT * 2 }, (_, index) => courtyardNote(index))
     for (let i = 1; i < notes.length; i++) expect(notes[i].at).toBeGreaterThan(notes[i - 1].at)
-    expect(notes.slice(1).some((note, i) => note.at - notes[i].at >= 8)).toBe(true)
+    expect(notes.slice(1).some((note, i) => note.at - notes[i].at >= 4)).toBe(true)
     for (let i = 0; i < COURTYARD_NOTE_COUNT; i++) {
       expect(notes[i + COURTYARD_NOTE_COUNT].at - notes[i].at).toBe(COURTYARD_SECONDS)
       expect(notes[i + COURTYARD_NOTE_COUNT].note).toBe(notes[i].note)
@@ -65,7 +70,7 @@ describe('空庭声景乐句', () => {
     expect(
       notes.every(
         ({ note, duration, velocity, pan }) =>
-          note >= 57 && note <= 76 && duration > 0 && velocity > 0 && velocity <= 1 && Math.abs(pan) <= 1,
+          note >= 64 && note <= 81 && duration > 0 && velocity > 0 && velocity <= 1 && Math.abs(pan) <= 1,
       ),
     ).toBe(true)
   })
@@ -98,5 +103,63 @@ describe('启程声景乐句', () => {
     }
     expect(courtyardNote(0, 1).note).not.toBe(courtyardNote(0, 2).note)
     expect(courtyardNote(0)).toEqual(courtyardNote(0, 2))
+  })
+})
+
+describe('推进乐句与成功层次', () => {
+  it('八段乐句保留应答和休止，两个章节在同一节拍循环', () => {
+    expect(COURTYARD_NOTE_COUNT).toBe(51)
+    for (const chapter of [1, 2] as const) {
+      for (let index = 0; index < COURTYARD_NOTE_COUNT; index++) {
+        const note = courtyardNote(index, chapter)
+        expect(note.at % 0.375).toBe(0)
+        expect(note.duration).toBeGreaterThan(0)
+        expect(courtyardNote(index + COURTYARD_NOTE_COUNT, chapter).at).toBe(note.at + 96)
+        expect(courtyardNote(index + COURTYARD_NOTE_COUNT, chapter).note).toBe(note.note)
+      }
+    }
+  })
+  it('律动每12秒由4音到8音再到12音，完成后停止，不按操作次数升级', () => {
+    const slots = Array.from({ length: 16 }, (_, i) => i)
+    expect(
+      ['explore', 'gather', 'ready', 'complete'].map(
+        (stage) => slots.filter((i) => pulseActive(i, stage as Parameters<typeof pulseActive>[1])).length,
+      ),
+    ).toEqual([4, 8, 12, 0])
+    for (const chapter of [1, 2] as const) {
+      for (let index = 0; index < COURTYARD_PULSE_COUNT; index++) {
+        const note = courtyardPulse(index, chapter)
+        expect(note.note).toBeGreaterThanOrEqual(60)
+        const chord = courtyardChordAt(note.at, chapter)
+        expect(chord.notes.some((pitch) => pitch % 12 === note.note % 12)).toBe(true)
+        expect(courtyardPulse(index + COURTYARD_PULSE_COUNT, chapter).at).toBeCloseTo(note.at + 96)
+      }
+    }
+  })
+  it('进度只由实际收光和通关决定；撤销、重开可退回，空目标不自动奏成功层', () => {
+    expect(musicStage({ required: 2, requiredCollected: 0, collected: 0 })).toBe('explore')
+    expect(musicStage({ required: 2, requiredCollected: 0, collected: 1 })).toBe('gather')
+    expect(musicStage({ required: 2, requiredCollected: 1, collected: 1 })).toBe('gather')
+    expect(musicStage({ required: 2, requiredCollected: 2, collected: 2 })).toBe('ready')
+    expect(musicStage({ required: 2, requiredCollected: 2, collected: 2 }, true)).toBe('complete')
+    expect(musicStage({ required: 0, requiredCollected: 0, collected: 0 })).toBe('explore')
+  })
+  it('普通、选做、必需集齐、点灯与新增评价有不同音序，评价在点灯后进入', () => {
+    const chord = courtyardChordAt(0)
+    const voices = (sound: Parameters<typeof successNotes>[0], count?: number) => successNotes(sound, chord, count)
+    expect(
+      ['orb', 'optionalOrb', 'ready', 'lantern'].map((sound) => voices(sound as Parameters<typeof voices>[0]).length),
+    ).toEqual([2, 3, 3, 4])
+    expect(voices('optionalOrb').map((note) => note.note)).not.toEqual(voices('ready').map((note) => note.note))
+    expect([0, 1, 2, 3, 4].map((count) => voices('rating', count).length)).toEqual([0, 1, 2, 3, 3])
+    expect(voices('rating', 3)[0].at).toBeGreaterThan(voices('lantern').at(-1)!.at)
+    for (const sound of ['orb', 'optionalOrb', 'ready', 'lantern', 'rating'] as const) {
+      for (const note of voices(sound, 3)) {
+        expect(note.velocity).toBeGreaterThan(0)
+        expect(note.velocity).toBeLessThanOrEqual(1)
+        expect(note.duration).toBeGreaterThan(0)
+        expect(midiFrequency(note.note)).toBeGreaterThan(100)
+      }
+    }
   })
 })
