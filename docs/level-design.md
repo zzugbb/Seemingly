@@ -66,6 +66,8 @@
 
 T6.13a第二稿的第7～12关还未进入运行数据时，可用`node docs/levels/check-designs.mjs`直接验证文档内的完整TypeScript和自动验证基准。该工具还检查中途箱位的选做时机、第九关经过压板不触发、第十二关所有首次合法动作仍可恢复及章节谱面；不修改targets或正式入口。状态数／最优步数不代替发现深度，选做应明确是在探索、站位、时机还是资源上增加取舍，不能一律顺手多走一格或转满一圈。检查范围、离散运动采样的限制及实现交接见[第三、四章](levels/chapter-3-4.md)。
 
+T6.14接入后必须另跑`node docs/levels/check-designs.mjs --runtime`，比对实际mainLevels中的12关顺序、前六关revision、新六关完整定义及targets，并对正式对象复跑检查；只跑默认文档模式不能证明源码与稿件一致。当前六关版本应被正式模式拒绝，不据此修改难度目标或把未实现算失败。
+
 ## 关卡文件
 
 - 每关一个文件：主线 `src/game/levels/level-01.ts` 到 `level-15.ts`，挑战关 `challenge-1.ts` 到 `challenge-5.ts`；在 `levels/index.ts` 中分别按顺序导出主线列表和挑战列表。

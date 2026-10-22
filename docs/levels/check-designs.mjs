@@ -30,6 +30,13 @@ assert.notDeepEqual(chapterScore(3).onsets, chapterScore(4).onsets, '两章分�
 const intervals = (notes) => notes.slice(1).map((note, i) => note.note - notes[i].note)
 assert.notDeepEqual(intervals(chapterScore(3).notes), intervals(chapterScore(4).notes), '两章旋律轮廓分别展开')
 
+const options = process.argv.slice(2)
+assert(
+  options.every((option) => option === '--runtime'),
+  '只支持 --runtime 正式接入核对选项',
+)
+const checkRuntime = options.includes('--runtime')
+
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const sources = new Map()
 const baselines = new Map()
@@ -100,9 +107,28 @@ try {
   const geometry = await server.ssrLoadModule('/src/game/core/clearance.ts')
   const shapes = await server.ssrLoadModule('/src/game/core/shapes.ts')
   const { surfaceY } = await server.ssrLoadModule('/src/game/core/iso.ts')
+  const runtime = checkRuntime ? await server.ssrLoadModule('/src/game/levels/index.ts') : null
+  const runtimeTargets = checkRuntime ? await server.ssrLoadModule('/src/game/levels/targets.ts') : null
+  if (runtime) {
+    const missing = [...baselines.keys()].filter((id) => !runtime.mainLevels.some((level) => level.id === id))
+    assert.equal(missing.length, 0, `正式主线尚未接入：${missing.join('、')}；当前只能通过设计稿检查`)
+    assert.deepEqual(
+      runtime.mainLevels.map((level) => level.id),
+      Array.from({ length: 12 }, (_, i) => `level-${String(i + 1).padStart(2, '0')}`),
+      'T6.14正式主线须按顺序提供12关',
+    )
+    assert.deepEqual(
+      runtime.mainLevels.slice(0, 6).map((level) => level.revision),
+      [2, 3, 4, 3, 3, 4],
+      '前六关revision保持',
+    )
+  }
   const ids = new Set()
   for (const [id, expected] of baselines) {
-    const { default: level } = await server.ssrLoadModule(`design:${id}`)
+    const { default: documented } = await server.ssrLoadModule(`design:${id}`)
+    const level = runtime ? runtime.mainLevels.find((entry) => entry.id === id) : documented
+    if (runtime) assert.deepEqual(level, documented, `${id} 正式关卡与当前完整设计稿不一致`)
+
     assert(level.decor.islands.length >= 2 && level.decor.islands.length <= 4, `${id} 岛屿数量`)
     const ornaments =
       level.decor.trees.length +
@@ -130,6 +156,7 @@ try {
       illusionsMin: 2,
       tradeoffsMin: 1,
     }
+    if (runtimeTargets) assert.deepEqual(runtimeTargets.targets[id], target, `${id} 正式targets与设计交接不一致`)
     assert.deepEqual(validateLevel(level, ids, target), [], `${id} 主线校验`)
     assert.deepEqual(measureLevel(level, target.randomWin.steps), expected.metrics, `${id} 指标漂移`)
     assert.equal(expected.all.length, target.minActionsAll, `${id} 全收集解法必须最优`)
@@ -266,7 +293,7 @@ try {
     assert.deepEqual(report.issues, [], `${id} 运动实体相交`)
     assert.deepEqual(report, expected.clearance, `${id} 运动覆盖变化`)
     console.log(
-      `${id} ${level.title}：${target.minActions}/${target.minActionsAll}步，${expected.metrics.reachableStates}状态，主线／全收集／提示／181姿态净空通过`,
+      `${id} ${level.title}：${target.minActions}/${target.minActionsAll}步，${expected.metrics.reachableStates}状态，主线／全收集／提示／181姿态净空${runtime ? '／正式数据与targets一致' : ''}通过`,
     )
   }
 } finally {

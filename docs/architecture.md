@@ -91,6 +91,8 @@ src/
 
 T6.13a第二稿的第7～12关当前仅存在于[设计稿](levels/chapter-3-4.md)，正式mainLevels、targets和revision表仍为六关。设计验证器`docs/levels/check-designs.mjs`在隔离的Vite SSR进程读取Markdown参考实现，调用既有规则与几何辅助函数，不参与游戏运行；T6.14才按稿加入正式关卡、首次能力与新章节乐句。新章精确谱面在docs/levels/chapter-scores.mjs，仅供设计验证，正式模块不导入docs；接入须参数化循环／和弦时长及拍点（第三章88 BPM、第四章96 BPM），保留前两章80 BPM／96秒。第9、12关需在原12源／8音乐预算内排程章末音列，并与撤销、静音和换关清理共用生命周期，新听感仍待试听。
 
+T6.13b开发前核对补充：设计检查器的`--runtime`模式仅供T6.14正式12关接入验收，比对完整关卡定义、targets、顺序及前六关revision后，用正式对象重跑规则与净空。默认模式仍仅验证文档。新教学不能直接扩大第五关原有`provenSkills`引用；推箱开始事件不等于动作结束，能力记忆须在实际状态提交后更新，详见[开发前复核](levels/chapter-3-4.md#开发前复核t613b)。
+
 `src/game/levels/types.ts`。注释中「T6.2」「T6.6」表示已实现，「T6.16」表示后续任务中新增：
 
 ```ts
