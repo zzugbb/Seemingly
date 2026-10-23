@@ -85,7 +85,7 @@ describe('第 1～4 章', () => {
       '重量',
     ])
     expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
-    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 1, 1, 1, 1, 1])
+    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 1, 1, 1, 1])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
@@ -424,6 +424,74 @@ describe('第 1～4 章', () => {
     expect(canWinWithoutRiding(mainLevels[5])).toBe(false)
     expect(noSouthDockWin(false)).toBe(12)
     expect(noSouthDockWin(true)).toBeNull()
+  })
+  it('联动：两个把手都必需，远桥相位锁定，东口校准仍是同长解', () => {
+    const level = mainLevels[7]
+    expect(level.revision).toBe(2)
+    expect(analyze(level)).toMatchObject({
+      minActions: 13,
+      minActionsAll: 14,
+      reachableStates: 1064,
+      deadEndStates: 0,
+      illusions: 9,
+      tradeoffs: 2,
+    })
+    for (const handle of ['pair', 'relay']) {
+      const blocked = structuredClone(level)
+      const mechanism = blocked.mechanisms.find((item) => item.id === handle)!
+      if (mechanism.type === 'rotator') mechanism.handle = undefined
+      expect(analyze(blocked).minActions).toBeNull()
+    }
+    for (const state of reachableStates(level))
+      expect(state.rotator.remote).toBe((state.rotator.pair + state.rotator.relay + 1) % 4)
+    const main = new LevelSim(level)
+    for (const step of level.solution) {
+      if (step.type === 'walk') walk(main, step.to)
+      else if (step.type === 'operate') operate(main, step.mechanism)
+    }
+    expect(main.status).toBe('won')
+    expect(main.steps()).toBe(13)
+    expect(main.orbProgress()).toMatchObject({ collected: 2, requiredCollected: 2 })
+    const alternate = new LevelSim(level)
+    const play = (step: { type: 'walk'; tileId?: string; to?: Vec3 } | { type: 'operate'; mechanism: string }) => {
+      if (step.type === 'operate') operate(alternate, step.mechanism)
+      else if (step.to) walk(alternate, step.to)
+      else expect(alternate.command({ type: 'walk', tileId: step.tileId! })).toBe('ok')
+      if (step.type === 'walk' && step.tileId) settle(alternate)
+    }
+    play({ type: 'walk', tileId: 'pair#0' })
+    play({ type: 'operate', mechanism: 'pair' })
+    play({ type: 'walk', to: [4, 2, 7] })
+    play({ type: 'walk', tileId: 'pair#0' })
+    play({ type: 'operate', mechanism: 'pair' })
+    expect(alternate.state().at).toBe('pair#0')
+    play({ type: 'operate', mechanism: 'relay' })
+    play({ type: 'walk', tileId: 'remote#0' })
+    play({ type: 'operate', mechanism: 'pair' })
+    play({ type: 'walk', to: [15, 9, 13] })
+    play({ type: 'walk', tileId: 'relay#0' })
+    play({ type: 'operate', mechanism: 'relay' })
+    play({ type: 'operate', mechanism: 'relay' })
+    play({ type: 'walk', to: [6, 2, 0] })
+    expect(alternate.status).toBe('won')
+    expect(alternate.steps()).toBe(13)
+    const missed = new LevelSim(level)
+    walk(missed, [1, 1, 3])
+    operate(missed, 'pair')
+    walk(missed, [4, 2, 7])
+    operate(missed, 'pair')
+    expect(missed.state().at).toBe('4,2,7')
+    expect(missed.command({ type: 'walk', tileId: 'pair#0' })).toBe('unreachable')
+    let restored = false
+    for (let turn = 0; turn < 3 && !restored; turn++) {
+      operate(missed, 'pair')
+      restored = missed.command({ type: 'walk', tileId: 'pair#0' }) === 'ok'
+    }
+    expect(restored).toBe(true)
+    expect(settle(missed).some((event) => event.type === 'step')).toBe(true)
+    expect(missed.state().at).toBe('pair#0')
+    expect(missed.undo()).toBe(true)
+    expect(missed.state().at).toBe('4,2,7')
   })
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
     const broken = structuredClone(mainLevels[0])

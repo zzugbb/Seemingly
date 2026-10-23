@@ -16,7 +16,7 @@ const lessons: Readonly<Record<string, readonly { skill: TutorialId; text: strin
   'level-02': [{ skill: 'rotate', text: '点击金色转轮，观察路面怎样连接' }],
   'level-03': [{ skill: 'ride', text: '站在移动的积木上，小人会随它一起移动' }],
   'level-05': [{ skill: 'lift', text: '拉动金色拉杆，观察平台怎样移动' }],
-  'level-08': [{ skill: 'link', text: '一个转轮，也会带动另一座桥' }],
+  'level-08': [{ skill: 'link', text: '两个转轮，都能带动远处的桥' }],
   'level-09': [{ skill: 'plate', text: '停在单框压板上，召来远处的平台' }],
   'level-10': [
     { skill: 'push', text: '站到箱子旁，点击箱子向前推一格' },

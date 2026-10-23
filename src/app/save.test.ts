@@ -262,6 +262,39 @@ describe('v2 存档', () => {
     writeSave(updated)
     expect(loadSave()).toEqual(updated)
   })
+  it('第八关修订 2 只清除自身旧评价，第七关、静音和已学能力保留', () => {
+    storage()
+    const record = { done: true, allOrbs: true, bestSteps: 8, parMet: true }
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: true,
+        tutorials: ['walk', 'link'],
+        levels: { 'level-07': record, 'level-08': record, 'level-09': record },
+        revisions: { 'level-07': 1, 'level-08': 1, 'level-09': 1 },
+      }),
+    )
+    const cleared = loadSave()
+    expect(cleared.muted).toBe(true)
+    expect(cleared.tutorials).toEqual(['walk', 'link'])
+    expect(cleared.levels['level-07']).toEqual(record)
+    expect(cleared.levels['level-08']).toBeUndefined()
+    expect(cleared.levels['level-09']).toEqual(record)
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: true,
+        tutorials: ['walk', 'link'],
+        levels: { 'level-07': record, 'level-08': record },
+        revisions: { 'level-07': 1, 'level-08': 2 },
+      }),
+    )
+    expect(loadSave().levels).toEqual({ 'level-07': record, 'level-08': record })
+  })
   it.each([
     '{',
     'null',

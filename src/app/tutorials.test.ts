@@ -53,7 +53,7 @@ describe('首次教学', () => {
     expect(learnedTutorials(save)).toEqual([...openingTutorialIds])
     expect(nextTutorial('level-02', save)).toBeNull()
     expect(nextTutorial('level-05', save)).toBeNull()
-    expect(nextTutorial('level-08', save)).toBe('一个转轮，也会带动另一座桥')
+    expect(nextTutorial('level-08', save)).toBe('两个转轮，都能带动远处的桥')
     expect(nextTutorial('level-09', save)).toBe('停在单框压板上，召来远处的平台')
     expect(nextTutorial('level-10', save)).toBe('站到箱子旁，点击箱子向前推一格')
     expect(nextTutorial('level-11', save)).toBe('顺着箭头进入路面')
