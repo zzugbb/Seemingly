@@ -2,23 +2,9 @@ import { audioEngine, type AudioBus } from './engine'
 import { music } from './music'
 import { chapterSealNotes, midiFrequency, stepNote, successNotes, type Chord } from './theory'
 import { feltBuffer, woodBuffer } from './instruments'
+import { feedbackFocus, type Sound } from './mix'
 
-export type Sound =
-  | 'step'
-  | 'turn'
-  | 'mechanism'
-  | 'orb'
-  | 'optionalOrb'
-  | 'ready'
-  | 'lantern'
-  | 'rating'
-  | 'unreachable'
-  | 'undo'
-  | 'goalLocked'
-  | 'push'
-  | 'gate'
-  | 'patrol'
-  | 'seal'
+export type { Sound } from './mix'
 interface SoundOptions {
   open?: boolean
   register?: number
@@ -170,5 +156,8 @@ export function renderSound(
 }
 export function playSound(sound: Sound, options?: SoundOptions): void {
   const bus = audioEngine.getBus()
-  if (bus) renderSound(bus, sound, options)
+  if (!bus) return
+  renderSound(bus, sound, options)
+  const focus = feedbackFocus(sound)
+  if (focus) audioEngine.focusFeedback(focus)
 }
