@@ -1,6 +1,6 @@
-import { useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import type { Mesh } from 'three'
+import { Matrix4, type InstancedMesh, type Mesh } from 'three'
 import type { ScreenDir, Vec3 } from '../levels/types'
 import { arrowBarGeometry, blockGeometry, material, slabGeometry, useAnimatedMaterial } from './materials'
 import { hintStrength, type RenderHint } from './feedback'
@@ -108,6 +108,35 @@ export function WalkTile({
   )
 }
 
+interface RenderBlock {
+  pos: Vec3
+  color: string
+  kind: 'path' | 'solid'
+  id: string
+  lit?: boolean
+  oneWay?: ScreenDir
+}
+
+function SolidBatch({ blocks }: { blocks: RenderBlock[] }) {
+  const ref = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const mesh = ref.current
+    if (!mesh) return
+    const matrix = new Matrix4()
+    blocks.forEach((block, index) => mesh.setMatrixAt(index, matrix.makeTranslation(...block.pos)))
+    mesh.instanceMatrix.needsUpdate = true
+    mesh.computeBoundingSphere()
+  }, [blocks])
+  return (
+    <instancedMesh
+      ref={ref}
+      args={[blockGeometry, material(blocks[0].color, { glow: blocks[0].lit }), blocks.length]}
+      castShadow
+      receiveShadow
+    />
+  )
+}
+
 export function Blocks({
   blocks,
   hovered,
@@ -117,7 +146,7 @@ export function Blocks({
   hint,
   canSelect,
 }: {
-  blocks: { pos: Vec3; color: string; kind: 'path' | 'solid'; id: string; lit?: boolean; oneWay?: ScreenDir }[]
+  blocks: RenderBlock[]
   hovered: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
@@ -125,8 +154,22 @@ export function Blocks({
   hint?: RenderHint | null
   canSelect?: (id: string) => boolean
 }) {
+  const solids = useMemo(() => {
+    const groups = new Map<string, RenderBlock[]>()
+    for (const block of blocks) {
+      if (block.kind !== 'solid') continue
+      const key = `${block.color}:${Boolean(block.lit)}`
+      const group = groups.get(key)
+      if (group) group.push(block)
+      else groups.set(key, [block])
+    }
+    return [...groups]
+  }, [blocks])
   return (
     <group>
+      {solids.map(([key, group]) => (
+        <SolidBatch key={key} blocks={group} />
+      ))}
       {blocks.map((block) =>
         block.kind === 'path' ? (
           <WalkTile
@@ -142,16 +185,7 @@ export function Blocks({
             onHover={(on) => onHover(on ? block.id : null)}
             onSelect={() => onSelect(block.id)}
           />
-        ) : (
-          <mesh
-            key={block.id}
-            position={block.pos}
-            geometry={blockGeometry}
-            material={material(block.color, { glow: block.lit })}
-            castShadow
-            receiveShadow
-          />
-        ),
+        ) : null,
       )}
     </group>
   )
