@@ -53,10 +53,10 @@ const courtyardPhrases = [
 const phraseVelocities = [0.58, 0.68, 0.62, 0.74, 0.72, 0.6, 0.72, 0.52]
 const melody = courtyardPhrases.flatMap((phrase, section) => phrase.map((note, index) => ({ section, index, note })))
 export const COURTYARD_NOTE_COUNT = melody.length
-export const COURTYARD_GAIN = 4.4
+export const COURTYARD_GAIN = 3.3
 export const COURTYARD_PAD_GAIN = 0.08
 export const COURTYARD_PAD_HIGHPASS = 180
-export const COURTYARD_MELODY_GAIN = 1.2
+export const COURTYARD_MELODY_GAIN = 0.5
 export const COURTYARD_BEAT_SECONDS = 0.75
 export const COURTYARD_PULSE_COUNT = COURTYARD_SECONDS / COURTYARD_BEAT_SECONDS
 export type MusicStage = 'explore' | 'gather' | 'ready' | 'complete'
