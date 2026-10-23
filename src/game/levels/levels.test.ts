@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateLevels } from '../core/validate'
 import { LevelSim } from '../core/sim'
-import { applyAction, initialState, legalActions, stateKey } from '../core/rules'
+import { applyAction, gatesOf, initialState, legalActions, stateKey } from '../core/rules'
 import { analyze, buildPolicy, reachableStates } from '../core/solver'
 import type { LevelDef, Vec3 } from './types'
 import { mainLevels, challengeLevels } from './index'
@@ -85,7 +85,7 @@ describe('第 1～4 章', () => {
       '重量',
     ])
     expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
-    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 1, 1, 1])
+    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 2, 1, 1])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
@@ -547,6 +547,70 @@ describe('第 1～4 章', () => {
       }
     }
     expect(longer).toBe(true)
+  })
+  it('推动：箱留远岸守近门，人三次乘台，返庭取光后十二步点灯', () => {
+    const level = mainLevels[9]
+    expect(analyze(level)).toMatchObject({ minActions: 12, minActionsAll: 13, reachableStates: 1012, deadEndStates: 0 })
+    const sim = new LevelSim(level)
+    walk(sim, [0, 0, 2])
+    for (let count = 0; count < 2; count++) {
+      expect(sim.command({ type: 'push', crate: 'crate-0' })).toBe('ok')
+      settle(sim)
+    }
+    const loaded = structuredClone(sim.state())
+    operate(sim, 'freight')
+    expect(sim.state().crates['crate-0']).toBe('freight#1')
+    expect(sim.undo()).toBe(true)
+    expect(sim.state()).toEqual(loaded)
+    operate(sim, 'freight')
+    expect(sim.command({ type: 'push', crate: 'crate-0' })).toBe('ok')
+    settle(sim)
+    expect(sim.state().crates['crate-0']).toBe('8,2,4')
+    expect(gatesOf(level, sim.state()).door).toBe(true)
+    operate(sim, 'freight')
+    expect(sim.state().at).toBe('freight#1')
+    walk(sim, [1, 0, 0])
+    expect(sim.orbProgress().requiredCollected).toBe(2)
+    expect(sim.undo()).toBe(true)
+    expect(sim.orbProgress().requiredCollected).toBe(1)
+    expect(gatesOf(level, sim.state()).door).toBe(true)
+    walk(sim, [1, 0, 0])
+    walk(sim, [3, 1, 2])
+    operate(sim, 'freight')
+    walk(sim, [10, 4, 9])
+    operate(sim, 'finish')
+    expect(walk(sim, level.goal)).toContainEqual({ type: 'won' })
+    expect(sim.steps()).toBe(12)
+    expect(sim.state().crates['crate-0']).toBe('8,2,4')
+  })
+  it('推动：先赴灯塔会缺近庭光，选做可以在任一次远岸停靠取得', () => {
+    const level = mainLevels[9]
+    const replay = (sim: LevelSim, steps: typeof level.solution) => {
+      for (const step of steps) {
+        if (step.type === 'walk') walk(sim, step.to)
+        else if (step.type === 'operate') operate(sim, step.mechanism)
+        else {
+          expect(sim.command(step)).toBe('ok')
+          settle(sim)
+        }
+      }
+    }
+    const skipped = new LevelSim(level)
+    replay(skipped, [...level.solution.slice(0, 5), ...level.solution.slice(9, 11)])
+    expect(walk(skipped, level.goal)).toContainEqual({ type: 'goal-locked', missing: 1 })
+    expect(skipped.status).toBe('playing')
+    for (const stop of [4, 9]) {
+      const sim = new LevelSim(level)
+      replay(sim, [
+        ...level.solution.slice(0, stop),
+        { type: 'walk', to: [5, 1, 1] },
+        ...(stop === 4 ? [{ type: 'walk' as const, to: [5, 1, 3] as Vec3 }] : []),
+        ...level.solution.slice(stop),
+      ])
+      expect(sim.status).toBe('won')
+      expect(sim.steps()).toBe(stop === 4 ? 14 : 13)
+      expect(sim.orbProgress().collected).toBe(4)
+    }
   })
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
     const broken = structuredClone(mainLevels[0])
