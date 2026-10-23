@@ -149,7 +149,11 @@ export function HandleControl({
             ref={(mesh) => {
               dots.current[index] = mesh
             }}
-            position={[(index - ((handle.uses ?? 0) - 1) / 2) * 0.09, -0.47, 0.03]}
+            position={
+              (handle.uses ?? 0) > 4
+                ? [((index % 4) - 1.5) * 0.15, -0.38 - Math.floor(index / 4) * 0.14, 0.03]
+                : [(index - ((handle.uses ?? 0) - 1) / 2) * 0.09, -0.47, 0.03]
+            }
             geometry={handleDotGeometry}
             material={material(palette.glow)}
           />

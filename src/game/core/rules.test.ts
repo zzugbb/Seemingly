@@ -287,6 +287,24 @@ describe('可达路线、合法动作与状态键', () => {
     }
   })
 
+  it('共享几何只按机关位置复用，公开集合及坐标改写不会污染后续查询', () => {
+    const level = fixture()
+    const state = initialState(level)
+    const tiles = tilesOf(level, state)
+    const original = [...tiles.get('0,0,0')!.pos]
+    tiles.get('0,0,0')!.pos[0] = 99
+    tiles.delete('1,0,0')
+    const occupied = occupiedOf(level, state)
+    occupied.clear()
+    const visible = visibleTilesOf(level, state)
+    visible.clear()
+    expect(tilesOf(level, state).get('0,0,0')!.pos).toEqual(original)
+    expect(tilesOf(level, state).has('1,0,0')).toBe(true)
+    expect(occupiedOf(level, state).size).toBeGreaterThan(0)
+    expect(visibleTilesOf(level, state).size).toBeGreaterThan(0)
+    level.blocks.push({ pos: [99, 0, 99], kind: 'path', color: 'sand' })
+    expect(tilesOf(level, initialState(level)).has('99,0,99')).toBe(true)
+  })
   it('修改对外返回的路线或转移路线不会污染后续动作', () => {
     const level = fixture()
     const state = initialState(level)

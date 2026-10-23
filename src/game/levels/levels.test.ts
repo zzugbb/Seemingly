@@ -85,13 +85,13 @@ describe('第 1～4 章', () => {
       '重量',
     ])
     expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
-    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 2, 2, 1])
+    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 2, 2, 2])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
   })
-  it('十二关通过全部结构、安全、解法、可见性、规模与难度校验', () => {
-    expect(validateLevels(mainLevels, targets)).toEqual([])
+  it.each(mainLevels)('$id：通过全部结构、安全、解法、可见性、规模与难度校验', (level) => {
+    expect(validateLevels([level], targets)).toEqual([])
   })
   it('启程：先去灯笼会提示缺光点，撤销可恢复到出发前', () => {
     const level = mainLevels[0],
@@ -670,6 +670,71 @@ describe('第 1～4 章', () => {
       expect(sim.undo()).toBe(true)
       expect(policy.get(stateKey(sim.state()))).toBeTruthy()
     }
+  })
+  it('重量：四程运输依次留箱、开远庭双门、取光、改压归门，十六步结束仍余四次', () => {
+    const level = mainLevels[11]
+    expect(analyze(level)).toMatchObject({
+      minActions: 16,
+      minActionsAll: 17,
+      reachableStates: 9194,
+      deadEndStates: 5186,
+    })
+    const sim = new LevelSim(level)
+    const stops: number[] = []
+    for (const [index, step] of level.solution.entries()) {
+      if (step.type === 'walk') walk(sim, step.to)
+      else if (step.type === 'operate') {
+        operate(sim, step.mechanism)
+        stops.push(sim.state().mover.freight.stopIndex)
+      } else {
+        expect(sim.command(step)).toBe('ok')
+        settle(sim)
+      }
+      if (index === 2) {
+        expect(sim.state().crates['crate-0']).toBe('8,2,4')
+        expect(gatesOf(level, sim.state())['far-hold']).toBe(true)
+        expect(sim.state().gates['far-door']).toBe(false)
+      }
+      if (index === 7) {
+        expect(sim.state().orbs).toContain('orb-2')
+        expect(sim.state().crates['crate-0']).toBe('8,2,4')
+      }
+      if (index === 10) expect(sim.state().gates['far-door']).toBe(true)
+    }
+    expect(stops).toEqual([1, 2, 1, 0])
+    expect(sim.status).toBe('won')
+    expect(sim.steps()).toBe(16)
+    expect(sim.state().handleUses.freight).toBe(4)
+    expect(sim.state().crates['crate-0']).toBe('9,3,7')
+    expect(sim.undo()).toBe(true)
+    expect(sim.status).toBe('playing')
+    expect(sim.state().handleUses.freight).toBe(4)
+  })
+  it('重量：全部十四种首步与一百四十七种两步前缀有解，耗尽后需多次撤销恢复', () => {
+    const level = mainLevels[11]
+    const policy = buildPolicy(level)
+    const start = initialState(level)
+    const first = legalActions(level, start)
+    expect(first).toHaveLength(14)
+    let prefixes = 0
+    for (const action of first) {
+      const one = applyAction(level, start, action)!.state
+      expect(policy.get(stateKey(one))).toBeTruthy()
+      for (const next of legalActions(level, one)) {
+        const two = applyAction(level, one, next)!.state
+        expect(policy.get(stateKey(two))).toBeTruthy()
+        prefixes++
+      }
+    }
+    expect(prefixes).toBe(147)
+    const sim = new LevelSim(level)
+    for (let count = 0; count < 8; count++) operate(sim, 'freight')
+    expect(sim.command({ type: 'operate', mechanism: 'freight' })).toBe('handle-used-up')
+    expect(policy.get(stateKey(sim.state()))).toBeNull()
+    for (let count = 0; count < 6; count++) expect(sim.undo()).toBe(true)
+    expect(sim.steps()).toBe(2)
+    expect(sim.state().handleUses.freight).toBe(2)
+    expect(policy.get(stateKey(sim.state()))).toBeTruthy()
   })
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
     const broken = structuredClone(mainLevels[0])

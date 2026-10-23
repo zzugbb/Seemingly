@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { emptySave, loadSave, writeSave } from './save'
+import { mainLevels, levelRevisions } from '../game/levels'
 const memory = new Map<string, string>()
 const storage = () =>
   vi.stubGlobal('localStorage', {
@@ -351,7 +352,7 @@ describe('v2 存档', () => {
         muted: true,
         tutorials: ['push', 'hold', 'oneway'],
         levels: { 'level-10': record, 'level-11': record, 'level-12': record },
-        revisions: { 'level-10': 2, 'level-11': 1, 'level-12': 1 },
+        revisions: { 'level-10': 2, 'level-11': 1, 'level-12': 2 },
       }),
     )
     const loaded = loadSave()
@@ -362,6 +363,36 @@ describe('v2 存档', () => {
     expect(loaded.muted).toBe(true)
     writeSave({ ...loaded, levels: { ...loaded.levels, 'level-11': record } })
     expect(loadSave().levels['level-11']).toEqual(record)
+  })
+  it('第三稿只使八至十二关旧评价失效，前七关、静音和全部已学能力保留', () => {
+    storage()
+    const record = { done: true, allOrbs: true, bestSteps: 12, parMet: true }
+    const tutorials = [
+      'walk',
+      'collect',
+      'rotate',
+      'ride',
+      'lift',
+      'link',
+      'plate',
+      'push',
+      'hold',
+      'oneway',
+      'limited',
+    ]
+    const levels = Object.fromEntries(mainLevels.map((level) => [level.id, record]))
+    const revisions = { ...levelRevisions, ...Object.fromEntries(mainLevels.slice(7).map((level) => [level.id, 1])) }
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({ version: 2, campaign: 'remake', muted: true, levels, revisions, tutorials }),
+    )
+    const loaded = loadSave()
+    expect(Object.keys(loaded.levels)).toEqual(mainLevels.slice(0, 7).map((level) => level.id))
+    expect(loaded.muted).toBe(true)
+    expect(loaded.tutorials).toEqual(tutorials)
+    const updated = { ...loaded, levels: { ...loaded.levels, 'level-12': record } }
+    writeSave(updated)
+    expect(loadSave()).toEqual(updated)
   })
   it.each([
     '{',

@@ -31,6 +31,35 @@ export interface Transition {
 
 type Operable = RotatorDef | MoverDef | GateDef
 const routeCache = new WeakMap<GameState, { level: LevelDef; key: string; routes: Map<string, string[]> }>()
+interface Geometry {
+  tiles: Map<string, Tile>
+  blocks: Vec3[]
+  occupied: Set<string>
+  visible?: Set<string>
+}
+const geometryCache = new WeakMap<LevelDef, Map<string, Geometry>>()
+
+function geometryOf(level: LevelDef, state: GameState): Geometry {
+  const key = JSON.stringify([state.rotator, Object.entries(state.mover).map(([id, cursor]) => [id, cursor.stopIndex])])
+  let layouts = geometryCache.get(level)
+  if (!layouts) geometryCache.set(level, (layouts = new Map()))
+  const cached = layouts.get(key)
+  if (cached) return cached
+  const tiles = new Map<string, Tile>()
+  const blocks: Vec3[] = []
+  for (const block of blocksOf(level, state)) {
+    blocks.push(block.pos)
+    if (block.kind === 'path') tiles.set(block.id, { id: block.id, pos: block.pos })
+  }
+  const geometry: Geometry = { tiles, blocks, occupied: new Set(blocks.map(cellId)) }
+  layouts.set(key, geometry)
+  if (layouts.size > 64) layouts.delete(layouts.keys().next().value!)
+  return geometry
+}
+
+function visibleOf(geometry: Geometry): Set<string> {
+  return (geometry.visible ??= visibleTiles(geometry.tiles, geometry.blocks))
+}
 
 export const tileRefId = (ref: TileRef): string => ('tile' in ref ? cellId(ref.tile) : `${ref.mechanism}#${ref.block}`)
 
@@ -43,6 +72,8 @@ function* blocksOf(level: LevelDef, state: GameState) {
 }
 
 export function initialState(level: LevelDef): GameState {
+  // 新的一局或搜索重新读取关卡定义；同次查询期间关卡数据保持只读。
+  geometryCache.delete(level)
   const state: GameState = {
     at: cellId(level.start),
     rotator: {},
@@ -74,14 +105,11 @@ export function initialState(level: LevelDef): GameState {
 }
 
 export function tilesOf(level: LevelDef, state: GameState): Map<string, Tile> {
-  const tiles = new Map<string, Tile>()
-  for (const block of blocksOf(level, state))
-    if (block.kind === 'path') tiles.set(block.id, { id: block.id, pos: block.pos })
-  return tiles
+  return new Map([...geometryOf(level, state).tiles].map(([id, tile]) => [id, { id, pos: [...tile.pos] }]))
 }
 
 export function occupiedOf(level: LevelDef, state: GameState): Set<string> {
-  return new Set([...blocksOf(level, state)].map((block) => cellId(block.pos)))
+  return new Set(geometryOf(level, state).occupied)
 }
 
 export function gatesOf(level: LevelDef, state: GameState, departing = false): Record<string, boolean> {
@@ -122,16 +150,13 @@ const visibleTiles = (tiles: Map<string, Tile>, blocks: Vec3[]): Set<string> =>
   )
 
 export function visibleTilesOf(level: LevelDef, state: GameState): Set<string> {
-  return visibleTiles(
-    tilesOf(level, state),
-    [...blocksOf(level, state)].map((block) => block.pos),
-  )
+  return new Set(visibleOf(geometryOf(level, state)))
 }
 
 function entryFilter(level: LevelDef, state: GameState, tiles: Map<string, Tile>, ignoreCrate?: string) {
-  const blocks = [...blocksOf(level, state)].map((block) => block.pos)
-  const visible = visibleTiles(tiles, blocks)
-  const occupied = new Set(blocks.map(cellId))
+  const geometry = geometryOf(level, state)
+  const visible = visibleOf(geometry)
+  const occupied = geometry.occupied
   const crates = new Set(
     Object.entries(state.crates)
       .filter(([id]) => id !== ignoreCrate)
@@ -160,8 +185,8 @@ function entryFilter(level: LevelDef, state: GameState, tiles: Map<string, Tile>
 }
 
 export function walkGraph(level: LevelDef, state: GameState): Graph {
-  const tiles = tilesOf(level, state)
-  const graph = buildGraph([...tiles.values()], occupiedOf(level, state))
+  const { tiles, occupied } = geometryOf(level, state)
+  const graph = buildGraph([...tiles.values()], occupied)
   const canEnter = entryFilter(level, state, tiles)
   // 保留当前位置的出边，遮挡只禁止进入；邻居顺序沿用 buildGraph。
   return new Map([...graph].map(([id, neighbors]) => [id, neighbors.filter((to) => canEnter(id, to))]))
@@ -199,8 +224,8 @@ const hasUses = (mechanism: Operable, state: GameState): boolean =>
   (mechanism.handle.uses === undefined || (state.handleUses[mechanism.id] ?? 0) < mechanism.handle.uses)
 
 function pushTarget(level: LevelDef, state: GameState, crate: string): string | null {
-  const tiles = tilesOf(level, state),
-    from = tiles.get(state.at),
+  const { tiles } = geometryOf(level, state)
+  const from = tiles.get(state.at),
     at = tiles.get(state.crates[crate])
   if (!from || !at || !directionOf(from, at)) return null
   const canEnter = entryFilter(level, state, tiles, crate)
@@ -323,7 +348,7 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
     after = gatesOf(level, next)
   result.gatesChanged = Object.keys(after).filter((id) => before[id] !== after[id])
   for (const id of result.gatesChanged) if (!result.moved.includes(id)) result.moved.push(id)
-  if (action.type === 'walk' && cellId(tilesOf(level, next).get(next.at)!.pos) === cellId(level.goal)) {
+  if (action.type === 'walk' && cellId(geometryOf(level, next).tiles.get(next.at)!.pos) === cellId(level.goal)) {
     result.goalLocked = level.orbs.filter((orb, index) => !orb.optional && !next.orbs.includes(`orb-${index}`)).length
     next.won = result.goalLocked === 0
   }

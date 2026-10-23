@@ -70,7 +70,7 @@ export const levelThemes: Readonly<Record<string, string>> = {
   'level-09': '召来远台，再恢复归路',
   'level-10': '把箱留下，人再回来',
   'level-11': '先开出口，再换推向',
-  'level-12': '把重量留下，把自己送回',
+  'level-12': '中站留箱，远庭取光',
 }
 
 export type SelectStatus = 'locked' | 'done' | 'next' | 'open'
