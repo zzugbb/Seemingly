@@ -428,7 +428,7 @@ function playStatus(
 
 function mechanismNotice(level: LevelDef, id: string, settled: boolean): { text: string; settled: boolean } {
   const mechanism = level.mechanisms.find((item) => item.id === id)
-  // 当前非转盘机关只有竖向平移台，到位文案与样段共用，不另起一套名称。
-  const name = mechanism?.type === 'rotator' ? '桥臂' : '升降台'
+  const name =
+    mechanism?.type === 'rotator' ? '桥臂' : mechanism?.type === 'mover' && mechanism.axis !== 'y' ? '运输台' : '升降台'
   return { text: settled ? `${name}已到位` : `${name}${name === '桥臂' ? '转动' : '移动'}中`, settled }
 }

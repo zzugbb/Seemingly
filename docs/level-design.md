@@ -70,7 +70,7 @@
 
 实现者把设计稿转成 `src/game/levels/level-XX.ts`，把预期指标写进 `src/game/levels/targets.ts`。实现时不得修改谜题本身；如果校验或指标不通过，停下来反馈，不要自己改布局或改目标。
 
-第7～12关当前运行仍是T6.14第二稿；最新设计合同为T6.14a第三稿，第七关保留、第八至十二关待T6.14b～f接入。`node docs/levels/check-designs.mjs`仍核对文档内的完整TypeScript和自动验证基准，包括中途箱位、第九关经过压板不触发、第十二关所有首次合法动作仍可恢复及章节谱面。`node docs/levels/check-designs.mjs --runtime`比对正式12关、前六关revision、新六关定义与targets，并对正式对象复跑；只跑默认模式不能代替这次核对。状态数／最优步数不代替发现深度。检查范围见[第三、四章](levels/chapter-3-4.md)。
+第7～12关当前按T6.14a第三稿运行，第七关保留、第八至十二关已由T6.14b～f逐项接入；g已通过正式连续流程技术验收，最终难度仍待用户试玩。`node docs/levels/check-designs.mjs`仍核对文档内的完整TypeScript和自动验证基准，包括中途箱位、第九关经过压板不触发、第十二关所有首次合法动作仍可恢复及章节谱面。`node docs/levels/check-designs.mjs --runtime`比对正式12关、前六关revision、新六关定义与targets，并对正式对象复跑；只跑默认模式不能代替这次核对。状态数／最优步数不代替发现深度。检查范围见[第三、四章](levels/chapter-3-4.md)。
 
 ## 关卡文件
 
