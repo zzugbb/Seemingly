@@ -127,7 +127,14 @@ try {
   for (const [id, expected] of baselines) {
     const { default: documented } = await server.ssrLoadModule(`design:${id}`)
     const level = runtime ? runtime.mainLevels.find((entry) => entry.id === id) : documented
-    if (runtime) assert.deepEqual(level, documented, `${id} 正式关卡与当前完整设计稿不一致`)
+    if (runtime) {
+      assert.equal(
+        level.revision ?? 1,
+        documented.revision ?? 1,
+        `${id} 正式revision仍旧；请按T6.14b～f逐关接入第三稿，不能据设计检查通过宣称正式完成`,
+      )
+      assert.deepEqual(level, documented, `${id} 正式关卡与当前完整设计稿不一致`)
+    }
 
     assert(level.decor.islands.length >= 2 && level.decor.islands.length <= 4, `${id} 岛屿数量`)
     const ornaments =
@@ -203,13 +210,62 @@ try {
       const collected = trace.find((t) => t.transition.collected.includes(optional))
       assert.equal(collected?.before.crates['crate-0'], corner, `${id} 选做须在中途停箱时取得`)
     }
+    const mainOffset = trace.length
+    replay(level.solution)
+    const mainTrace = trace.splice(mainOffset)
+    if (id === 'level-09')
+      assert.equal(mainTrace.filter((t) => t.transition.plate === 'call-north').length, 2, '主线必须召高台并恢复归门')
+    if (id === 'level-10')
+      assert.equal(
+        mainTrace.filter((t) => t.action.type === 'operate' && t.action.mechanism === 'freight').length,
+        3,
+        '人箱去程、独自返程、再次赴远岸',
+      )
+    if (id === 'level-11')
+      assert.equal(
+        mainTrace.find((t) => t.transition.plate === 'latch')?.before.crates['crate-0'],
+        '6,2,7',
+        '主线必须先临时停箱开低廊，再停板开出口',
+      )
+    if (id === 'level-12') {
+      assert.equal(
+        mainTrace.filter((t) => t.action.type === 'operate' && t.action.mechanism === 'freight').length,
+        4,
+        '最优四程运输',
+      )
+      const freight = level.mechanisms.find((m) => m.id === 'freight')
+      assert.deepEqual(freight.stops, [0, 2, 6])
+      assert.equal(freight.handle.uses, 8, '保留一次完整往返的四次余量')
+    }
     const policy = solver.buildPolicy(level)
+    for (const [name, steps] of Object.entries(expected.recovery ?? {})) {
+      const offset = trace.length
+      assert(replay(steps).won, `${id} 补救路线${name}未完成`)
+      trace.splice(offset)
+      assert.deepEqual(validateLevel({ ...level, solution: steps }), [], `${id} 补救路线${name}可见性／解法校验`)
+    }
+    for (const [name, steps] of Object.entries(expected.deadPrefixes ?? {})) {
+      const offset = trace.length
+      const state = replay(steps)
+      trace.splice(offset)
+      assert(!state.won && policy.get(rules.stateKey(state)) === null, `${id} ${name}应给撤销建议`)
+    }
     if (id === 'level-12') {
       const start = rules.initialState(level)
-      for (const action of rules.legalActions(level, start)) {
+      // 策略表也收录值为null的死局；has只表示见过该状态，不能证明仍有解。
+      const first = rules.legalActions(level, start)
+      let secondCount = 0
+      for (const action of first) {
         const next = rules.applyAction(level, start, action).state
-        assert(next.won || policy.has(rules.stateKey(next)), '第十二关首次合法尝试必须仍有解')
+        assert(next.won || policy.get(rules.stateKey(next)), '第十二关首次合法尝试必须仍有解')
+        for (const second of rules.legalActions(level, next)) {
+          secondCount++
+          const after = rules.applyAction(level, next, second).state
+          assert(after.won || policy.get(rules.stateKey(after)), '第十二关前两步合法试探必须仍有解')
+        }
       }
+      assert.equal(first.length, 14)
+      assert.equal(secondCount, 147)
       let state = rules.applyAction(level, start, { type: 'operate', mechanism: 'freight' }).state
       let count = 1
       while (!state.won && count <= 20) {
@@ -218,7 +274,7 @@ try {
         state = rules.applyAction(level, state, hint).state
         count++
       }
-      assert(state.won && count === 10, '追台路线仍以十步完成，无需撤销')
+      assert(state.won && count === expected.metrics.minActions, '首次空人送箱后仍能以主线最少步数完成，无需撤销')
     }
     for (const state of solver.reachableStates(level)) {
       const hint = policy.get(rules.stateKey(state))
@@ -268,6 +324,48 @@ try {
         `${id} 不存在避开中途停箱时机的全收集捷径`,
       )
     }
+    if (id === 'level-08') {
+      for (const handle of ['pair', 'relay'])
+        assert.equal(
+          canWin((_state, action) => action.type !== 'operate' || action.mechanism !== handle),
+          false,
+          `第八关必须使用${handle}，不能退化为单把手顺推`,
+        )
+      for (const state of solver.reachableStates(level))
+        assert.equal(
+          state.rotator.remote,
+          (state.rotator.pair + state.rotator.relay + 1) % 4,
+          '共享远桥保持设计相位关系',
+        )
+    }
+    if (id === 'level-10')
+      assert.equal(
+        canWin(
+          (state, action, tr) =>
+            !(
+              action.type === 'operate' &&
+              action.mechanism === 'freight' &&
+              state.mover.freight.stopIndex === 1 &&
+              tr.state.mover.freight.stopIndex === 0 &&
+              state.at.startsWith('freight#') &&
+              state.crates['crate-0'] === '8,2,4'
+            ),
+        ),
+        false,
+        '卸箱后人必须独自返近岸取光',
+      )
+    if (id === 'level-11')
+      assert.equal(
+        canWin((_state, _action, tr) => tr.plate !== 'latch'),
+        false,
+        '主线必须触发低廊出口开关',
+      )
+    if (id === 'level-12')
+      assert.equal(
+        canWin((state, _action, tr) => !(tr.collected.includes('orb-2') && state.crates['crate-0'] === '8,2,4')),
+        false,
+        '远庭取必需光时箱子必须仍压在中站',
+      )
     if (level.crates.length) {
       assert.equal(
         canWin(
