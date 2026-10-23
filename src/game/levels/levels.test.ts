@@ -85,7 +85,7 @@ describe('第 1～4 章', () => {
       '重量',
     ])
     expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
-    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 1, 1, 1, 1])
+    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 1, 1, 1])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
@@ -492,6 +492,61 @@ describe('第 1～4 章', () => {
     expect(missed.state().at).toBe('pair#0')
     expect(missed.undo()).toBe(true)
     expect(missed.state().at).toBe('4,2,7')
+  })
+  it('牵引：经过不召台，停住才召台，主线两次恢复归门，南侧绕行仍可通关', () => {
+    const level = mainLevels[8]
+    expect(level.revision).toBe(2)
+    expect(analyze(level)).toMatchObject({
+      minActions: 13,
+      minActionsAll: 14,
+      reachableStates: 1184,
+      deadEndStates: 0,
+      illusions: 16,
+      tradeoffs: 3,
+    })
+    let passed = initialState(level)
+    for (const action of [
+      { type: 'walk' as const, tileId: 'swing#0' },
+      { type: 'operate' as const, mechanism: 'swing' },
+      { type: 'walk' as const, tileId: '4,2,8' },
+    ])
+      passed = applyAction(level, passed, action)!.state
+    expect(passed.mover.receiver.stopIndex).toBe(1)
+    expect(passed.gates.door).toBe(false)
+    const stopped = applyAction(level, passed, { type: 'walk', tileId: '4,2,7' })!.state
+    expect(stopped.mover.receiver.stopIndex).toBe(0)
+    expect(stopped.gates.door).toBe(true)
+    expect(stopped.gates['south-door']).toBe(true)
+    const sim = new LevelSim(level)
+    let north = 0
+    for (const step of level.solution) {
+      const events =
+        step.type === 'walk' ? walk(sim, step.to) : step.type === 'operate' ? operate(sim, step.mechanism) : []
+      north += events.filter((event) => event.type === 'plate' && event.id === 'call-north').length
+    }
+    expect(north).toBe(2)
+    expect(sim.status).toBe('won')
+    expect(sim.steps()).toBe(13)
+    expect(sim.orbProgress().requiredCollected).toBe(3)
+    const withoutNorth = [initialState(level)]
+    const seenSouth = new Set([stateKey(withoutNorth[0]!)])
+    let longer = false
+    for (let index = 0; index < withoutNorth.length && !longer; index++) {
+      const state = withoutNorth[index]!
+      for (const action of legalActions(level, state)) {
+        const transition = applyAction(level, state, action)!
+        if (transition.plate === 'call-north') continue
+        if (transition.state.won) {
+          longer = true
+          break
+        }
+        const key = stateKey(transition.state)
+        if (seenSouth.has(key)) continue
+        seenSouth.add(key)
+        withoutNorth.push(transition.state)
+      }
+    }
+    expect(longer).toBe(true)
   })
   it('改坏一处坐标会指出是哪一项、哪一格', () => {
     const broken = structuredClone(mainLevels[0])

@@ -273,7 +273,7 @@ describe('v2 存档', () => {
         muted: true,
         tutorials: ['walk', 'link'],
         levels: { 'level-07': record, 'level-08': record, 'level-09': record },
-        revisions: { 'level-07': 1, 'level-08': 1, 'level-09': 1 },
+        revisions: { 'level-07': 1, 'level-08': 1, 'level-09': 2 },
       }),
     )
     const cleared = loadSave()
@@ -294,6 +294,27 @@ describe('v2 存档', () => {
       }),
     )
     expect(loadSave().levels).toEqual({ 'level-07': record, 'level-08': record })
+  })
+  it('第九关修订 2 只清除自身旧评价，第八关、静音和已学能力保留', () => {
+    storage()
+    const record = { done: true, allOrbs: true, bestSteps: 10, parMet: true }
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: true,
+        tutorials: ['walk', 'link', 'plate'],
+        levels: { 'level-08': record, 'level-09': record, 'level-10': record },
+        revisions: { 'level-08': 2, 'level-09': 1, 'level-10': 1 },
+      }),
+    )
+    const cleared = loadSave()
+    expect(cleared.muted).toBe(true)
+    expect(cleared.tutorials).toEqual(['walk', 'link', 'plate'])
+    expect(cleared.levels['level-08']).toEqual(record)
+    expect(cleared.levels['level-09']).toBeUndefined()
+    expect(cleared.levels['level-10']).toEqual(record)
   })
   it.each([
     '{',

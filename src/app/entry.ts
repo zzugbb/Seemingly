@@ -67,7 +67,7 @@ export const levelThemes: Readonly<Record<string, string>> = {
   'level-06': '两座桥的回程',
   'level-07': '在停靠之间取舍',
   'level-08': '两处转轮，共用一座远桥',
-  'level-09': '停下，召来远台',
+  'level-09': '召来远台，再恢复归路',
   'level-10': '随台过岸的重量',
   'level-11': '转过桥，再换推向',
   'level-12': '把重量留下，把自己送回',
