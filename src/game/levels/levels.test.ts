@@ -85,7 +85,7 @@ describe('第 1～4 章', () => {
       '重量',
     ])
     expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
-    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 2, 1, 1])
+    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 2, 2, 1])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
     expect(mainLevels.every((level) => !level.ending)).toBe(true)
@@ -610,6 +610,65 @@ describe('第 1～4 章', () => {
       expect(sim.status).toBe('won')
       expect(sim.steps()).toBe(stop === 4 ? 14 : 13)
       expect(sim.orbProgress().collected).toBe(4)
+    }
+  })
+  it('越界：低廊路过不触发，停板开出口后才可将箱改压主线门', () => {
+    const level = mainLevels[10]
+    expect(analyze(level)).toMatchObject({
+      minActions: 11,
+      minActionsAll: 12,
+      reachableStates: 3712,
+      deadEndStates: 1040,
+    })
+    const sim = new LevelSim(level)
+    for (const step of level.solution.slice(0, 5)) {
+      if (step.type === 'walk') walk(sim, step.to)
+      else if (step.type === 'operate') operate(sim, step.mechanism)
+      else {
+        expect(sim.command(step)).toBe('ok')
+        settle(sim)
+      }
+    }
+    expect(sim.state().crates['crate-0']).toBe('6,2,7')
+    expect(gatesOf(level, sim.state())['garden-door']).toBe(true)
+    const passed = walk(sim, [0, -1, 3])
+    expect(passed).toContainEqual({ type: 'step', tileId: '1,-1,3' })
+    expect(sim.state().gates['exit-door']).toBe(false)
+    expect(walk(sim, [1, -1, 3])).toContainEqual({ type: 'plate', id: 'latch', triggered: true })
+    expect(sim.state().gates['exit-door']).toBe(true)
+    walk(sim, [8, 3, 8])
+    expect(sim.command({ type: 'push', crate: 'crate-0' })).toBe('ok')
+    settle(sim)
+    expect(gatesOf(level, sim.state(), true)).toMatchObject({ 'garden-door': false, door: true, 'exit-door': true })
+    walk(sim, [11, 4, 10])
+    operate(sim, 'finish')
+    walk(sim, level.goal)
+    expect(sim.status).toBe('won')
+    expect(sim.steps()).toBe(12)
+    expect(sim.orbProgress().collected).toBe(3)
+  })
+  it('越界：过早推进或入口反推均是无解状态，撤销恢复非空获胜策略', () => {
+    const level = mainLevels[10]
+    const policy = buildPolicy(level)
+    for (const early of [true, false]) {
+      const sim = new LevelSim(level)
+      const prefix = early
+        ? [...level.solution.slice(0, 5), level.solution[6], level.solution[7]]
+        : [
+            { type: 'walk' as const, to: [3, 1, 3] as Vec3 },
+            { type: 'push' as const, crate: 'crate-0' },
+          ]
+      for (const step of prefix) {
+        if (step.type === 'walk') walk(sim, step.to)
+        else if (step.type === 'operate') operate(sim, step.mechanism)
+        else {
+          expect(sim.command(step)).toBe('ok')
+          settle(sim)
+        }
+      }
+      expect(policy.get(stateKey(sim.state()))).toBeNull()
+      expect(sim.undo()).toBe(true)
+      expect(policy.get(stateKey(sim.state()))).toBeTruthy()
     }
   })
   it('改坏一处坐标会指出是哪一项、哪一格', () => {

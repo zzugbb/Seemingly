@@ -327,7 +327,7 @@ describe('v2 存档', () => {
         muted: true,
         tutorials: ['push', 'hold'],
         levels: { 'level-09': record, 'level-10': record, 'level-11': record },
-        revisions: { 'level-09': 2, 'level-10': 1, 'level-11': 1 },
+        revisions: { 'level-09': 2, 'level-10': 1, 'level-11': 2 },
       }),
     )
     const loaded = loadSave()
@@ -339,6 +339,29 @@ describe('v2 存档', () => {
     expect(loadSave()).toEqual(updated)
     expect(loaded.tutorials).toEqual(['push', 'hold'])
     expect(loaded.muted).toBe(true)
+  })
+  it('第十一关修订只清自身旧评价，保留第十、十二关及单向格教学', () => {
+    storage()
+    const record = { done: true, allOrbs: true, bestSteps: 12, parMet: true }
+    memory.set(
+      'seemingly:save:v2',
+      JSON.stringify({
+        version: 2,
+        campaign: 'remake',
+        muted: true,
+        tutorials: ['push', 'hold', 'oneway'],
+        levels: { 'level-10': record, 'level-11': record, 'level-12': record },
+        revisions: { 'level-10': 2, 'level-11': 1, 'level-12': 1 },
+      }),
+    )
+    const loaded = loadSave()
+    expect(loaded.levels['level-10']).toEqual(record)
+    expect(loaded.levels['level-11']).toBeUndefined()
+    expect(loaded.levels['level-12']).toEqual(record)
+    expect(loaded.tutorials).toEqual(['push', 'hold', 'oneway'])
+    expect(loaded.muted).toBe(true)
+    writeSave({ ...loaded, levels: { ...loaded.levels, 'level-11': record } })
+    expect(loadSave().levels['level-11']).toEqual(record)
   })
   it.each([
     '{',
