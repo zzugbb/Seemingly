@@ -291,3 +291,29 @@ describe('固定种子随机通关率', () => {
     }
   })
 })
+
+it('巡逻位置进入搜索状态；最优提示可让巡逻压板后通门，策略与模拟器一致', () => {
+  const level = defineLevel({
+    id: 'solver-patrol',
+    title: '巡逻求解测试',
+    chapter: 5,
+    solution: [
+      { type: 'walk', to: [0, 0, 1] },
+      { type: 'walk', to: [3, 0, 0] },
+    ],
+    build: (b) => {
+      for (let x = 0; x <= 3; x++) b.path([x, 0, 0], 'sand')
+      b.path([0, 0, 1], 'sand')
+      b.path([2, 0, 1], 'sand')
+      b.path([3, 0, 1], 'sand')
+      b.patrol({ route: [{ tile: [3, 0, 1] }, { tile: [2, 0, 1] }], mode: 'pingpong' })
+      b.plate({ id: 'pad', tile: [2, 0, 1], target: 'gate', mode: 'hold' })
+      b.gate({ id: 'gate', tile: [2, 0, 0], mode: 'hold' })
+      b.start([0, 0, 0])
+      b.goal([3, 0, 0])
+    },
+  })
+  expect(analyze(level)).toMatchObject({ minActions: 2, minActionsAll: 2 })
+  expect(followPolicy(level, initialState(level), buildPolicy(level))).toBe(2)
+  expect(runSolution(level).ok).toBe(true)
+})

@@ -75,6 +75,11 @@ export type TileRef = { tile: Vec3 } | { mechanism: string; block: number }
 export type OrbDef = TileRef & { optional?: boolean }
 export type CrateDef = TileRef
 
+export interface PatrolDef {
+  route: TileRef[]
+  mode: 'pingpong' | 'loop'
+}
+
 export interface IslandDef {
   x: [number, number]
   z: [number, number]
@@ -109,6 +114,7 @@ export interface LevelDef {
   mechanisms: MechanismDef[]
   orbs: OrbDef[]
   crates?: CrateDef[]
+  patrols?: PatrolDef[]
   start: Vec3
   goal: Vec3
   decor: DecorDef

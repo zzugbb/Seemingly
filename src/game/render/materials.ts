@@ -21,6 +21,7 @@ import { palette } from './palette'
 
 export const blockGeometry = new RoundedBoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 3, BLOCK_RADIUS)
 export const slabGeometry = new RoundedBoxGeometry(SLAB_WIDTH, SLAB_HEIGHT * 2, SLAB_WIDTH, 2, SLAB_RADIUS)
+export const patrolGeometry = new SphereGeometry(0.22, 20, 14)
 export const orbGeometry = new SphereGeometry(0.09, 16, 12)
 export const orbRingGeometry = new TorusGeometry(0.16, 0.012, 6, 32)
 export const orbSparkGeometry = new SphereGeometry(0.018, 6, 4)

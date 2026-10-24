@@ -11,6 +11,7 @@ import type {
   MoverDef,
   OrbDef,
   PlateDef,
+  PatrolDef,
   RotatorDef,
   SolutionStep,
   Vec3,
@@ -28,6 +29,7 @@ export interface LevelBuilder {
   plate(spec: Omit<PlateDef, 'type'>): void
   gate(spec: Omit<GateDef, 'type'>): void
   crate(def: CrateDef): void
+  patrol(def: PatrolDef): void
   orb(def: OrbDef): void
   start(pos: Vec3): void
   goal(pos: Vec3): void
@@ -53,6 +55,7 @@ export function defineLevel(spec: {
   const mechanisms: MechanismDef[] = []
   const orbs: OrbDef[] = []
   const crates: CrateDef[] = []
+  const patrols: PatrolDef[] = []
   const decor: DecorDef = { islands: [], trees: [], flowers: [], windows: [] }
   let start: Vec3 | undefined
   let goal: Vec3 | undefined
@@ -89,6 +92,9 @@ export function defineLevel(spec: {
     },
     crate(def) {
       crates.push(def)
+    },
+    patrol(def) {
+      patrols.push(def)
     },
     orb(def) {
       orbs.push(def)
@@ -128,6 +134,7 @@ export function defineLevel(spec: {
     mechanisms,
     orbs,
     crates,
+    ...(patrols.length ? { patrols } : {}),
     start,
     goal,
     decor,

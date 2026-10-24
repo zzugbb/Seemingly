@@ -29,6 +29,7 @@ export function playSimEvent(event: SimEvent, level: LevelDef, progress?: OrbPro
   if (event.type === 'orb') playSound(orbSound(level, event.id, progress))
   if (event.type === 'goal-locked') playSound('goalLocked')
   if (event.type === 'undo') playSound('undo')
+  if (event.type === 'patrol-move') playSound('patrol')
   if (event.type === 'push') playSound('push')
   if (event.type === 'gate') playSound('gate', { open: event.open })
   if (event.type === 'won') {

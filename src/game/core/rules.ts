@@ -13,6 +13,7 @@ export interface GameState {
   gates: Record<string, boolean>
   handleUses: Record<string, number>
   crates: Record<string, string>
+  patrols: Record<string, { index: number; direction: 1 | -1 }>
 }
 
 export type Action =
@@ -27,6 +28,7 @@ export interface Transition {
   goalLocked: number
   pushed: { crate: string; from: string; to: string } | null
   gatesChanged: string[]
+  patrolMoves: { patrol: string; from: string; to: string }[]
 }
 
 type Operable = RotatorDef | MoverDef | GateDef
@@ -84,6 +86,7 @@ export function initialState(level: LevelDef): GameState {
     gates: {},
     handleUses: {},
     crates: {},
+    patrols: {},
   }
   for (const mechanism of level.mechanisms) {
     if (mechanism.type === 'rotator') state.rotator[mechanism.id] = mechanism.initialStep ?? 0
@@ -101,6 +104,9 @@ export function initialState(level: LevelDef): GameState {
   level.crates?.forEach((crate, index) => {
     state.crates[`crate-${index}`] = tileRefId(crate)
   })
+  level.patrols?.forEach((_, index) => {
+    state.patrols[`patrol-${index}`] = { index: 0, direction: 1 }
+  })
   return state
 }
 
@@ -112,9 +118,20 @@ export function occupiedOf(level: LevelDef, state: GameState): Set<string> {
   return new Set(geometryOf(level, state).occupied)
 }
 
+export function patrolTilesOf(level: LevelDef, state: GameState): Record<string, string> {
+  const tiles: Record<string, string> = {}
+  level.patrols?.forEach((patrol, index) => {
+    const id = `patrol-${index}`
+    const ref = patrol.route[state.patrols[id].index]
+    if (ref) tiles[id] = tileRefId(ref)
+  })
+  return tiles
+}
+
 export function gatesOf(level: LevelDef, state: GameState, departing = false): Record<string, boolean> {
-  const occupants = new Set([state.at, ...Object.values(state.crates)])
-  const presses = new Set(Object.values(state.crates))
+  const objects = [...Object.values(state.crates), ...Object.values(patrolTilesOf(level, state))]
+  const occupants = new Set([state.at, ...objects])
+  const presses = new Set(objects)
   if (!departing) presses.add(state.at)
   const held = new Set(
     level.mechanisms.flatMap((item) =>
@@ -153,16 +170,26 @@ export function visibleTilesOf(level: LevelDef, state: GameState): Set<string> {
   return new Set(visibleOf(geometryOf(level, state)))
 }
 
-function entryFilter(level: LevelDef, state: GameState, tiles: Map<string, Tile>, ignoreCrate?: string) {
+function entryFilter(
+  level: LevelDef,
+  state: GameState,
+  tiles: Map<string, Tile>,
+  options: { ignoreCrate?: string; patrol?: string; gates?: Record<string, boolean> } = {},
+) {
   const geometry = geometryOf(level, state)
   const visible = visibleOf(geometry)
   const occupied = geometry.occupied
   const crates = new Set(
     Object.entries(state.crates)
-      .filter(([id]) => id !== ignoreCrate)
+      .filter(([id]) => id !== options.ignoreCrate)
       .map(([, at]) => at),
   )
-  const gates = gatesOf(level, state, true)
+  const patrols = new Set(
+    Object.entries(patrolTilesOf(level, state))
+      .filter(([id]) => id !== options.patrol)
+      .map(([, at]) => at),
+  )
+  const gates = options.gates ?? gatesOf(level, state, !options.patrol)
   const closed = new Set(
     level.mechanisms.flatMap((item) => (item.type === 'gate' && !gates[item.id] ? [cellId(item.tile)] : [])),
   )
@@ -173,7 +200,12 @@ function entryFilter(level: LevelDef, state: GameState, tiles: Map<string, Tile>
     [...tiles.values()]
       .filter(
         ({ id, pos: [x, y, z] }) =>
-          !crates.has(id) && !closed.has(id) && !occupied.has(cellId([x, y + 1, z])) && visible.has(id),
+          !crates.has(id) &&
+          !patrols.has(id) &&
+          !(options.patrol && id === state.at) &&
+          !closed.has(id) &&
+          !occupied.has(cellId([x, y + 1, z])) &&
+          visible.has(id),
       )
       .map((tile) => tile.id),
   )
@@ -228,7 +260,7 @@ function pushTarget(level: LevelDef, state: GameState, crate: string): string | 
   const from = tiles.get(state.at),
     at = tiles.get(state.crates[crate])
   if (!from || !at || !directionOf(from, at)) return null
-  const canEnter = entryFilter(level, state, tiles, crate)
+  const canEnter = entryFilter(level, state, tiles, { ignoreCrate: crate })
   if (!canEnter(from.id, at.id)) return null
   const a = at.pos[0] - at.pos[1],
     b = at.pos[2] - at.pos[1]
@@ -266,13 +298,40 @@ function moveMechanisms(level: LevelDef, state: GameState, source: Operable): st
     else {
       if (mechanism.mode !== 'toggle') continue
       const occupied =
-        state.at === cellId(mechanism.tile) || Object.values(state.crates).includes(cellId(mechanism.tile))
+        state.at === cellId(mechanism.tile) ||
+        Object.values(state.crates).includes(cellId(mechanism.tile)) ||
+        Object.values(patrolTilesOf(level, state)).includes(cellId(mechanism.tile))
       if (state.gates[id] && occupied) continue
       state.gates[id] = !state.gates[id]
     }
     moved.push(id)
   }
   return moved
+}
+
+function movePatrols(level: LevelDef, state: GameState): Transition['patrolMoves'] {
+  if (!level.patrols?.length) return []
+  const { tiles, occupied } = geometryOf(level, state)
+  const graph = buildGraph([...tiles.values()], occupied)
+  // 压力在整轮巡逻前、后各求值一次；同轮占位则按编号即时更新。
+  const gates = gatesOf(level, state)
+  const moves: Transition['patrolMoves'] = []
+  level.patrols.forEach((patrol, number) => {
+    const id = `patrol-${number}`
+    const cursor = state.patrols[id]
+    if (patrol.route.length < 2) return
+    let direction = cursor.direction
+    if (patrol.mode === 'pingpong' && (cursor.index + direction < 0 || cursor.index + direction >= patrol.route.length))
+      direction = direction === 1 ? -1 : 1
+    const index = (cursor.index + direction + patrol.route.length) % patrol.route.length
+    const from = tileRefId(patrol.route[cursor.index]),
+      to = tileRefId(patrol.route[index])
+    const canEnter = entryFilter(level, state, tiles, { patrol: id, gates })
+    const moved = !!graph.get(from)?.includes(to) && canEnter(from, to)
+    state.patrols[id] = { index: moved ? index : cursor.index, direction }
+    if (moved) moves.push({ patrol: id, from, to })
+  })
+  return moves
 }
 
 export function applyAction(level: LevelDef, state: GameState, action: Action): Transition | null {
@@ -303,6 +362,7 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
     gates: { ...state.gates },
     handleUses: { ...state.handleUses },
     crates: { ...state.crates },
+    patrols: { ...state.patrols },
   }
   const result: Transition = {
     state: next,
@@ -313,6 +373,7 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
     goalLocked: 0,
     pushed,
     gatesChanged: [],
+    patrolMoves: [],
   }
   if (operated) {
     if (operated.handle?.uses !== undefined) next.handleUses[operated.id] = (state.handleUses[operated.id] ?? 0) + 1
@@ -344,6 +405,7 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
       }
     }
   }
+  result.patrolMoves = movePatrols(level, next)
   const before = gatesOf(level, state),
     after = gatesOf(level, next)
   result.gatesChanged = Object.keys(after).filter((id) => before[id] !== after[id])
@@ -370,5 +432,6 @@ export function stateKey(state: GameState): string {
     entries(state.gates),
     entries(state.handleUses),
     entries(state.crates),
+    entries(state.patrols).map(([id, { index, direction }]) => [id, index, direction]),
   ])
 }

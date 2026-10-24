@@ -82,6 +82,7 @@ describe('关卡数据与初始状态', () => {
       gates: {},
       handleUses: {},
       crates: {},
+      patrols: {},
     })
     const mechanisms = level.mechanisms.map((item) => (item.type === 'mover' ? { ...item, initialStop: 2 } : item))
     expect(initialState({ ...level, mechanisms }).mover.lift).toEqual({ stopIndex: 2, direction: 1 })
@@ -114,6 +115,7 @@ describe('行走与光点', () => {
       goalLocked: 0,
       pushed: null,
       gatesChanged: [],
+      patrolMoves: [],
     })
   })
 
@@ -386,6 +388,7 @@ describe('可达路线、合法动作与状态键', () => {
       gates: {},
       handleUses: {},
       crates: {},
+      patrols: {},
     }
     const reordered: GameState = {
       ...state,
@@ -632,5 +635,127 @@ describe('T6.6 新机制规则', () => {
     expect(pushed.state.at).toBe('2,0,0')
     expect(pushed.state.won).toBe(false)
     expect(pushed.plate).toBeNull()
+  })
+})
+
+describe('巡逻者', () => {
+  const patrolLevel = (build: (b: LevelBuilder) => void = () => {}) =>
+    defineLevel({
+      id: 'patrol-rules',
+      title: '巡逻测试',
+      chapter: 5,
+      solution: [],
+      build: (b) => {
+        for (let x = 0; x < 4; x++) b.path([x, 0, 0], 'sand')
+        b.path([0, 0, 1], 'sand')
+        b.start([0, 0, 1])
+        b.goal([3, 0, 0])
+        b.rotator({ id: 'clock', pivot: [5, 0, 0], blocks: [], handle: { block: [0, 0, 1], face: 'z' } })
+        b.patrol({ route: [{ tile: [0, 0, 0] }, { tile: [1, 0, 0] }, { tile: [2, 0, 0] }], mode: 'pingpong' })
+        build(b)
+      },
+    })
+  const tick = (level: ReturnType<typeof patrolLevel>, state: GameState) =>
+    transitioned(applyAction(level, state, { type: 'operate', mechanism: 'clock' }))
+  it('往返到端点先反向，每个玩家动作只走一格；不会收光或触发压板', () => {
+    const level = patrolLevel((b) => {
+      b.orb({ tile: [1, 0, 0] })
+      b.plate({ id: 'p', tile: [1, 0, 0], target: 'clock' })
+    })
+    let state = initialState(level)
+    const original = structuredClone(state)
+    for (const [index, direction] of [
+      [1, 1],
+      [2, 1],
+      [1, -1],
+      [0, -1],
+      [1, 1],
+    ]) {
+      const next = tick(level, state)
+      expect(next.state.patrols['patrol-0']).toEqual({ index, direction })
+      expect(next.patrolMoves).toHaveLength(1)
+      expect(next.plate).toBeNull()
+      expect(next.collected).toEqual([])
+      state = next.state
+    }
+    expect(original.patrols['patrol-0']).toEqual({ index: 0, direction: 1 })
+  })
+  it('环形路线首尾相接，非法指令不推进巡逻', () => {
+    const level = patrolLevel()
+    level.patrols![0] = {
+      route: [{ tile: [0, 0, 0] }, { tile: [1, 0, 0] }, { tile: [1, 0, 1] }, { tile: [0, 0, 1] }],
+      mode: 'loop',
+    }
+    level.blocks.push({ pos: [1, 0, 1], kind: 'path', color: 'sand' })
+    // 玩家不占环线，手写无关位置只检验环形游标。
+    let state = { ...initialState(level), at: '3,0,0' }
+    for (const index of [1, 2, 3, 0]) {
+      state = tick(level, state).state
+      expect(state.patrols['patrol-0'].index).toBe(index)
+    }
+    expect(applyAction(level, state, { type: 'walk', tileId: '0,0,0' })).toBeNull()
+  })
+  it.each(['player', 'crate', 'gate', 'oneway', 'hidden', 'disconnected'] as const)(
+    '%s挡住下一格时原地等待',
+    (obstacle) => {
+      const level = patrolLevel((b) => {
+        if (obstacle === 'crate') b.crate({ tile: [1, 0, 0] })
+        if (obstacle === 'gate') b.gate({ id: 'g', tile: [1, 0, 0], mode: 'toggle' })
+        if (obstacle === 'hidden') b.solid([2, 1, 1], 'rose')
+      })
+      if (obstacle === 'oneway') level.blocks.find((b) => cellId(b.pos) === '1,0,0')!.oneWay = '-a'
+      if (obstacle === 'disconnected') level.patrols![0].route[1] = { tile: [2, 0, 0] }
+      const state = initialState(level)
+      if (obstacle === 'player') state.at = '1,0,0'
+      const result = tick(level, state)
+      expect(result.patrolMoves).toEqual([])
+      expect(result.state.patrols['patrol-0'].index).toBe(0)
+    },
+  )
+  it('玩家和箱子不能进入巡逻占位，离开遮挡格允许且不伤害玩家', () => {
+    const level = patrolLevel((b) => b.crate({ tile: [2, 0, 0] }))
+    const state = initialState(level)
+    expect(reachableFrom(level, state).has('0,0,0')).toBe(false)
+    state.at = '3,0,0'
+    state.patrols['patrol-0'].index = 1
+    expect(applyAction(level, state, { type: 'push', crate: 'crate-0' })).toBeNull()
+    const blocked = patrolLevel((b) => b.solid([2, 1, 1], 'rose'))
+    blocked.patrols![0].route = [{ tile: [1, 0, 0] }, { tile: [0, 0, 0] }]
+    expect(tick(blocked, initialState(blocked)).state.patrols['patrol-0'].index).toBe(1)
+  })
+  it('巡逻压板开门，玩家离板寻路仍能用其压力，门内占位阻止关闭', () => {
+    const level = patrolLevel((b) => {
+      b.plate({ id: 'pad', tile: [1, 0, 0], target: 'g', mode: 'hold' })
+      b.gate({ id: 'g', tile: [2, 0, 0], mode: 'hold' })
+    })
+    const a = tick(level, initialState(level)).state
+    expect(gatesOf(level, a, true).g).toBe(true)
+    expect(reachableFrom(level, a).has('3,0,0')).toBe(false) // 巡逻者仍挡住窄廊。
+    const b = tick(level, a).state
+    expect(b.patrols['patrol-0'].index).toBe(2)
+    expect(gatesOf(level, b).g).toBe(true)
+    const c = tick(level, b).state
+    expect(gatesOf(level, c).g).toBe(true) // 返回压板。
+    const d = tick(level, { ...c, patrols: { 'patrol-0': { index: 1, direction: -1 } } }).state
+    expect(gatesOf(level, d).g).toBe(false)
+  })
+  it('随机关移动后再判断路线连接；位置与方向都进入状态键', () => {
+    const level = patrolLevel((b) =>
+      b.mover({
+        id: 'lift',
+        origin: [0, 0, 2],
+        axis: 'x',
+        stops: [0, 2],
+        blocks: [{ offset: [0, 0, 0] }],
+        handle: { block: [0, 0, 1], face: 'z' },
+      }),
+    )
+    level.patrols![0].route = [{ mechanism: 'lift', block: 0 }, { tile: [0, 0, 1] }]
+    const state = initialState(level)
+    const result = transitioned(applyAction(level, state, { type: 'operate', mechanism: 'lift' }))
+    expect(result.state.patrols['patrol-0'].index).toBe(0)
+    expect(tilesOf(level, result.state).get('lift#0')!.pos).toEqual([2, 0, 2])
+    expect(stateKey(state)).not.toBe(stateKey({ ...state, patrols: { 'patrol-0': { index: 0, direction: -1 } } }))
+    expect(stateKey(state)).not.toBe(stateKey({ ...state, patrols: { 'patrol-0': { index: 1, direction: 1 } } }))
   })
 })

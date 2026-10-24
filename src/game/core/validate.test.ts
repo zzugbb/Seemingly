@@ -305,3 +305,59 @@ describe('T6.6 结构、安全与规模', () => {
     expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '规模上限', cell: level.id }))
   })
 })
+
+describe('巡逻路线与安全校验', () => {
+  it.each(
+    [
+      [],
+      [{ tile: [1, 0, 0] }],
+      [{ tile: [1, 0, 0] }, { tile: [99, 0, 0] }],
+      [{ tile: [0, 0, 1] }, { tile: [2, 0, 0] }],
+    ].map((route) => ({ route })),
+  )('拒绝无效路线 %#', ({ route }) => {
+    const level = fixture()
+    level.patrols = [{ mode: 'pingpong', route: structuredClone(route) as import('../levels/types').TileRef[] }]
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '巡逻路线' }))
+  })
+  it('限制巡逻者数量并拒绝开局重叠、非法环线闭合', () => {
+    const level = fixture()
+    const patrol = {
+      route: [{ tile: [1, 0, 0] as [number, number, number] }, { tile: [2, 0, 0] as [number, number, number] }],
+      mode: 'pingpong' as const,
+    }
+    level.patrols = [patrol, patrol]
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '规模上限' }))
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '基本结构' }))
+    level.patrols = [
+      { mode: 'loop', route: [{ tile: [0, 0, 1] }, { tile: [0, 0, 0] }, { tile: [1, 0, 0] }, { tile: [2, 0, 0] }] },
+    ]
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '巡逻路线' }))
+  })
+  it('巡逻者随升降台到位时头顶不安全，即使随后走开也报错', () => {
+    const level = defineLevel({
+      id: 'unsafe-patrol',
+      title: '安全测试',
+      chapter: 5,
+      solution: [],
+      build: (b) => {
+        b.path([0, 0, 0], 'sand')
+        b.path([0, 0, 1], 'sand')
+        b.path([1, 0, 2], 'sand')
+        b.start([0, 0, 0])
+        b.goal([0, 0, 1])
+        b.solid([1, 3, 0], 'rose')
+        b.mover({
+          id: 'lift',
+          origin: [1, 0, 0],
+          axis: 'y',
+          stops: [0, 2],
+          blocks: [{ offset: [0, 0, 0] }],
+          handle: { block: [0, 0, 0], face: 'z' },
+        })
+        b.patrol({ mode: 'pingpong', route: [{ mechanism: 'lift', block: 0 }, { tile: [1, 0, 1] }] })
+        b.path([1, 0, 1], 'sand')
+      },
+    })
+    expect(validateLevel(level)).toContainEqual(expect.objectContaining({ check: '乘坐安全' }))
+  })
+})

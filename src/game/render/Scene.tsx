@@ -8,6 +8,7 @@ import type { LevelSim, SimEvent } from '../core/sim'
 import type { LevelDef, Vec3 } from '../levels/types'
 import { Blocks } from './Blocks'
 import { Crates } from './Crates'
+import { Patrols } from './Patrols'
 import { Gates } from './Gates'
 import { Orbs } from './Orbs'
 import type { RenderFeedback, RenderHint } from './feedback'
@@ -235,6 +236,7 @@ export function Scene({
         <Orbs sim={sim} reducedMotion={reducedMotion} sparkleScale={quality.sparkleScale} />
         <Crates sim={sim} feedback={feedback} hint={hint} onPush={pushCrate} interactive={interactive} />
         <Gates sim={sim} onBlocked={onBlocked} feedback={feedback} hint={hint} interactive={interactive} />
+        <Patrols sim={sim} reducedMotion={reducedMotion} />
         <Character ref={characterRef} occlusion={interactive} />
         <Marker marker={marker} sim={tactile ? sim : undefined} reducedMotion={tactile && reducedMotion} />
         <Lantern

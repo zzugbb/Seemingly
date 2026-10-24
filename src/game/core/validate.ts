@@ -3,7 +3,7 @@ import type { LevelTarget } from '../levels/targets'
 import { cellId } from './iso'
 import { moverBlocks, moverCursor, rotatorBlocks, type MoverCursor } from './mechanisms'
 import { measureLevel } from './metrics'
-import { initialState, occupiedOf, tileRefId, tilesOf } from './rules'
+import { applyAction, initialState, legalActions, occupiedOf, patrolTilesOf, tileRefId, tilesOf } from './rules'
 import { placedBlocks, runSolution } from './solve'
 import { reachableStates, StateLimitError } from './solver'
 import { rayHitsAny, topVisible } from './visibility'
@@ -12,6 +12,7 @@ export type LevelCheck =
   | '基本结构'
   | '无重叠'
   | '乘坐安全'
+  | '巡逻路线'
   | '解法可行'
   | '可见性'
   | '遮挡规则'
@@ -219,6 +220,28 @@ const checkStructure = (level: LevelDef, ids: Set<string>, issues: LevelIssue[],
     if (!validRef(level, crate)) push(issues, seen, { check: '基本结构', cell: id, detail: '积木箱引用的路面积木无效' })
     element(id, tileRefId(crate))
   })
+  level.patrols?.forEach((patrol, index) => {
+    const id = `patrol-${index}`
+    if (patrol.route.length < 2) {
+      push(issues, seen, { check: '巡逻路线', cell: id, detail: '巡逻路线至少需要两格' })
+      return
+    }
+    if (patrol.route.some((ref) => !validRef(level, ref))) {
+      push(issues, seen, { check: '巡逻路线', cell: id, detail: '巡逻路线引用的路面积木无效' })
+      return
+    }
+    element(id, tileRefId(patrol.route[0]))
+    const tiles = tilesOf(level, state)
+    const route = patrol.route.map((ref) => tiles.get(tileRefId(ref))!.pos)
+    const edges = route.slice(1).map((to, i) => [route[i], to])
+    if (patrol.mode === 'loop') edges.push([route[route.length - 1], route[0]])
+    for (const [from, to] of edges) {
+      const a = screenOf(from),
+        b = screenOf(to)
+      if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) !== 1)
+        push(issues, seen, { check: '巡逻路线', cell: id, detail: `开局路线 ${cellId(from)} → ${cellId(to)} 不相邻` })
+    }
+  })
 }
 
 const validRef = (level: LevelDef, ref: TileRef): boolean => {
@@ -238,6 +261,7 @@ const checkScale = (level: LevelDef, issues: LevelIssue[], seen: Set<string>) =>
   const moving = level.mechanisms.filter((item) => item.type === 'rotator' || item.type === 'mover').length
   for (const [name, count, max] of [
     ['积木箱', level.crates?.length ?? 0, 2],
+    ['巡逻者', level.patrols?.length ?? 0, 1],
     ['光点', level.orbs.length, 4],
     ['转盘与平移台', moving, level.challenge ? 5 : 4],
   ] as const) {
@@ -262,10 +286,28 @@ const reachableLayouts = (level: LevelDef, issues: LevelIssue[], seen: Set<strin
       layout = { blocks: placedBlocks(level, gear), occupied: occupiedOf(level, state), tiles: tilesOf(level, state) }
       layouts.set(key, layout)
     }
-    for (const [id, at] of [['小人', state.at], ...Object.entries(state.crates)]) {
+    for (const [id, at] of [
+      ['小人', state.at],
+      ...Object.entries(state.crates),
+      ...Object.entries(patrolTilesOf(level, state)),
+    ]) {
       const pos = layout.tiles.get(at)?.pos
       if (pos && layout.occupied.has(cellId([pos[0], pos[1] + 1, pos[2]]))) {
         push(issues, seen, { check: '乘坐安全', cell: cellId(pos), detail: `${id}头顶有积木` })
+      }
+    }
+  }
+  if (level.patrols?.length) {
+    for (const state of reachableStates(level)) {
+      for (const action of legalActions(level, state)) {
+        const next = applyAction(level, state, action)!.state
+        const tiles = tilesOf(level, next),
+          occupied = occupiedOf(level, next)
+        for (const [id, at] of Object.entries(patrolTilesOf(level, state))) {
+          const pos = tiles.get(at)!.pos
+          if (occupied.has(cellId([pos[0], pos[1] + 1, pos[2]])))
+            push(issues, seen, { check: '乘坐安全', cell: cellId(pos), detail: `${id}随机关到位时头顶有积木` })
+        }
       }
     }
   }

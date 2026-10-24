@@ -551,3 +551,94 @@ describe('T6.6 推动、门与撤销', () => {
     expect(sim.steps()).toBe(0)
   })
 })
+
+describe('巡逻者动画与撤销', () => {
+  const fixture = () =>
+    defineLevel({
+      id: 'sim-patrol',
+      title: '巡逻测试',
+      chapter: 5,
+      solution: [],
+      build: (b) => {
+        for (let x = 0; x < 4; x++) b.path([x, 0, 0], 'sand')
+        b.path([0, 0, 1], 'sand')
+        b.start([0, 0, 1])
+        b.goal([3, 0, 0])
+        b.patrol({ route: [{ tile: [0, 0, 0] }, { tile: [1, 0, 0] }, { tile: [2, 0, 0] }], mode: 'pingpong' })
+        b.plate({ id: 'pad', tile: [1, 0, 0], target: 'gate', mode: 'hold' })
+        b.gate({ id: 'gate', tile: [2, 0, 0], mode: 'hold' })
+        b.rotator({ id: 'clock', pivot: [5, 0, 0], blocks: [], handle: { block: [0, 0, 1], face: 'z' } })
+      },
+    })
+  it('先完成操作再移动0.3秒，之后开门；忙时拒绝输入，撤销恢复全部状态和朝向', () => {
+    const def = fixture(),
+      sim = new LevelSim(def),
+      before = structuredClone(sim.state()),
+      pose = sim.patrolPose('patrol-0')
+    sim.command({ type: 'operate', mechanism: 'clock' })
+    const events: SimEvent[] = []
+    for (let i = 0; i < 27; i++) events.push(...sim.update(1 / 30))
+    expect(events).toContainEqual({ type: 'patrol-move', patrol: 'patrol-0' })
+    for (let i = 0; i < 4; i++) sim.update(1 / 30)
+    expect(sim.patrolPose('patrol-0').hop).toBeGreaterThan(0)
+    expect(sim.command({ type: 'walk', tileId: '3,0,0' })).toBe('busy')
+    expect(sim.undo()).toBe(false)
+    events.push(...settle(sim))
+    expect(events.findIndex((e) => e.type === 'patrol-move')).toBeLessThan(events.findIndex((e) => e.type === 'gate'))
+    expect(sim.platePose('pad').pressed).toBe(true)
+    expect(sim.gatePose('gate').open).toBe(1)
+    expect(sim.state()).toEqual(applyAction(def, before, { type: 'operate', mechanism: 'clock' })!.state)
+    expect(sim.undo()).toBe(true)
+    expect(sim.state()).toEqual(before)
+    expect(sim.patrolPose('patrol-0')).toEqual(pose)
+  })
+  it('行走中改道仍只推进一次巡逻', () => {
+    const def = fixture()
+    def.mechanisms = []
+    def.patrols![0].route = [{ tile: [1, 0, 0] }, { tile: [2, 0, 0] }]
+    const sim = new LevelSim(def)
+    sim.command({ type: 'walk', tileId: '0,0,0' })
+    sim.update(1 / 30)
+    sim.command({ type: 'walk', tileId: '0,0,0' })
+    const events = settle(sim)
+    expect(events.filter((e) => e.type === 'patrol-move')).toHaveLength(1)
+    expect(sim.steps()).toBe(1)
+  })
+})
+
+it('巡逻者乘坐转盘中间帧随动，到位后被断路挡住小跳，撤销恢复朝向', () => {
+  const def = defineLevel({
+    id: 'patrol-ride',
+    title: '乘坐测试',
+    chapter: 5,
+    solution: [],
+    build: (b) => {
+      b.path([0, 0, 0], 'sand')
+      b.path([0, 0, 1], 'sand')
+      b.path([4, 0, 0], 'sand')
+      b.start([0, 0, 0])
+      b.goal([0, 0, 1])
+      b.solid([2, 0, 0], 'teal')
+      b.rotator({
+        id: 'bridge',
+        pivot: [2, 0, 0],
+        blocks: [{ offset: [1, 0, 0] }],
+        handle: { block: [2, 0, 0], face: 'z' },
+      })
+      b.patrol({ mode: 'pingpong', route: [{ mechanism: 'bridge', block: 0 }, { tile: [4, 0, 0] }] })
+    },
+  })
+  const sim = new LevelSim(def),
+    initial = sim.patrolPose('patrol-0')
+  sim.command({ type: 'operate', mechanism: 'bridge' })
+  for (let i = 0; i < 14; i++) sim.update(1 / 30)
+  const mid = sim.patrolPose('patrol-0')
+  expect(mid.position[0]).toBeGreaterThan(2)
+  expect(mid.position[0]).toBeLessThan(3)
+  expect(mid.position[2]).toBeLessThan(0)
+  const events = settle(sim)
+  expect(events.some((e) => e.type === 'patrol-move')).toBe(false)
+  expect(sim.patrolPose('patrol-0').position).toEqual([2, surfaceY(0), -1])
+  expect(sim.undo()).toBe(true)
+  expect(sim.patrolPose('patrol-0')).toEqual(initial)
+})
