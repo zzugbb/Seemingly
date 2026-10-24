@@ -18,6 +18,7 @@ const runtimeMode = process.argv.includes('--runtime')
 const score = chapterFiveScore(),
   pitch = new Set(score.scale.map((n) => n % 12))
 assert.equal(score.notes.length, 51)
+assert(finaleNotes().at(-1).at < 0.9, '塔收束末音应在谢谢游玩出现前起音')
 assert.equal(score.chords.length, 8)
 assert.equal(score.seconds, (128 * 60) / 84)
 for (const note of [...score.notes, ...finaleNotes()])
@@ -174,6 +175,20 @@ try {
     assert.equal(main.trace.filter((t) => t.tr.patrolMoves.length).length > 0, true)
     const policy = solver.buildPolicy(level)
     if (id !== 'level-13') {
+      let firstCount = 0,
+        secondCount = 0
+      const first = rules.initialState(level)
+      for (const a of rules.legalActions(level, first)) {
+        const next = rules.applyAction(level, first, a).state
+        assert(next.won || policy.get(rules.stateKey(next)), `${id} 首次试探应可恢复`)
+        firstCount++
+        for (const b of rules.legalActions(level, next)) {
+          const later = rules.applyAction(level, next, b).state
+          assert(later.won || policy.get(rules.stateKey(later)), `${id} 两步试探应可恢复`)
+          secondCount++
+        }
+      }
+      console.log(`${id} ${firstCount}种首步／${secondCount}种两步前缀均有解`)
       let empty = rules.initialState(level)
       for (let i = 0; i < 2; i++) empty = rules.applyAction(level, empty, { type: 'operate', mechanism: 'ferry' }).state
       assert(policy.get(rules.stateKey(empty)), `${id} 一次空送往返后仍应可恢复`)
@@ -182,13 +197,13 @@ try {
       const action = policy.get(rules.stateKey(st))
       if (action) assert(rules.applyAction(level, st, action))
     }
-    const canWin = (allow) => {
+    const canWin = (allow, allOrbs = false) => {
       const first = rules.initialState(level),
         queue = [first],
         seen = new Set([rules.stateKey(first)])
       for (let i = 0; i < queue.length; i++) {
         const st = queue[i]
-        if (st.won) return true
+        if (st.won && (!allOrbs || st.orbs.length === level.orbs.length)) return true
         for (const a of rules.legalActions(level, st)) {
           const tr = rules.applyAction(level, st, a)
           if (!allow(st, a, tr)) continue
@@ -214,14 +229,52 @@ try {
       )
     if (id === 'level-15') {
       assert.equal(
-        canWin((_, a) => !(a.type === 'operate' && a.mechanism === 'home')),
+        canWin((_, a, tr) => !tr.moved.includes('home')),
         false,
         '必须揭挡并接归桥',
       )
-      assert(
-        main.trace.some((t) => t.tr.pushed?.to === '13,1,1'),
-        '返程必须改压北位',
+      const finalCrate = '17,5,6'
+      assert.equal(
+        canWin((_, a, tr) => tr.pushed?.to !== finalCrate),
+        false,
+        '主线必须把箱子换到旧巡逻板',
       )
+      const states = solver.reachableStates(level)
+      const early = states.filter((st) => st.crates['crate-0'] === finalCrate && !st.orbs.includes('orb-2'))
+      assert(early.length > 0, '提前换位应是可验证的错误选择')
+      const earlyExchange = states.filter((st) => st.spentPlates.includes('exchange') && !st.orbs.includes('orb-2'))
+      assert(
+        earlyExchange.length > 0 && earlyExchange.every((st) => !policy.get(rules.stateKey(st))),
+        '过早停联动板须撤销恢复',
+      )
+      assert(
+        early.every((st) => !policy.get(rules.stateKey(st))),
+        '提前换位后不能再取得远庭光',
+      )
+      assert(
+        states
+          .filter((st) => st.won)
+          .every((st) => st.crates['crate-0'] === finalCrate && st.patrols['patrol-0'].index === 2),
+      )
+      assert.equal(
+        canWin((st, a, tr) => !tr.collected.includes('orb-3') || st.spentPlates.includes('exchange'), true),
+        false,
+        '选做必须在联动关闭旧桥之前取得',
+      )
+      assert.equal(main.trace.filter((t) => t.action.type === 'operate' && t.action.mechanism === 'ferry').length, 2)
+      assert.equal(all.trace.filter((t) => t.action.type === 'operate' && t.action.mechanism === 'ferry').length, 4)
+      assert(
+        all.trace.findIndex((t) => t.tr.collected.includes('orb-3')) <
+          all.trace.findIndex((t) => t.tr.moved.includes('home')),
+      )
+      const exchange = main.trace.find((t) => t.tr.moved.includes('home'))
+      assert(
+        exchange &&
+          rules.gatesOf(level, exchange.before)['landing-door'] &&
+          !rules.gatesOf(level, exchange.tr.state)['landing-door'],
+      )
+      console.log(`${id} ${early.length}个提前换位状态均无解；无换位／联动后取选做反事实通过`)
+
       assert.equal(level.ending.lanterns.length, 15)
       assert.equal(new Set(level.ending.lanterns.map((p) => p.join(','))).size, 15)
       assert.deepEqual(level.ending.lanterns[0], level.goal)
@@ -232,6 +285,16 @@ try {
           level.blocks.some((b) => b.pos.every((v, i) => v === p[i])),
           '灯必须有静态基座',
         )
+    }
+    if (id === 'level-13') {
+      assert(
+        all.trace.some(
+          (t) =>
+            t.action.type === 'operate' && t.action.mechanism === 'ferry' && t.before.patrols['patrol-0'].index === 3,
+        ),
+        '选做须用空台把巡逻留在另一块板',
+      )
+      assert.equal(baseline.metrics.deadEndStates, 0)
     }
     const report = checkBuildings(level, { rules, solver, geometry, shapes, surfaceY })
     assert.deepEqual(report.issues, [], `${id} 运动实体相交`)

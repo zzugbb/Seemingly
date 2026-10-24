@@ -57,7 +57,7 @@ export function finaleNotes() {
   // 十五灯演出后的收束；只按通关事实触发，不按正确连接触发。
   return [77, 81, 83, 84, 89].map((note, i) => ({
     note,
-    at: i * 0.24,
+    at: i * 0.18,
     duration: i === 4 ? 1.8 : 0.6,
     velocity: 0.24,
     pan: 0,
