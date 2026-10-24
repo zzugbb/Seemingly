@@ -40,7 +40,7 @@ export function Scene({
   onEvent,
   onStateChange,
   onUnreachable,
-  onLanternLit,
+  onTowerLit,
   hint,
   tactile = false,
 }: {
@@ -55,7 +55,7 @@ export function Scene({
   onEvent?: (event: SimEvent) => void
   onStateChange?: () => void
   onUnreachable?: () => void
-  onLanternLit?: () => void
+  onTowerLit?: () => void
   hint?: RenderHint | null
   tactile?: boolean
 }) {
@@ -97,6 +97,7 @@ export function Scene({
       }
       if (event.type === 'undo') {
         setWon(false)
+        setTowerLit(false)
         plateFx.current.spent = new Set(sim.state().spentPlates)
         plateFx.current.flashAt.clear()
         feedback.current.goalLockedAt = -10000
@@ -252,9 +253,11 @@ export function Scene({
             ending={level.ending}
             sparkleScale={quality.sparkleScale}
             reducedMotion={reducedMotion}
-            onTowerLit={() => setTowerLit(true)}
+            onTowerLit={() => {
+              setTowerLit(true)
+              onTowerLit?.()
+            }}
             onReady={() => onEndingReady?.()}
-            onLanternLit={() => onLanternLit?.()}
           />
         )}
         <Decor decor={level.decor} quality={quality} reducedMotion={reducedMotion} />

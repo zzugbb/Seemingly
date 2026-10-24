@@ -4,6 +4,7 @@ import {
   chordAt,
   chordDuration,
   courtyardClock,
+  finaleChord,
   courtyardNote,
   courtyardPulse,
   pulseActive,
@@ -34,7 +35,8 @@ interface Layer {
   nextChord: number
   nextBox: number
   gain: GainNode
-  sources: Set<AudioScheduledSourceNode>
+  sources: Map<AudioScheduledSourceNode, number>
+  finale: boolean
 }
 const pads = new WeakMap<BaseAudioContext, Map<string, AudioBuffer>>()
 function padBuffer(context: BaseAudioContext, chord: Chord): AudioBuffer {
@@ -89,7 +91,7 @@ export function renderCourtyardNote(bus: AudioBus, note: ScoreNote, at: number, 
   })
 }
 
-export function renderCourtyardPad(bus: AudioBus, chord: Chord, at: number, remaining: number): void {
+export function renderCourtyardPad(bus: AudioBus, chord: Chord, at: number, remaining: number, attack = 4): void {
   const { context } = bus
   const source = context.createBufferSource()
   source.buffer = silkBuffer(context, chord)
@@ -103,7 +105,7 @@ export function renderCourtyardPad(bus: AudioBus, chord: Chord, at: number, rema
   lowpass.frequency.value = 900
   const envelope = context.createGain()
   envelope.gain.setValueAtTime(0, at)
-  envelope.gain.linearRampToValueAtTime(COURTYARD_PAD_GAIN, at + Math.min(4, remaining))
+  envelope.gain.linearRampToValueAtTime(COURTYARD_PAD_GAIN, at + Math.min(attack, remaining))
   envelope.gain.setValueAtTime(COURTYARD_PAD_GAIN, at + remaining)
   envelope.gain.linearRampToValueAtTime(0, at + remaining + 5)
   source.connect(highpass)
@@ -127,6 +129,7 @@ export class MusicPlayer {
   private soundtrack: Soundtrack = 'generative'
   private paused = 0
   private stage: MusicStage = 'explore'
+  private finale = false
 
   start(chapter: Chapter = this.chapter, challenge = this.challenge, soundtrack = this.soundtrack): void {
     const bus = audioEngine.getBus('music')
@@ -159,7 +162,10 @@ export class MusicPlayer {
     old.gain.gain.cancelScheduledValues(at)
     old.gain.gain.setValueAtTime(old.gain.gain.value, at)
     old.gain.gain.linearRampToValueAtTime(0, at + 3)
-    for (const source of old.sources) source.stop(at + 3)
+    for (const [source, start] of old.sources) {
+      if (start > at) this.bus.cancel(source)
+      else source.stop(at + 3)
+    }
     this.layer = this.createLayer(chapter, challenge, 0)
     this.tick()
   }
@@ -184,7 +190,27 @@ export class MusicPlayer {
     expression.gain.cancelScheduledValues(at)
     expression.gain.setTargetAtTime(stage === 'complete' ? 0.5 : 1, at, 0.2)
   }
+  setFinale(active: boolean): void {
+    if (active === this.finale) return
+    this.finale = active
+    if (!this.bus || !this.layer) return
+    const elapsed = this.elapsed()
+    if (this.retiring) this.disposeLayer(this.retiring)
+    const at = this.bus.context.currentTime
+    const old = this.layer
+    this.retiring = old
+    old.gain.gain.cancelScheduledValues(at)
+    old.gain.gain.setValueAtTime(old.gain.gain.value, at)
+    old.gain.gain.linearRampToValueAtTime(0, at + 1.2)
+    for (const [source, start] of old.sources) {
+      if (start > at) this.bus.cancel(source)
+      else source.stop(at + 1.2)
+    }
+    this.layer = this.createLayer(this.chapter, this.challenge, elapsed)
+    this.tick()
+  }
   currentChord(): Chord {
+    if (this.finale) return finaleChord
     return this.isCourtyard()
       ? courtyardChordAt(this.elapsed(), this.chapter)
       : chordAt(this.chapter, this.elapsed(), this.challenge)
@@ -203,7 +229,7 @@ export class MusicPlayer {
       at = context.currentTime
     const gain = context.createGain()
     gain.gain.setValueAtTime(0, at)
-    gain.gain.linearRampToValueAtTime(this.isCourtyard() ? COURTYARD_GAIN : 1, at + 3)
+    gain.gain.linearRampToValueAtTime(this.isCourtyard() ? COURTYARD_GAIN : 1, at + (this.finale ? 1.2 : 3))
     gain.connect(this.bus!.output)
     const expression = context.createGain()
     expression.gain.value = this.stage === 'complete' ? 0.5 : 1
@@ -214,6 +240,7 @@ export class MusicPlayer {
     return {
       chapter,
       challenge,
+      finale: this.finale,
       expression,
       pulse,
       nextPulse: Math.ceil(elapsed / courtyardClock(chapter).beatSeconds),
@@ -223,11 +250,11 @@ export class MusicPlayer {
       nextChord: at + 0.01,
       nextBox: at + 1.5,
       gain,
-      sources: new Set(),
+      sources: new Map(),
     }
   }
   private disposeLayer(layer: Layer) {
-    for (const source of layer.sources) this.bus?.cancel(source)
+    for (const source of layer.sources.keys()) this.bus?.cancel(source)
     layer.sources.clear()
     layer.gain.disconnect()
     layer.expression.disconnect()
@@ -240,7 +267,7 @@ export class MusicPlayer {
       output,
       cancel: bus.cancel,
       schedule: (source, at, duration, cleanup) => {
-        layer.sources.add(source)
+        layer.sources.set(source, at)
         return bus.schedule(source, at, duration, () => {
           layer.sources.delete(source)
           cleanup()
@@ -257,7 +284,7 @@ export class MusicPlayer {
   ): void {
     source.connect(nodes[0])
     nodes.forEach((node, index) => node.connect(nodes[index + 1] ?? layer.gain))
-    layer.sources.add(source)
+    layer.sources.set(source, at)
     this.bus!.schedule(source, at, duration, () => {
       layer.sources.delete(source)
       nodes.forEach((node) => node.disconnect())
@@ -273,6 +300,14 @@ export class MusicPlayer {
     if (layer.nextChord < now) layer.nextChord = now + 0.01
     if (layer.nextBox < now) layer.nextBox = now + 0.01
     const horizon = now + 0.3
+    if (layer.finale) {
+      while (layer.nextChord < horizon) {
+        const at = layer.nextChord
+        renderCourtyardPad(this.busFor(layer, layer.expression), finaleChord, at, 8, 1.2)
+        layer.nextChord = at + 8
+      }
+      return
+    }
     while (layer.nextChord < horizon) {
       const at = layer.nextChord,
         elapsed = Math.max(0, at - layer.epoch),

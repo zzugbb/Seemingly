@@ -31,7 +31,10 @@ export function PlayScreen() {
 function LevelPlay({ level, list, index }: { level: LevelDef; list: LevelList; index: number }) {
   const [runId, setRunId] = useState(0)
   const [started, setStarted] = useState(list !== 'sample')
-  const restart = useCallback(() => setRunId((id) => id + 1), [])
+  const restart = useCallback(() => {
+    if (useApp.getState().screen === 'ending') useApp.getState().play(list, index)
+    setRunId((id) => id + 1)
+  }, [list, index])
   return (
     <Run
       key={runId}
@@ -88,6 +91,7 @@ function Run({
   const [showSampleResult, setShowSampleResult] = useState(false)
   const [motionNotice, setMotionNotice] = useState<{ text: string; settled: boolean } | null>(null)
   const usedHint = useRef(false)
+  const patrolMoving = useRef(false)
   const client = useRef<ReturnType<typeof prepareHints> | null>(null)
   const query = useRef(0)
   const snapshot = () => ({
@@ -168,6 +172,8 @@ function Run({
 
   const undo = useCallback(() => {
     if (!sim.undo()) return
+    if (useApp.getState().screen === 'ending') useApp.getState().play(list, index)
+    setEndingReady(false)
     audioEngine.stopEffects()
     music.setProgress(musicStage(sim.orbProgress()))
     query.current++
@@ -176,7 +182,7 @@ function Run({
     setToast(null)
     setMotionNotice(null)
     setThinking(false)
-  }, [sim])
+  }, [sim, list, index])
   const requestHint = useCallback(async () => {
     if (!sim.isIdle() || sim.status === 'won' || !client.current) return
     const request = ++query.current
@@ -200,7 +206,6 @@ function Run({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
-        ending ||
         !started ||
         event.repeat ||
         (event.target instanceof HTMLElement &&
@@ -246,6 +251,10 @@ function Run({
       if (event.type === 'mechanism-start' || event.type === 'mechanism-end') {
         setMotionNotice(mechanismNotice(level, event.id, event.type === 'mechanism-end'))
       }
+    }
+    if (event.type === 'patrol-move') {
+      patrolMoving.current = true
+      setMotionNotice({ text: '小生物正在移动', settled: false })
     }
     if (event.type === 'goal-locked') setToast(`还差 ${event.missing} 个光点`)
     if (
@@ -307,16 +316,20 @@ function Run({
           onEvent={onEvent}
           onStateChange={() => {
             refresh()
+            if (sim.isIdle() && patrolMoving.current) {
+              patrolMoving.current = false
+              setMotionNotice({ text: '小生物已停下', settled: true })
+            }
             if (list === 'main' && sim.isIdle())
               learnTutorials(lessons.current.confirm(level, sim.state(), learnedTutorials(useApp.getState().save)))
           }}
           onUnreachable={() => playSound('unreachable')}
-          onLanternLit={() => playSound('lantern')}
+          onTowerLit={() => playSound('finale')}
           onWon={won}
           onBlocked={(text) => setToast(blockedCopy(list, level, text))}
         />
       </Canvas>
-      {!ending && started && (
+      {started && (!ending || !endingReady) && (
         <Hud
           label={`${label} · ${level.title}`}
           steps={hud.steps}
@@ -324,6 +337,7 @@ function Run({
           muted={muted}
           canUndo={hud.canUndo}
           thinking={thinking}
+          hintDisabled={ending}
           onUndo={undo}
           onHint={() => void requestHint()}
           onRestart={onRestart}

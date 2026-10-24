@@ -55,13 +55,13 @@ describe('标题入口', () => {
     expect(journeyChoice(save, mainLevels).label).toBe('重访旅程')
   })
 
-  it('前六关完成后继续第七关，十二关评价齐全才重访', () => {
+  it('前六关完成后继续第七关，十五关评价齐全才重访', () => {
     const six = saveWith(Object.fromEntries(mainLevels.slice(0, 6).map((level) => [level.id, record(3)])))
     expect(campaignStats(six, mainLevels, challengeLevels)).toMatchObject({
       mainDone: 6,
-      mainCount: 12,
+      mainCount: 15,
       earned: 18,
-      ratingMax: 36,
+      ratingMax: 45,
     })
     expect(journeyChoice(six, mainLevels)).toMatchObject({
       mode: 'continue',
@@ -69,7 +69,7 @@ describe('标题入口', () => {
       index: 6,
     })
     const save = saveWith(Object.fromEntries(mainLevels.map((level) => [level.id, record(3)])))
-    expect(campaignStats(save, mainLevels, challengeLevels)).toMatchObject({ mainDone: 12, earned: 36, ratingMax: 36 })
+    expect(campaignStats(save, mainLevels, challengeLevels)).toMatchObject({ mainDone: 15, earned: 45, ratingMax: 45 })
     expect(journeyChoice(save, mainLevels)).toMatchObject({ mode: 'revisit', caption: '当前开放的关卡已全部抵达' })
   })
 
@@ -149,4 +149,12 @@ describe('选关状态', () => {
     expect(save.levels['level-03']?.done).toBe(true)
     expect(save.levels['level-06']?.done).toBe(true)
   })
+})
+
+it('旧十二关完整进度接上第十三关，评价保留并扩为45项', () => {
+  const save = saveWith(
+    Object.fromEntries(mainLevels.slice(0, 12).map((level) => [level.id, record(level.solution.length, true, true)])),
+  )
+  expect(campaignStats(save)).toMatchObject({ mainDone: 12, mainCount: 15, earned: 36, ratingMax: 45 })
+  expect(journeyChoice(save)).toMatchObject({ mode: 'continue', index: 12, caption: '前往 第 13 关 · 留步' })
 })

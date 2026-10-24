@@ -39,7 +39,16 @@ describe('建筑运动净空', () => {
 
   it('联动、压板、门和箱子不交给只覆盖独立机关的检查器', () => {
     const extended = mainLevels.filter((level) => !supportedByBasicSweep(level))
-    expect(extended.map((level) => level.id)).toEqual(['level-08', 'level-09', 'level-10', 'level-11', 'level-12'])
+    expect(extended.map((level) => level.id)).toEqual([
+      'level-08',
+      'level-09',
+      'level-10',
+      'level-11',
+      'level-12',
+      'level-13',
+      'level-14',
+      'level-15',
+    ])
     for (const level of extended) expect(() => checkMotionClearance(level)).toThrow(/另行建模/)
   })
 

@@ -1,6 +1,6 @@
 import { audioEngine, type AudioBus } from './engine'
 import { music } from './music'
-import { chapterSealNotes, midiFrequency, stepNote, successNotes, type Chord } from './theory'
+import { chapterSealNotes, finaleNotes, midiFrequency, stepNote, successNotes, type Chord } from './theory'
 import { feltBuffer, woodBuffer } from './instruments'
 import { feedbackFocus, type Sound } from './mix'
 
@@ -95,10 +95,15 @@ export function renderSound(
     sound === 'ready' ||
     sound === 'lantern' ||
     sound === 'rating' ||
-    sound === 'seal'
+    sound === 'seal' ||
+    sound === 'finale'
   ) {
     const notes =
-      sound === 'seal' ? chapterSealNotes(options.chapter === 4 ? 4 : 3) : successNotes(sound, chord, options.count)
+      sound === 'finale'
+        ? finaleNotes()
+        : sound === 'seal'
+          ? chapterSealNotes(options.chapter === 4 ? 4 : 3)
+          : successNotes(sound, chord, options.count)
     for (const note of notes) {
       if (courtyard) {
         const source = bus.context.createBufferSource()

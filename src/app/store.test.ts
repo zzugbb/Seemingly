@@ -46,7 +46,7 @@ describe('进度与评价', () => {
     useApp.setState({ save })
     const complete = useApp.getState().completeLevel
     expect(campaignStats(save).earned).toBe(15)
-    expect(campaignStats(save).ratingMax).toBe(36)
+    expect(campaignStats(save).ratingMax).toBe(45)
     expect(isUnlocked(save, 'main', 6)).toBe(true)
     const id = 'level-04'
     complete(id, { steps: 8, allOrbs: false, usedHint: true })

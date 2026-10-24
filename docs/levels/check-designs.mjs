@@ -113,9 +113,9 @@ try {
     const missing = [...baselines.keys()].filter((id) => !runtime.mainLevels.some((level) => level.id === id))
     assert.equal(missing.length, 0, `正式主线尚未接入：${missing.join('、')}；当前只能通过设计稿检查`)
     assert.deepEqual(
-      runtime.mainLevels.map((level) => level.id),
+      runtime.mainLevels.slice(0, 12).map((level) => level.id),
       Array.from({ length: 12 }, (_, i) => `level-${String(i + 1).padStart(2, '0')}`),
-      'T6.14正式主线须按顺序提供12关',
+      'T6.14正式主线前缀须按顺序保留12关',
     )
     assert.deepEqual(
       runtime.mainLevels.slice(0, 6).map((level) => level.revision),

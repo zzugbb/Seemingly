@@ -71,6 +71,9 @@ export const levelThemes: Readonly<Record<string, string>> = {
   'level-10': '把箱留下，人再回来',
   'level-11': '先开出口，再换推向',
   'level-12': '中站留箱，远庭取光',
+  'level-13': '移台留住重量，再借空台引它换板',
+  'level-14': '箱子挡回路，小生物守另一块板',
+  'level-15': '去时各守一门，回来交换职责',
 }
 
 export type SelectStatus = 'locked' | 'done' | 'next' | 'open'

@@ -64,12 +64,12 @@ const noSouthDockWin = (all: boolean) => {
   return null
 }
 
-describe('第 1～4 章', () => {
-  it('按顺序提供十二关，前四章各三关，每关都有设计者给定的难度目标', () => {
+describe('主线五章', () => {
+  it('按顺序提供十五关，每章各三关，每关都有设计者给定的难度目标', () => {
     expect(mainLevels.map((level) => level.id)).toEqual(
-      Array.from({ length: 12 }, (_, index) => `level-${String(index + 1).padStart(2, '0')}`),
+      Array.from({ length: 15 }, (_, index) => `level-${String(index + 1).padStart(2, '0')}`),
     )
-    expect(mainLevels.map((level) => level.chapter)).toEqual([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4])
+    expect(mainLevels.map((level) => level.chapter)).toEqual([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5])
     expect(mainLevels.map((level) => level.title)).toEqual([
       '启程',
       '转动',
@@ -83,16 +83,24 @@ describe('第 1～4 章', () => {
       '推动',
       '越界',
       '重量',
+      '留步',
+      '相守',
+      '归来',
     ])
     expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
-    expect(mainLevels.slice(6).map((level) => level.revision)).toEqual([1, 2, 2, 2, 2, 2])
+    expect(mainLevels.slice(6, 12).map((level) => level.revision)).toEqual([1, 2, 2, 2, 2, 2])
     expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
     expect(challengeLevels).toEqual([])
-    expect(mainLevels.every((level) => !level.ending)).toBe(true)
+    expect(mainLevels.slice(0, 14).every((level) => !level.ending)).toBe(true)
+    expect(mainLevels[14].ending?.lanterns).toHaveLength(15)
   })
-  it.each(mainLevels)('$id：通过全部结构、安全、解法、可见性、规模与难度校验', (level) => {
-    expect(validateLevels([level], targets)).toEqual([])
-  })
+  it.each(mainLevels)(
+    '$id：通过全部结构、安全、解法、可见性、规模与难度校验',
+    (level) => {
+      expect(validateLevels([level], targets)).toEqual([])
+    },
+    10_000,
+  )
   it('启程：先去灯笼会提示缺光点，撤销可恢复到出发前', () => {
     const level = mainLevels[0],
       sim = new LevelSim(level)
@@ -740,5 +748,16 @@ describe('第 1～4 章', () => {
     const broken = structuredClone(mainLevels[0])
     broken.blocks.find((block) => block.pos.join(',') === '0,0,3')!.pos = [0, 0, 2]
     expect(validateLevels([broken])).toContainEqual({ check: '无重叠', cell: '0,0,2', detail: '两块积木占用同一格' })
+  })
+})
+
+describe('第五章正式求解预算', () => {
+  it.each(mainLevels.slice(12))('$id：全新对象的状态搜索仍在两秒内', (level) => {
+    const fresh = structuredClone(level)
+    const started = performance.now()
+    const result = analyze(fresh)
+    expect(performance.now() - started).toBeLessThan(2000)
+    expect(result.minActions).toBe(targets[level.id].minActions)
+    expect(result.reachableStates).toBeLessThanOrEqual(30000)
   })
 })

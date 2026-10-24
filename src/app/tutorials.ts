@@ -5,7 +5,16 @@ import type { LevelDef } from '../game/levels/types'
 import type { SaveData } from './save'
 
 export const openingTutorialIds = ['walk', 'collect', 'rotate', 'ride', 'lift'] as const
-export const tutorialIds = [...openingTutorialIds, 'link', 'plate', 'push', 'hold', 'oneway', 'limited'] as const
+export const tutorialIds = [
+  ...openingTutorialIds,
+  'link',
+  'plate',
+  'push',
+  'hold',
+  'oneway',
+  'limited',
+  'patrol',
+] as const
 export type TutorialId = (typeof tutorialIds)[number]
 
 const lessons: Readonly<Record<string, readonly { skill: TutorialId; text: string }[]>> = {
@@ -24,6 +33,7 @@ const lessons: Readonly<Record<string, readonly { skill: TutorialId; text: strin
   ],
   'level-11': [{ skill: 'oneway', text: '顺着箭头进入路面' }],
   'level-12': [{ skill: 'limited', text: '亮点是剩余次数，撤销可恢复' }],
+  'level-13': [{ skill: 'patrol', text: '小生物会在你完成一步后走一格' }],
 }
 
 const provenSkills: Readonly<Record<string, readonly TutorialId[]>> = {
@@ -39,6 +49,7 @@ const provenSkills: Readonly<Record<string, readonly TutorialId[]>> = {
   'level-10': ['walk', 'collect', 'rotate', 'ride', 'lift', 'push', 'hold'],
   'level-11': ['walk', 'collect', 'rotate', 'ride', 'push', 'hold', 'oneway'],
   'level-12': ['walk', 'collect', 'ride', 'lift', 'push', 'hold', 'limited'],
+  'level-13': ['walk', 'collect', 'ride', 'lift', 'patrol'],
 }
 
 export function readTutorials(value: unknown): TutorialId[] {
@@ -87,6 +98,7 @@ export function createTutorialSession() {
   let plateSettled = false
   let pendingPush: { crate: string; from: string } | null = null
   let limitedSettled = false
+  let patrolMoved = false
   const resetPending = () => {
     starts = []
     ends = []
@@ -94,11 +106,16 @@ export function createTutorialSession() {
     plateSettled = false
     pendingPush = null
     limitedSettled = false
+    patrolMoved = false
   }
   return {
     observe(level: LevelDef, event: SimEvent, state: GameState): TutorialId[] {
       if (event.type === 'undo') {
         resetPending()
+        return []
+      }
+      if (event.type === 'patrol-move') {
+        patrolMoved = true
         return []
       }
       if (event.type === 'push') {
@@ -134,6 +151,7 @@ export function createTutorialSession() {
       if (pendingPush && state.crates[pendingPush.crate] !== pendingPush.from) skills.push('push')
       if (known.includes('push') && crateHoldsGate(level, state)) skills.push('hold')
       if (limitedSettled) skills.push('limited')
+      if (patrolMoved) skills.push('patrol')
       resetPending()
       return skills
     },

@@ -10,6 +10,9 @@ import level09 from './level-09'
 import level10 from './level-10'
 import level11 from './level-11'
 import level12 from './level-12'
+import level13 from './level-13'
+import level14 from './level-14'
+import level15 from './level-15'
 import sample01 from './sample-01'
 
 import type { LevelDef } from './types'
@@ -28,6 +31,9 @@ export const mainLevels = [
   level10,
   level11,
   level12,
+  level13,
+  level14,
+  level15,
 ]
 
 export const challengeLevels: LevelDef[] = []

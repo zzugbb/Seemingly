@@ -380,8 +380,11 @@ describe('v2 存档', () => {
       'oneway',
       'limited',
     ]
-    const levels = Object.fromEntries(mainLevels.map((level) => [level.id, record]))
-    const revisions = { ...levelRevisions, ...Object.fromEntries(mainLevels.slice(7).map((level) => [level.id, 1])) }
+    const levels = Object.fromEntries(mainLevels.slice(0, 12).map((level) => [level.id, record]))
+    const revisions = {
+      ...levelRevisions,
+      ...Object.fromEntries(mainLevels.slice(7, 12).map((level) => [level.id, 1])),
+    }
     memory.set(
       'seemingly:save:v2',
       JSON.stringify({ version: 2, campaign: 'remake', muted: true, levels, revisions, tutorials }),
@@ -422,4 +425,31 @@ describe('v2 存档', () => {
     expect(loadSave()).toEqual(emptySave())
     expect(() => writeSave(emptySave())).not.toThrow()
   })
+})
+
+it('正式扩展十五关时保留旧十二关全部成绩、静音与已学能力', () => {
+  storage()
+  const levels = Object.fromEntries(
+    mainLevels
+      .slice(0, 12)
+      .map((level) => [level.id, { done: true, allOrbs: true, parMet: true, bestSteps: level.solution.length }]),
+  )
+  memory.set(
+    'seemingly:save:v2',
+    JSON.stringify({
+      version: 2,
+      campaign: 'remake',
+      muted: true,
+      levels,
+      revisions: Object.fromEntries(mainLevels.slice(0, 12).map((l) => [l.id, l.revision ?? 1])),
+      tutorials: ['walk', 'collect', 'limited'],
+    }),
+  )
+  const loaded = loadSave()
+  expect(loaded.levels).toEqual(levels)
+  expect(loaded.muted).toBe(true)
+  expect(loaded.tutorials).toEqual(['walk', 'collect', 'limited'])
+  expect(loaded.levels['level-13']).toBeUndefined()
+  writeSave({ ...loaded, tutorials: [...loaded.tutorials!, 'patrol'] })
+  expect(loadSave().tutorials).toContain('patrol')
 })

@@ -15,3 +15,9 @@ describe('结尾时序', () => {
     expect(endingProgress(100, 9)).toEqual({ litCount: 9, towerLit: true, finished: true })
   })
 })
+
+it('正式十五灯在6.9秒塔亮、7.8秒显示结尾', () => {
+  expect(endingProgress(6.3, 15)).toEqual({ litCount: 15, towerLit: false, finished: false })
+  expect(endingProgress(6.9, 15)).toEqual({ litCount: 15, towerLit: true, finished: false })
+  expect(endingProgress(7.8, 15)).toEqual({ litCount: 15, towerLit: true, finished: true })
+})

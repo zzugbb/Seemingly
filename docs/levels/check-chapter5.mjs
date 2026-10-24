@@ -118,6 +118,22 @@ try {
     [2, 3, 4, 3, 3, 4, 1, 2, 2, 2, 2, 2],
   )
   if (runtimeMode) assert.equal(runtime.mainLevels.length, 15, 'T6.18尚未接入15关，设计检查不能代替正式实现')
+  if (runtimeMode) {
+    const theory = await s.ssrLoadModule('/src/audio/theory.ts')
+    assert.deepEqual(theory.courtyardClock(5), {
+      bpm: score.bpm,
+      beatSeconds: score.beat,
+      seconds: score.seconds,
+      chordSeconds: score.chordSeconds,
+      noteCount: 51,
+    })
+    assert.deepEqual(theory.chapterScale(5), score.scale)
+    for (let i = 0; i < 51; i++) assert.deepEqual(theory.courtyardNote(i, 5), score.notes[i])
+    for (let i = 0; i < 8; i++)
+      assert.deepEqual(theory.courtyardChordAt(i * score.chordSeconds + 1e-6, 5), score.chords[i])
+    assert.deepEqual(theory.finaleNotes(), finaleNotes())
+  }
+
   for (const [id, baseline] of baselines) {
     const documented = (await s.ssrLoadModule('design:' + id)).default
     const level = runtimeMode ? runtime.mainLevels.find((l) => l.id === id) : documented

@@ -26,6 +26,7 @@ const focusProfiles = {
   gate: { gain: 0.62, hold: 0.45, release: 0.4 },
   patrol: null,
   seal: { gain: 0.22, hold: 5.4, release: 0.8 },
+  finale: { gain: 0.22, hold: 2.6, release: 0.8 },
 } satisfies Record<string, FeedbackFocus | null>
 
 export type Sound = keyof typeof focusProfiles

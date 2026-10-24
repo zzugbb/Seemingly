@@ -84,6 +84,30 @@ export const targets: Record<string, LevelTarget> = {
     illusionsMin: 2,
     tradeoffsMin: 1,
   },
+  'level-13': {
+    minActions: 10,
+    minActionsAll: 14,
+    reachableStatesMin: 80,
+    randomWin: { steps: 60, maxRate: 0.2 },
+    illusionsMin: 2,
+    tradeoffsMin: 2,
+  },
+  'level-14': {
+    minActions: 13,
+    minActionsAll: 15,
+    reachableStatesMin: 80,
+    randomWin: { steps: 60, maxRate: 0.2 },
+    illusionsMin: 2,
+    tradeoffsMin: 2,
+  },
+  'level-15': {
+    minActions: 15,
+    minActionsAll: 19,
+    reachableStatesMin: 80,
+    randomWin: { steps: 60, maxRate: 0.2 },
+    illusionsMin: 2,
+    tradeoffsMin: 2,
+  },
 }
 
 export const sampleTargets: Record<string, LevelTarget> = {

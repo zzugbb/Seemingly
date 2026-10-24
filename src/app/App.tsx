@@ -27,6 +27,7 @@ export function App() {
       const challenge = (state.screen === 'play' || state.screen === 'ending') && state.current.list === 'challenge'
       const soundtrack = level?.soundtrack
       if (state.screen !== 'play' && state.screen !== 'ending') music.setProgress('explore')
+      music.setFinale(state.screen === 'ending')
       audioEngine.setMuted(state.save.muted)
       if (state.save.muted) music.stop()
       else music.start(chapter, challenge, soundtrack ?? 'generative')

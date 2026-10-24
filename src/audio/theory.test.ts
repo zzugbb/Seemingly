@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   chapterScale,
+  finaleNotes,
+  finaleChord,
   chordAt,
   chordDuration,
   chapterSealNotes,
@@ -235,4 +237,26 @@ describe('推进乐句与成功层次', () => {
       }
     }
   })
+})
+
+it('第五章独立84BPM完整利底亚乐句及塔收束，循环边界一致', () => {
+  const clock = courtyardClock(5),
+    mode = new Set(chapterScale(5).map((n) => n % 12))
+  expect(clock.bpm).toBe(84)
+  expect(clock.seconds).toBeCloseTo((128 * 60) / 84)
+  expect(clock.noteCount).toBe(51)
+  for (let i = 0; i < 51; i++) {
+    const note = courtyardNote(i, 5)
+    expect(mode.has(note.note % 12)).toBe(true)
+    expect(note.duration).toBeGreaterThan(0)
+    expect(courtyardNote(i + 51, 5).at).toBeCloseTo(note.at + clock.seconds)
+  }
+  for (let i = 0; i < 8; i++) {
+    const chord = courtyardChordAt(i * clock.chordSeconds + 1e-6, 5)
+    expect(chord.notes.every((n) => mode.has(n % 12))).toBe(true)
+  }
+  expect(courtyardChordAt(clock.seconds + 1e-6, 5)).toEqual(finaleChord)
+  expect(courtyardNote(0, 5)).not.toEqual(courtyardNote(0, 2))
+  expect(finaleNotes()).toHaveLength(5)
+  expect(finaleNotes().at(-1)!.at).toBeLessThan(0.9)
 })

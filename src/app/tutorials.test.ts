@@ -153,3 +153,37 @@ describe('首次教学', () => {
     expect(session.confirm(level, sim.state(), kept)).not.toContain('push')
   })
 })
+
+it('巡逻首次教学等真实移动提交后收起，旧十二关和等待不会提前学会', () => {
+  const save = emptySave()
+  for (const level of mainLevels.slice(0, 12))
+    save.levels[level.id] = { done: true, allOrbs: true, parMet: true, bestSteps: 8 }
+  expect(learnedTutorials(save)).not.toContain('patrol')
+  expect(nextTutorial('level-13', save)).toBe('小生物会在你完成一步后走一格')
+  const level = mainLevels[12],
+    sim = new LevelSim(level),
+    session = createTutorialSession()
+  expect(session.confirm(level, sim.state(), [])).not.toContain('patrol')
+  const step = level.solution[0]
+  expect(step.type).toBe('walk')
+  if (step.type !== 'walk') throw Error('设计基准首步应为行走')
+  expect(sim.command({ type: 'walk', tileId: sim.tileAt(step.to)!.id })).toBe('ok')
+  let sawPatrol = false
+  for (let i = 0; i < 800 && !sim.isIdle(); i++) {
+    for (const event of sim.update(1 / 30)) {
+      const skills = session.observe(level, event, sim.state())
+      if (event.type === 'patrol-move') {
+        sawPatrol = true
+        expect(sim.isIdle()).toBe(false)
+        expect(skills).not.toContain('patrol')
+      }
+    }
+  }
+  expect(sawPatrol).toBe(true)
+  save.tutorials = session.confirm(level, sim.state(), learnedTutorials(save))
+  expect(save.tutorials).toContain('patrol')
+  expect(nextTutorial('level-13', save)).toBeNull()
+  expect(sim.undo()).toBe(true)
+  expect(nextTutorial('level-13', save)).toBeNull()
+  expect(readTutorials(['patrol', 'patrol', 'unknown'])).toEqual(['patrol'])
+})

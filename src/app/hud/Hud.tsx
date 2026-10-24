@@ -5,6 +5,7 @@ export function Hud({
   muted,
   canUndo,
   thinking,
+  hintDisabled = false,
   onUndo,
   onHint,
   onRestart,
@@ -19,6 +20,7 @@ export function Hud({
   muted: boolean
   canUndo: boolean
   thinking: boolean
+  hintDisabled?: boolean
   onUndo: () => void
   onHint: () => void
   onRestart: () => void
@@ -50,7 +52,7 @@ export function Hud({
         <button className="hud-button" type="button" disabled={!canUndo} onClick={onUndo}>
           撤销
         </button>
-        <button className="hud-button" type="button" aria-busy={thinking} onClick={onHint}>
+        <button className="hud-button" type="button" disabled={hintDisabled} aria-busy={thinking} onClick={onHint}>
           {thinking ? '思考中…' : '提示'}
         </button>
         <div className="hud-desktop">{options}</div>
