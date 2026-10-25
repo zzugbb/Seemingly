@@ -274,7 +274,7 @@ describe('机关、压板与乘坐', () => {
 })
 
 describe('可达路线、合法动作与状态键', () => {
-  it('枚举同一状态的所有动作只做一次可达搜索，状态改变后重新搜索', () => {
+  it('同布局复用邻接图，位置变化后仍重新计算可达路线', () => {
     const level = fixture()
     const state = initialState(level)
     const search = vi.spyOn(iso, 'buildGraph')
@@ -282,11 +282,32 @@ describe('可达路线、合法动作与状态键', () => {
       for (const action of legalActions(level, state)) applyAction(level, state, action)
       expect(search).toHaveBeenCalledTimes(1)
       state.at = '1,0,0'
-      legalActions(level, state)
-      expect(search).toHaveBeenCalledTimes(2)
+      const actions = legalActions(level, state)
+      expect(actions).not.toContainEqual({ type: 'walk', tileId: state.at })
+      expect(actions).toContainEqual({ type: 'walk', tileId: '0,0,0' })
+      expect(reachableFrom(level, state).get('3,0,0')).toEqual(['2,0,0', '3,0,0'])
+      expect(search).toHaveBeenCalledTimes(1)
     } finally {
       search.mockRestore()
     }
+  })
+
+  it('复用静态邻接时门状态仍逐次生效，公开邻接表修改不污染缓存', () => {
+    const level = fixture((b) => b.gate({ id: 'door', tile: [1, 0, 0], mode: 'toggle' }))
+    const state = initialState(level)
+    expect(walkGraph(level, state).get(state.at)).not.toContain('1,0,0')
+    expect(reachableFrom(level, state).has('1,0,0')).toBe(false)
+    state.gates.door = true
+    const graph = walkGraph(level, state)
+    expect(graph.get(state.at)).toContain('1,0,0')
+    expect(reachableFrom(level, state).get('1,0,0')).toEqual(['1,0,0'])
+    graph.get(state.at)!.splice(0)
+    graph.delete('1,0,0')
+    expect(walkGraph(level, state).get(state.at)).toContain('1,0,0')
+    expect(walkGraph(level, state).has('1,0,0')).toBe(true)
+    state.gates.door = false
+    expect(walkGraph(level, state).get(state.at)).not.toContain('1,0,0')
+    expect(reachableFrom(level, state).has('1,0,0')).toBe(false)
   })
 
   it('共享几何只按机关位置复用，公开集合及坐标改写不会污染后续查询', () => {

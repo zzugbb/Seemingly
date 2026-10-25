@@ -37,7 +37,10 @@ interface Geometry {
   tiles: Map<string, Tile>
   blocks: Vec3[]
   occupied: Set<string>
+  oneWays: Map<string, ScreenDir>
   visible?: Set<string>
+  enterable?: Set<string>
+  graph?: Graph
 }
 const geometryCache = new WeakMap<LevelDef, Map<string, Geometry>>()
 
@@ -53,7 +56,14 @@ function geometryOf(level: LevelDef, state: GameState): Geometry {
     blocks.push(block.pos)
     if (block.kind === 'path') tiles.set(block.id, { id: block.id, pos: block.pos })
   }
-  const geometry: Geometry = { tiles, blocks, occupied: new Set(blocks.map(cellId)) }
+  const geometry: Geometry = {
+    tiles,
+    blocks,
+    occupied: new Set(blocks.map(cellId)),
+    oneWays: new Map(
+      level.blocks.flatMap((block) => (block.oneWay ? [[cellId(block.pos), block.oneWay] as const] : [])),
+    ),
+  }
   layouts.set(key, geometry)
   if (layouts.size > 64) layouts.delete(layouts.keys().next().value!)
   return geometry
@@ -61,6 +71,14 @@ function geometryOf(level: LevelDef, state: GameState): Geometry {
 
 function visibleOf(geometry: Geometry): Set<string> {
   return (geometry.visible ??= visibleTiles(geometry.tiles, geometry.blocks))
+}
+
+function graphOf(geometry: Geometry): Graph {
+  return (geometry.graph ??= buildGraph([...geometry.tiles.values()], geometry.occupied))
+}
+
+function enterableOf(geometry: Geometry): Set<string> {
+  return (geometry.enterable ??= new Set([...graphOf(geometry).keys()].filter((id) => visibleOf(geometry).has(id))))
 }
 
 export const tileRefId = (ref: TileRef): string => ('tile' in ref ? cellId(ref.tile) : `${ref.mechanism}#${ref.block}`)
@@ -130,19 +148,19 @@ export function patrolTilesOf(level: LevelDef, state: GameState): Record<string,
 
 export function gatesOf(level: LevelDef, state: GameState, departing = false): Record<string, boolean> {
   const objects = [...Object.values(state.crates), ...Object.values(patrolTilesOf(level, state))]
-  const occupants = new Set([state.at, ...objects])
-  const presses = new Set(objects)
-  if (!departing) presses.add(state.at)
-  const held = new Set(
-    level.mechanisms.flatMap((item) =>
-      item.type === 'plate' && item.mode === 'hold' && presses.has(cellId(item.tile)) ? [item.target] : [],
-    ),
-  )
+  const held = new Set<string>()
+  for (const item of level.mechanisms) {
+    if (item.type !== 'plate' || item.mode !== 'hold') continue
+    const tile = cellId(item.tile)
+    if ((!departing && state.at === tile) || objects.includes(tile)) held.add(item.target)
+  }
   const gates: Record<string, boolean> = {}
   for (const item of level.mechanisms) {
     if (item.type !== 'gate') continue
     gates[item.id] =
-      item.mode === 'toggle' ? state.gates[item.id] : held.has(item.id) || occupants.has(cellId(item.tile))
+      item.mode === 'toggle'
+        ? state.gates[item.id]
+        : held.has(item.id) || state.at === cellId(item.tile) || objects.includes(cellId(item.tile))
   }
   return gates
 }
@@ -177,8 +195,7 @@ function entryFilter(
   options: { ignoreCrate?: string; patrol?: string; gates?: Record<string, boolean> } = {},
 ) {
   const geometry = geometryOf(level, state)
-  const visible = visibleOf(geometry)
-  const occupied = geometry.occupied
+  const enterable = enterableOf(geometry)
   const crates = new Set(
     Object.entries(state.crates)
       .filter(([id]) => id !== options.ignoreCrate)
@@ -193,39 +210,35 @@ function entryFilter(
   const closed = new Set(
     level.mechanisms.flatMap((item) => (item.type === 'gate' && !gates[item.id] ? [cellId(item.tile)] : [])),
   )
-  const oneWays = new Map(
-    level.blocks.flatMap((block) => (block.oneWay ? [[cellId(block.pos), block.oneWay] as const] : [])),
-  )
-  const enterable = new Set(
-    [...tiles.values()]
-      .filter(
-        ({ id, pos: [x, y, z] }) =>
-          !crates.has(id) &&
-          !patrols.has(id) &&
-          !(options.patrol && id === state.at) &&
-          !closed.has(id) &&
-          !occupied.has(cellId([x, y + 1, z])) &&
-          visible.has(id),
-      )
-      .map((tile) => tile.id),
-  )
+  const oneWays = geometry.oneWays
   return (from: string, to: string): boolean => {
     const a = tiles.get(from),
       b = tiles.get(to)
-    return !!a && !!b && enterable.has(to) && (!oneWays.has(to) || oneWays.get(to) === directionOf(a, b))
+    return (
+      !!a &&
+      !!b &&
+      enterable.has(to) &&
+      !crates.has(to) &&
+      !patrols.has(to) &&
+      !(options.patrol && to === state.at) &&
+      !closed.has(to) &&
+      (!oneWays.has(to) || oneWays.get(to) === directionOf(a, b))
+    )
   }
 }
 
 export function walkGraph(level: LevelDef, state: GameState): Graph {
-  const { tiles, occupied } = geometryOf(level, state)
-  const graph = buildGraph([...tiles.values()], occupied)
+  const geometry = geometryOf(level, state)
+  const { tiles } = geometry
+  const graph = graphOf(geometry)
   const canEnter = entryFilter(level, state, tiles)
   // 保留当前位置的出边，遮挡只禁止进入；邻居顺序沿用 buildGraph。
   return new Map([...graph].map(([id, neighbors]) => [id, neighbors.filter((to) => canEnter(id, to))]))
 }
 
 function routesOf(level: LevelDef, state: GameState): Map<string, string[]> {
-  const key = stateKey(state)
+  // 收光、额度与一次性压板记录不参与寻路；影响通路的状态仍逐次核对，允许调用方原地更新。
+  const key = JSON.stringify([state.at, state.rotator, state.mover, state.gates, state.crates, state.patrols])
   const cached = routeCache.get(state)
   if (cached?.level === level && cached.key === key) return cached.routes
   const graph = walkGraph(level, state)
@@ -311,8 +324,9 @@ function moveMechanisms(level: LevelDef, state: GameState, source: Operable): st
 
 function movePatrols(level: LevelDef, state: GameState): Transition['patrolMoves'] {
   if (!level.patrols?.length) return []
-  const { tiles, occupied } = geometryOf(level, state)
-  const graph = buildGraph([...tiles.values()], occupied)
+  const geometry = geometryOf(level, state)
+  const { tiles } = geometry
+  const graph = graphOf(geometry)
   // 压力在整轮巡逻前、后各求值一次；同轮占位则按编号即时更新。
   const gates = gatesOf(level, state)
   const moves: Transition['patrolMoves'] = []
