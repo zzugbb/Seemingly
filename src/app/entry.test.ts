@@ -49,7 +49,7 @@ describe('标题入口', () => {
     })
   })
 
-  it('当前开放关卡全部抵达但评价未满时重访选关，评价上限按实际列表计算', () => {
+  it('主线关卡全部抵达但评价未满时重访选关，评价上限按实际列表计算', () => {
     const levels = Object.fromEntries(mainLevels.map((level) => [level.id, record(level.solution.length, true, false)]))
     const save = saveWith(levels)
     const stats = campaignStats(save, mainLevels, challengeLevels)
@@ -75,7 +75,7 @@ describe('标题入口', () => {
     })
     const save = saveWith(Object.fromEntries(mainLevels.map((level) => [level.id, record(3)])))
     expect(campaignStats(save, mainLevels, challengeLevels)).toMatchObject({ mainDone: 15, earned: 45, ratingMax: 60 })
-    expect(journeyChoice(save, mainLevels)).toMatchObject({ mode: 'revisit', caption: '当前开放的关卡已全部抵达' })
+    expect(journeyChoice(save, mainLevels)).toMatchObject({ mode: 'revisit', caption: '主线关卡已全部抵达' })
   })
 
   it('修订缺口继续第一个未抵达关，不按较大编号跳过', () => {

@@ -55,7 +55,7 @@ export function journeyChoice(save: SaveData, main: readonly LevelDef[] = mainLe
       index,
     }
   }
-  return { mode: 'revisit', label: '重访旅程', caption: '当前开放的关卡已全部抵达', index }
+  return { mode: 'revisit', label: '重访旅程', caption: '主线关卡已全部抵达', index }
 }
 
 export const levelThemes: Readonly<Record<string, string>> = {

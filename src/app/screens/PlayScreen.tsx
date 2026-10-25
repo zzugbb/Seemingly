@@ -184,7 +184,11 @@ function Run({
     setThinking(false)
   }, [sim, list, index])
   const requestHint = useCallback(async () => {
-    if (!sim.isIdle() || sim.status === 'won' || !client.current) return
+    if (!sim.isIdle() || sim.status === 'won') return
+    if (!client.current) {
+      setToast('提示暂时不可用，请稍后再试')
+      return
+    }
     const request = ++query.current
     const key = stateKey(sim.state())
     setThinking(true)
