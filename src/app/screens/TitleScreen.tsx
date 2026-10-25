@@ -35,7 +35,12 @@ export function TitleScreen() {
           <p className="entry-tagline">路看似相连，就能走过去。</p>
           {stats.showProgress && (
             <p className="entry-progress">
-              主线已抵达 {stats.mainDone}/{stats.mainCount} · 已获评价 {stats.earned}/{stats.ratingMax}
+              <span>
+                主线 {stats.mainDone}/{stats.mainCount} · 挑战 {stats.challengeDone}/{stats.challengeCount}
+              </span>
+              <span>
+                已获评价 {stats.earned}/{stats.ratingMax}
+              </span>
             </p>
           )}
           <button className="entry-primary" type="button" onClick={begin}>

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { challengeLevels, mainLevels } from '../game/levels'
 import { emptySave, type LevelRecord, type SaveData } from './save'
-import { campaignStats, chapterArrival, initialPreviewIndex, journeyChoice, selectStatus } from './entry'
+import {
+  campaignStats,
+  challengeMilestone,
+  chapterArrival,
+  initialPreviewIndex,
+  journeyChoice,
+  nextLevelIndex,
+  selectStatus,
+} from './entry'
 
 const record = (steps: number, allOrbs = true, parMet = true): LevelRecord => ({
   done: true,
@@ -104,6 +112,62 @@ describe('标题入口', () => {
       showProgress: false,
     })
     expect(journeyChoice(save, mainLevels).mode).toBe('start')
+  })
+
+  it('主线与挑战分别计数，全部抵达仍不等于全部评价', () => {
+    const save = saveWith(
+      Object.fromEntries([...mainLevels, ...challengeLevels].map((level) => [level.id, record(30, false, false)])),
+    )
+    expect(campaignStats(save)).toMatchObject({
+      mainDone: 15,
+      mainCount: 15,
+      challengeDone: 5,
+      challengeCount: 5,
+      earned: 20,
+      ratingMax: 60,
+    })
+    expect(journeyChoice(save).caption).toBe('主线关卡已全部抵达')
+    delete save.levels['challenge-3']
+    expect(campaignStats(save)).toMatchObject({ mainDone: 15, challengeDone: 4 })
+  })
+
+  it('60项全部取得后更换标题说明，缺一项时保留主线说明', () => {
+    const save = saveWith(Object.fromEntries([...mainLevels, ...challengeLevels].map((level) => [level.id, record(3)])))
+    expect(journeyChoice(save)).toMatchObject({ mode: 'revisit', caption: '全部关卡与评价已完成' })
+    save.levels['challenge-2'].parMet = false
+    expect(campaignStats(save).earned).toBe(59)
+    expect(journeyChoice(save).caption).toBe('主线关卡已全部抵达')
+  })
+})
+
+describe('挑战完成与连续进入', () => {
+  it.each(challengeLevels)('最后补完的是 $id 时同样触发全挑战收尾，重玩不重复触发', (last) => {
+    const after = saveWith(Object.fromEntries(challengeLevels.map((level) => [level.id, record(30, false, false)])))
+    const before = structuredClone(after)
+    delete before.levels[last.id]
+    expect(challengeMilestone(before, before)).toBeUndefined()
+    expect(challengeMilestone(before, after)).toBe('全部挑战已抵达')
+    expect(challengeMilestone(after, after)).toBeUndefined()
+  })
+
+  it('下一挑战锁定时回选关，补齐对应母章才提供下一关，不跳过锁定关', () => {
+    const save = saveWith(
+      Object.fromEntries(mainLevels.map((level) => [level.id, record(30, level.chapter !== 2, false)])),
+    )
+    expect(nextLevelIndex(save, 'challenge', 0)).toBeNull()
+    for (const level of mainLevels.filter((level) => level.chapter === 2)) save.levels[level.id].allOrbs = true
+    expect(nextLevelIndex(save, 'challenge', 0)).toBe(1)
+    expect(nextLevelIndex(save, 'challenge', 4)).toBeNull()
+    expect(nextLevelIndex(save, 'challenge', -1)).toBeNull()
+    expect(nextLevelIndex(save, 'challenge', 5)).toBeNull()
+  })
+
+  it('主线下一关照常解锁，终章和内部样段没有下一关', () => {
+    expect(nextLevelIndex(emptySave(), 'main', 0)).toBeNull()
+    const save = saveWith({ 'level-01': record(3) })
+    expect(nextLevelIndex(save, 'main', 0)).toBe(1)
+    expect(nextLevelIndex(save, 'main', 14)).toBeNull()
+    expect(nextLevelIndex(save, 'sample', 0)).toBeNull()
   })
 })
 

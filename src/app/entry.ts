@@ -1,11 +1,13 @@
 import { challengeLevels, mainLevels } from '../game/levels'
 import type { LevelDef } from '../game/levels/types'
 import type { SaveData } from './save'
-import { firstPlayableIndex, isUnlocked } from './store'
+import { firstPlayableIndex, isUnlocked, levelLists, type LevelList } from './store'
 
 export interface CampaignStats {
   mainDone: number
   mainCount: number
+  challengeDone: number
+  challengeCount: number
   earned: number
   ratingMax: number
   showProgress: boolean
@@ -34,13 +36,19 @@ export function campaignStats(
   return {
     mainDone,
     mainCount: main.length,
+    challengeDone: challenge.filter((level) => save.levels[level.id]?.done).length,
+    challengeCount: challenge.length,
     earned,
     ratingMax: formal.length * 3,
     showProgress: mainDone > 0 || earned > 0,
   }
 }
 
-export function journeyChoice(save: SaveData, main: readonly LevelDef[] = mainLevels): JourneyChoice {
+export function journeyChoice(
+  save: SaveData,
+  main: readonly LevelDef[] = mainLevels,
+  challenge: readonly LevelDef[] = challengeLevels,
+): JourneyChoice {
   const index = firstPlayableIndex(save)
   const done = main.filter((level) => save.levels[level.id]?.done).length
   const level = main[index]
@@ -55,7 +63,20 @@ export function journeyChoice(save: SaveData, main: readonly LevelDef[] = mainLe
       index,
     }
   }
-  return { mode: 'revisit', label: '重访旅程', caption: '主线关卡已全部抵达', index }
+  const stats = campaignStats(save, main, challenge)
+  const caption = stats.earned === stats.ratingMax ? '全部关卡与评价已完成' : '主线关卡已全部抵达'
+  return { mode: 'revisit', label: '重访旅程', caption, index }
+}
+
+export function challengeMilestone(before: SaveData, after: SaveData): string | undefined {
+  const completed = (save: SaveData) =>
+    challengeLevels.length > 0 && challengeLevels.every((level) => save.levels[level.id]?.done)
+  return !completed(before) && completed(after) ? '全部挑战已抵达' : undefined
+}
+
+export function nextLevelIndex(save: SaveData, list: LevelList, index: number): number | null {
+  if (list === 'sample' || !levelLists[list][index] || !isUnlocked(save, list, index + 1)) return null
+  return index + 1
 }
 
 export const levelThemes: Readonly<Record<string, string>> = {

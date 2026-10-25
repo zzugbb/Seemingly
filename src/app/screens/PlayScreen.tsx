@@ -20,6 +20,7 @@ import { isUnlocked, levelLists, useApp, type LevelList } from '../store'
 import { playNewRatings, playSimEvent } from '../sounds'
 import { prepareHints } from '../hints'
 import { createTutorialSession, learnedTutorials, nextTutorial } from '../tutorials'
+import { challengeMilestone, nextLevelIndex } from '../entry'
 
 export function PlayScreen() {
   const current = useApp((state) => state.current)
@@ -72,6 +73,7 @@ function Run({
   const goEnding = useApp((state) => state.goEnding)
   const toggleMute = useApp((state) => state.toggleMute)
   const muted = useApp((state) => state.save.muted)
+  const nextIndex = useApp((state) => nextLevelIndex(state.save, list, index))
   const quality = useApp((state) => state.quality)
   const tutorial = useApp((state) => nextTutorial(level.id, state.save))
   const learnTutorials = useApp((state) => state.learnTutorials)
@@ -82,7 +84,12 @@ function Run({
   const reducedMotion = prefersReducedMotion()
   const sim = useMemo(() => new LevelSim(level), [level])
   const [toast, setToast] = useState<string | null>(null)
-  const [result, setResult] = useState<{ ratings: RatingsValue; steps: number; unlocked: string } | null>(null)
+  const [result, setResult] = useState<{
+    ratings: RatingsValue
+    steps: number
+    unlocked: string
+    message?: string
+  } | null>(null)
   const [endingReady, setEndingReady] = useState(false)
   const [hint, setHint] = useState<RenderHint | null>(null)
   const [thinking, setThinking] = useState(true)
@@ -288,15 +295,17 @@ function Run({
       steps,
       ratings: { done: true, allOrbs, parMet: !usedHint.current && minimum !== null && steps <= minimum },
       unlocked: newlyUnlocked.length ? `解锁了${newlyUnlocked.join('、')}` : '',
+      message: list === 'challenge' ? challengeMilestone(before, after) : undefined,
     })
     if (level.ending) goEnding()
   }
-  const hasNext = list === 'main' && index + 1 < levelLists.main.length
+  const hasNext = nextIndex !== null
   const status = playStatus(tactile, hud, motionNotice)
   const footer = !result && sim.status !== 'won' ? (status ?? (list === 'main' ? tutorial : null)) : null
   const label = sample ? '独立体验' : list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
   const message =
-    !hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined
+    result?.message ??
+    (!hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined)
   return (
     <div className={`screen${list === 'challenge' ? ' challenge-screen' : ''}${sample ? ' sample-screen' : ''}`}>
       <Canvas
@@ -418,7 +427,7 @@ function Run({
           unlocked={result.unlocked}
           message={message}
           action={hasNext ? '下一关' : '回到选关'}
-          onAction={() => (hasNext ? play(list, index + 1) : goSelect())}
+          onAction={() => (nextIndex !== null ? play(list, nextIndex) : goSelect())}
           onRetry={onRestart}
         />
       )}

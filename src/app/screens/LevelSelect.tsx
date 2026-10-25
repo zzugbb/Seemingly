@@ -60,7 +60,12 @@ export function LevelSelect() {
             <h1>选择关卡</h1>
             {stats.showProgress && (
               <p className="entry-progress">
-                主线已抵达 {stats.mainDone}/{stats.mainCount} · 已获评价 {stats.earned}/{stats.ratingMax}
+                <span>
+                  主线 {stats.mainDone}/{stats.mainCount} · 挑战 {stats.challengeDone}/{stats.challengeCount}
+                </span>
+                <span>
+                  已获评价 {stats.earned}/{stats.ratingMax}
+                </span>
               </p>
             )}
             {chapterNames.map((name, chapterIndex) => {

@@ -701,6 +701,8 @@ button:disabled:hover {
 }
 
 .entry-progress {
+  display: grid;
+  gap: 2px;
   margin: 24px 0 0;
   font-size: 13px;
   line-height: 1.6;

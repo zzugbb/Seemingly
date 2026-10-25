@@ -703,3 +703,9 @@ README与三张正式实景、旧九关分享简介更新；不修改玩法源�
 静态邻接图、单向格及未被顶压／遮挡的可进入集合并入rules.ts既有Geometry缓存，仍按关卡身份与机关布局复用、最多64布局，initialState清理。行走与巡逻读取同一静态邻接，保持buildGraph邻居顺序；门、人物、箱子、巡逻占位及按住压力不缓存，逐状态过滤。公开walkGraph仍返回独立Map和邻接数组，不能污染静态缓存。
 
 路线缓存键包含at、rotator、mover、gates、crates、patrols，每次查询核对，支持调用方原地修改；orbs、spentPlates、handleUses和won不改变通路，不再为路线复用重复序列化。求解器完整stateKey仍包含全部字段，动作合法性、求值顺序、规模与两秒门槛不变。gatesOf仅减少临时集合，保留离板压力与门内占位。具体等价及性能记录见[性能检查](performance.md#ci求解性能修复t622b)，远程修复结果须后续用户授权推送后确认。
+
+## T6.22c完成反馈与导航
+
+entry.campaignStats增加challengeDone／challengeCount，标题与选关同样分两行展示抵达及评价。journeyChoice保持主线续玩／重访判定，仅在正式历史评价全满时替换caption。challengeMilestone比较completeLevel前后历史done，最后缺口从任意挑战补齐时返回全通文案；只存在本次result，撤销／重开清理，不写新存档或持久标记。
+
+nextLevelIndex只调用原isUnlocked检查当前列表的下一编号，不搜索或跳过锁定项；PlayScreen订阅该派生索引，主线及挑战完成后按该索引进入下一关或回选关，内部样段不连续进入。主线最终关仍优先goEnding，十五灯与声音生命周期保持，无新每帧状态、Worker或监听器。
