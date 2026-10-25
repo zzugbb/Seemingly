@@ -302,6 +302,11 @@ body {
   animation: fade-in 0.2s ease;
 }
 
+.challenge-screen .toast {
+  color: var(--ink);
+  background: rgba(255, 247, 234, 0.94);
+}
+
 .result {
   position: absolute;
   top: 96px;

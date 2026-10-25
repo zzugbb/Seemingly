@@ -1,4 +1,4 @@
-import { mainLevels } from '../game/levels'
+import { challengeLevels, mainLevels } from '../game/levels'
 import type { LevelDef } from '../game/levels/types'
 import type { SaveData } from './save'
 import { firstPlayableIndex, isUnlocked } from './store'
@@ -26,7 +26,7 @@ export const ratingCount = (record: Pick<SaveData['levels'][string], 'done' | 'a
 export function campaignStats(
   save: SaveData,
   main: readonly Pick<LevelDef, 'id'>[] = mainLevels,
-  challenge: readonly Pick<LevelDef, 'id'>[] = [],
+  challenge: readonly Pick<LevelDef, 'id'>[] = challengeLevels,
 ): CampaignStats {
   const formal = [...main, ...challenge]
   const earned = formal.reduce((count, level) => count + ratingCount(save.levels[level.id]), 0)
@@ -59,6 +59,11 @@ export function journeyChoice(save: SaveData, main: readonly LevelDef[] = mainLe
 }
 
 export const levelThemes: Readonly<Record<string, string>> = {
+  'challenge-1': '三庭的回访顺序',
+  'challenge-2': '两端错开的渡台',
+  'challenge-3': '同桥的正反控制',
+  'challenge-4': '同一个箱的三次交接',
+  'challenge-5': '运回重量，让出站位',
   'level-01': '第一束光',
   'level-02': '改变连接',
   'level-03': '随建筑移动',

@@ -30,14 +30,18 @@ export function LevelSelect() {
   const toggleMute = useApp((state) => state.toggleMute)
   const save = useApp((state) => state.save)
   const wide = useDesktopPreview()
-  const [preview, setPreview] = useState(() => initialPreviewIndex(save))
+  const [preview, setPreview] = useState<{ list: 'main' | 'challenge'; index: number }>(() => ({
+    list: 'main',
+    index: initialPreviewIndex(save),
+  }))
   const stats = campaignStats(save, mainLevels, challengeLevels)
   const settings = qualitySettings(useApp((state) => state.quality))
   const reducedMotion = prefersReducedMotion()
-  const previewLevel = mainLevels[preview] ?? mainLevels[0]!
+  const previewLevel = (preview.list === 'main' ? mainLevels : challengeLevels)[preview.index] ?? mainLevels[0]!
   const sim = useMemo(() => new LevelSim(previewLevel), [previewLevel])
-  const show = (index: number) => {
-    if (isUnlocked(save, 'main', index)) setPreview(index)
+  const show = (list: 'main' | 'challenge', index: number) => {
+    if (isUnlocked(save, list, index))
+      setPreview((previous) => (previous.list === list && previous.index === index ? previous : { list, index }))
   }
 
   return (
@@ -85,8 +89,8 @@ export function LevelSelect() {
                           className={`entry-card entry-card-${status.status}`}
                           type="button"
                           disabled={status.status === 'locked'}
-                          onMouseEnter={() => show(index)}
-                          onFocus={() => show(index)}
+                          onMouseEnter={() => show('main', index)}
+                          onFocus={() => show('main', index)}
                           onClick={() => play('main', index)}
                         >
                           <span className="entry-card-heading">
@@ -120,9 +124,11 @@ export function LevelSelect() {
                     return (
                       <button
                         key={level.id}
-                        className="entry-card"
+                        className={`entry-card${unlocked ? '' : ' entry-card-locked'}`}
                         type="button"
                         disabled={!unlocked}
+                        onMouseEnter={() => show('challenge', index)}
+                        onFocus={() => show('challenge', index)}
                         onClick={() => play('challenge', index)}
                       >
                         <span className="entry-card-heading">
@@ -135,6 +141,7 @@ export function LevelSelect() {
                           </span>
                         </span>
                         <span className="entry-card-name">{level.title}</span>
+                        <span className="entry-card-theme">{levelThemes[level.id]}</span>
                         <Ratings value={save.levels[level.id]} minimum={targets[level.id]?.minActions} />
                         {!unlocked && (
                           <span className="entry-card-status">
@@ -174,7 +181,8 @@ export function LevelSelect() {
               </div>
               <div className="entry-preview-copy" key={previewLevel.id}>
                 <p>
-                  第 {preview + 1} 关 · {previewLevel.title}
+                  {preview.list === 'challenge' ? `挑战 ${previewLevel.chapter}` : `第 ${preview.index + 1} 关`} ·{' '}
+                  {previewLevel.title}
                 </p>
                 {levelThemes[previewLevel.id] && <p>{levelThemes[previewLevel.id]}</p>}
               </div>

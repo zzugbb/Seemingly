@@ -4,6 +4,7 @@ export interface Chord {
   notes: readonly number[]
 }
 export const CHORD_SECONDS = 8
+const CHALLENGE_RATE = 0.9
 export type Soundtrack = 'generative' | 'courtyard'
 
 export const COURTYARD_SECONDS = 96
@@ -166,7 +167,17 @@ const openingClock: CourtyardClock = {
   beatSeconds: COURTYARD_BEAT_SECONDS,
   noteCount: COURTYARD_NOTE_COUNT,
 }
-export function courtyardClock(chapter: Chapter): CourtyardClock {
+export function courtyardClock(chapter: Chapter, challenge = false): CourtyardClock {
+  if (challenge) {
+    const clock = courtyardClock(chapter)
+    return {
+      ...clock,
+      bpm: clock.bpm * CHALLENGE_RATE,
+      seconds: clock.seconds / CHALLENGE_RATE,
+      chordSeconds: clock.chordSeconds / CHALLENGE_RATE,
+      beatSeconds: clock.beatSeconds / CHALLENGE_RATE,
+    }
+  }
   if (chapter === 5)
     return {
       bpm: finalScore.bpm,
@@ -258,8 +269,8 @@ const chapterPhrases = (chapter: 3 | 4) => {
 const riseNotes = chapterPhrases(3)
 const weightNotes = chapterPhrases(4)
 
-export function courtyardChordAt(seconds: number, chapter: Chapter = 2): Chord {
-  const time = Math.max(0, seconds)
+export function courtyardChordAt(seconds: number, chapter: Chapter = 2, challenge = false): Chord {
+  const time = Math.max(0, seconds) * (challenge ? CHALLENGE_RATE : 1)
   if (chapter === 5) return finalScore.chords[Math.floor(time / finalScore.chordSeconds) % finalScore.chords.length]
   if (chapter === 3 || chapter === 4) {
     const chords = chapter === 3 ? riseChords : weightChords
@@ -268,7 +279,11 @@ export function courtyardChordAt(seconds: number, chapter: Chapter = 2): Chord {
   const chords = chapter === 1 ? dawnChords : courtyardChords
   return chords[Math.floor(time / COURTYARD_CHORD_SECONDS) % chords.length]
 }
-export function courtyardNote(index: number, chapter: Chapter = 2): ScoreNote {
+export function courtyardNote(index: number, chapter: Chapter = 2, challenge = false): ScoreNote {
+  if (challenge) {
+    const note = courtyardNote(index, chapter)
+    return { ...note, at: note.at / CHALLENGE_RATE, duration: note.duration / CHALLENGE_RATE }
+  }
   const count = Math.max(0, Math.floor(index))
   if (chapter === 5) {
     const note = finalScore.notes[count % finalScore.notes.length]
@@ -289,14 +304,20 @@ export function courtyardNote(index: number, chapter: Chapter = 2): ScoreNote {
     pan: count % 2 === 0 ? -0.18 : 0.18,
   }
 }
-export function courtyardPulse(index: number, chapter: Chapter = 2): ScoreNote {
+export function courtyardPulse(index: number, chapter: Chapter = 2, challenge = false): ScoreNote {
   const count = Math.max(0, Math.floor(index))
-  const beat = courtyardClock(chapter).beatSeconds
+  const beat = courtyardClock(chapter, challenge).beatSeconds
   const at = count * beat + beat / 2
-  const chord = courtyardChordAt(at, chapter)
+  const chord = courtyardChordAt(at, chapter, challenge)
   let note = chord.notes[[1, 2, 3, 2, 0, 2, 1, 3][count % 8]]
   while (note < 60) note += 12
-  return { at, note, duration: 0.7, velocity: count % 4 === 0 ? 1 : 0.76, pan: count % 2 === 0 ? -0.3 : 0.3 }
+  return {
+    at,
+    note,
+    duration: 0.7 / (challenge ? CHALLENGE_RATE : 1),
+    velocity: count % 4 === 0 ? 1 : 0.76,
+    pan: count % 2 === 0 ? -0.3 : 0.3,
+  }
 }
 export function chapterSealNotes(chapter: 3 | 4): ScoreNote[] {
   const root = chapter === 3 ? 62 : 63

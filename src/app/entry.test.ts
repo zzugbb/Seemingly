@@ -15,7 +15,12 @@ const saveWith = (levels: SaveData['levels']): SaveData => ({ ...emptySave(), le
 describe('标题入口', () => {
   it('空进度从第一关开始，不显示伪造评价', () => {
     const stats = campaignStats(emptySave(), mainLevels, challengeLevels)
-    expect(stats).toMatchObject({ mainDone: 0, earned: 0, ratingMax: mainLevels.length * 3, showProgress: false })
+    expect(stats).toMatchObject({
+      mainDone: 0,
+      earned: 0,
+      ratingMax: (mainLevels.length + challengeLevels.length) * 3,
+      showProgress: false,
+    })
     expect(journeyChoice(emptySave(), mainLevels)).toMatchObject({
       mode: 'start',
       label: '开始旅程',
@@ -55,13 +60,13 @@ describe('标题入口', () => {
     expect(journeyChoice(save, mainLevels).label).toBe('重访旅程')
   })
 
-  it('前六关完成后继续第七关，十五关评价齐全才重访', () => {
+  it('前六关完成后继续第七关，十五关抵达后重访，挑战不阻塞主线', () => {
     const six = saveWith(Object.fromEntries(mainLevels.slice(0, 6).map((level) => [level.id, record(3)])))
     expect(campaignStats(six, mainLevels, challengeLevels)).toMatchObject({
       mainDone: 6,
       mainCount: 15,
       earned: 18,
-      ratingMax: 45,
+      ratingMax: 60,
     })
     expect(journeyChoice(six, mainLevels)).toMatchObject({
       mode: 'continue',
@@ -69,7 +74,7 @@ describe('标题入口', () => {
       index: 6,
     })
     const save = saveWith(Object.fromEntries(mainLevels.map((level) => [level.id, record(3)])))
-    expect(campaignStats(save, mainLevels, challengeLevels)).toMatchObject({ mainDone: 15, earned: 45, ratingMax: 45 })
+    expect(campaignStats(save, mainLevels, challengeLevels)).toMatchObject({ mainDone: 15, earned: 45, ratingMax: 60 })
     expect(journeyChoice(save, mainLevels)).toMatchObject({ mode: 'revisit', caption: '当前开放的关卡已全部抵达' })
   })
 
@@ -151,10 +156,10 @@ describe('选关状态', () => {
   })
 })
 
-it('旧十二关完整进度接上第十三关，评价保留并扩为45项', () => {
+it('旧十二关完整进度接上第十三关，主线评价保留且合计扩为60项', () => {
   const save = saveWith(
     Object.fromEntries(mainLevels.slice(0, 12).map((level) => [level.id, record(level.solution.length, true, true)])),
   )
-  expect(campaignStats(save)).toMatchObject({ mainDone: 12, mainCount: 15, earned: 36, ratingMax: 45 })
+  expect(campaignStats(save)).toMatchObject({ mainDone: 12, mainCount: 15, earned: 36, ratingMax: 60 })
   expect(journeyChoice(save)).toMatchObject({ mode: 'continue', index: 12, caption: '前往 第 13 关 · 留步' })
 })

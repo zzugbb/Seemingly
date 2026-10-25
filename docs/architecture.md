@@ -670,10 +670,18 @@ Scene在塔实际亮起时触发一次finale音序，14盏装饰灯不发完整�
 
 完整十五关的性能、生产子路径、加载、连续进度与用户确认统一见[性能检查](performance.md)。只改绘制提交，不修改规则、关卡、targets、revision、存档格式、已确认混音或依赖；真机长期帧率限制保留。本地提交不代表已推送发布或开始挑战章。
 
-## T6.20挑战设计合同（尚未接入）
+## T6.20挑战设计合同（T6.21已接入）
 
-[挑战交接](levels/challenges.md)和challenge-1～5给出五个独立LevelDef与精确targets；check-challenges.mjs从文档严格编译、默认检查设计，--runtime在T6.21接入后比对正式五关、目标和顺序，并锁定十五关对象不变。当前challengeLevels仍空；设计检查不能代替正式运行。
+[挑战交接](levels/challenges.md)和challenge-1～5给出五个独立LevelDef与精确targets；check-challenges.mjs从文档严格编译、默认检查设计，--runtime在T6.21接入后比对正式五关、目标和顺序，并锁定十五关对象不变。T6.20设计时challengeLevels为空，现已由T6.21正式接入；设计检查仍不能代替正式运行。
 
 正式接线范围：挑战卡桌面预览复用真实Scene、手机不挂预览；挑战完成统一返回选关，避免下一母章未解锁时“下一关”无效；复用主线tactile、运动／到位状态与正文墨色无解吐司，但不写教学或恢复常驻说明。保存格式与规则保持，挑战只增加独立成绩及revision 1。
 
-courtyard目前没有应用challenge的90%时钟。T6.21须同时缩放音符、和弦、脉冲、循环、currentChord与暂停／切换，不仅延长八音盒间隔；反馈音速度与h1电平保持。慢速新听感待用户试听，不继承母章原速确认。运行源码、音轨和前十五关本轮均未改。
+T6.20时courtyard没有应用challenge的90%时钟；T6.21现已同时缩放音符、和弦、脉冲、循环、currentChord与暂停／切换，不仅延长八音盒间隔；反馈音速度与h1电平保持。慢速新听感待用户试听，不继承母章原速确认。运行源码、音轨和前十五关本轮均未改。
+
+## T6.21挑战正式接入
+
+五个challenge-N完整对象、目标与revision 1已按T6.20合同导出，十五关及原targets未改。levelLists／hint.worker沿用原管线，metrics新增挑战列表；campaignStats默认汇总20关／60项，主线续玩与十五灯仍只看15关。存档格式保持v2，挑战成绩分别历史累计，不推断或写入主线教学。
+
+LevelSelect以列表与索引记录预览，同一Canvas按真实LevelDef切换，重复悬停不重建sim；锁定项不改变预览，手机不挂预览。PlayScreen挑战完成总回选关，复用tactile与临时运动／到位，空闲不显示首次教学或常驻底栏。无解吐司仅在challenge-screen使用正文墨色与暖白底，主线样式保持。
+
+courtyardClock／Note／Pulse／ChordAt增加缺省false的challenge参数。真实播放秒数保持不变，纯函数将谱面起音、时值、拍长与周期除以0.9，按实际秒×0.9查询和声；MusicPlayer所有循环、前瞻和currentChord读取同一配置。静音保存真实elapsed，恢复跳过已过音符；返回母章清除challenge并按既有交叉淡化切回原速，不修改h1电平或反馈音速度。新慢速听感待T6.22用户确认。

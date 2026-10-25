@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mainLevels, sampleLevels, levelRevisions, type LevelDef } from '../game/levels'
+import { challengeLevels, mainLevels, sampleLevels, levelRevisions, type LevelDef } from '../game/levels'
 import { targets } from '../game/levels/targets'
 import { emptySave, loadSave } from './save'
 import { campaignStats, ratingCount } from './entry'
@@ -46,7 +46,7 @@ describe('进度与评价', () => {
     useApp.setState({ save })
     const complete = useApp.getState().completeLevel
     expect(campaignStats(save).earned).toBe(15)
-    expect(campaignStats(save).ratingMax).toBe(45)
+    expect(campaignStats(save).ratingMax).toBe(60)
     expect(isUnlocked(save, 'main', 6)).toBe(true)
     const id = 'level-04'
     complete(id, { steps: 8, allOrbs: false, usedHint: true })
@@ -147,4 +147,54 @@ describe('进度与评价', () => {
     expect(isUnlocked(save, 'challenge', 1, lists)).toBe(true)
     expect(isUnlocked(save, 'challenge', 2, lists)).toBe(false)
   })
+})
+
+it('正式五挑战按母章解锁，与挑战完成次序和步数评价无关', () => {
+  const save = emptySave()
+  for (let index = 0; index < 5; index++) {
+    const chapter = mainLevels.filter((level) => level.chapter === index + 1)
+    expect(isUnlocked(save, 'challenge', index)).toBe(false)
+    for (const level of chapter) save.levels[level.id] = { done: true, allOrbs: false, parMet: false, bestSteps: 99 }
+    expect(isUnlocked(save, 'challenge', index)).toBe(index === 0)
+    for (const level of chapter.slice(0, 2)) save.levels[level.id].allOrbs = true
+    expect(isUnlocked(save, 'challenge', index)).toBe(index === 0)
+    save.levels[chapter[2].id].allOrbs = true
+    expect(isUnlocked(save, 'challenge', index)).toBe(true)
+  }
+  useApp.setState({ save })
+  useApp.getState().play('challenge', 4)
+  expect(useApp.getState().current).toEqual({ list: 'challenge', index: 4 })
+  expect(challengeLevels).toHaveLength(5)
+})
+
+it('旧十五关45项保留，挑战补评分别累计且不写主线教学，刷新后为48/60', () => {
+  const memory = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => memory.get(key) ?? null,
+    setItem: (key: string, value: string) => memory.set(key, value),
+  })
+  const records = Object.fromEntries(
+    mainLevels.map((l) => [l.id, { done: true, allOrbs: true, parMet: true, bestSteps: targets[l.id].minActions }]),
+  )
+  useApp.setState({ save: { ...emptySave(), levels: records, tutorials: ['walk'], muted: true } })
+  const original = structuredClone(records)
+  const app = useApp.getState()
+  expect(campaignStats(app.save)).toMatchObject({ mainDone: 15, earned: 45, ratingMax: 60 })
+  app.play('challenge', 1)
+  app.learnTutorials(['ride', 'patrol'])
+  app.completeLevel('challenge-2', { steps: 21, allOrbs: true, usedHint: true })
+  expect(useApp.getState().save.levels['challenge-2']).toEqual({
+    done: true,
+    allOrbs: true,
+    parMet: false,
+    bestSteps: 21,
+  })
+  app.completeLevel('challenge-2', { steps: 16, allOrbs: false, usedHint: false })
+  app.completeLevel('challenge-2', { steps: 30, allOrbs: false, usedHint: true })
+  const loaded = loadSave()
+  expect(loaded.levels['challenge-2']).toEqual({ done: true, allOrbs: true, parMet: true, bestSteps: 16 })
+  expect(loaded.tutorials).toEqual(['walk'])
+  expect(loaded.muted).toBe(true)
+  for (const [id, record] of Object.entries(original)) expect(loaded.levels[id]).toEqual(record)
+  expect(campaignStats(loaded)).toMatchObject({ mainDone: 15, earned: 48, ratingMax: 60 })
 })

@@ -8,12 +8,12 @@ const server = await createServer({
 })
 
 try {
-  const { levels, sampleLevels } = await server.ssrLoadModule('/src/game/levels/index.ts')
+  const { levels, challengeLevels, sampleLevels } = await server.ssrLoadModule('/src/game/levels/index.ts')
   const { targets, sampleTargets } = await server.ssrLoadModule('/src/game/levels/targets.ts')
   const { measureLevel, RANDOM_RUNS, RANDOM_SEED } = await server.ssrLoadModule('/src/game/core/metrics.ts')
   console.log(`随机模拟：固定种子 ${RANDOM_SEED}，每关 ${RANDOM_RUNS} 次；未登记目标的关卡统一使用 30 步预算。`)
   console.table(
-    [...levels, ...sampleLevels].map((level) => {
+    [...levels, ...challengeLevels, ...sampleLevels].map((level) => {
       const report = measureLevel(level, (targets[level.id] ?? sampleTargets[level.id])?.randomWin?.steps)
       return {
         关卡: level.id,

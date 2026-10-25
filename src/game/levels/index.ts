@@ -1,3 +1,8 @@
+import challenge1 from './challenge-1'
+import challenge2 from './challenge-2'
+import challenge3 from './challenge-3'
+import challenge4 from './challenge-4'
+import challenge5 from './challenge-5'
 import level01 from './level-01'
 import level02 from './level-02'
 import level03 from './level-03'
@@ -36,7 +41,7 @@ export const mainLevels = [
   level15,
 ]
 
-export const challengeLevels: LevelDef[] = []
+export const challengeLevels: LevelDef[] = [challenge1, challenge2, challenge3, challenge4, challenge5]
 export const levels = mainLevels
 export const sampleLevels = [sample01]
 export const levelRevisions: Record<string, number> = Object.fromEntries(

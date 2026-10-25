@@ -260,3 +260,35 @@ it('第五章独立84BPM完整利底亚乐句及塔收束，循环边界一致',
   expect(finaleNotes()).toHaveLength(5)
   expect(finaleNotes().at(-1)!.at).toBeLessThan(0.9)
 })
+
+describe('挑战乐句的统一时钟', () => {
+  it.each([1, 2, 3, 4, 5] as const)('第%i章的音符、和弦、脉冲和循环都按90%速度，音高与力度保持', (chapter) => {
+    const normal = courtyardClock(chapter)
+    const slow = courtyardClock(chapter, true)
+    expect(slow.bpm).toBeCloseTo(normal.bpm * 0.9)
+    for (const field of ['seconds', 'chordSeconds', 'beatSeconds'] as const)
+      expect(slow[field]).toBeCloseTo(normal[field] / 0.9)
+    expect(slow.noteCount).toBe(normal.noteCount)
+    for (let index = 0; index < normal.noteCount * 3; index++) {
+      const a = courtyardNote(index, chapter)
+      const b = courtyardNote(index, chapter, true)
+      expect(b.at).toBeCloseTo(a.at / 0.9)
+      expect(b.duration).toBeCloseTo(a.duration / 0.9)
+      expect([b.note, b.velocity, b.pan]).toEqual([a.note, a.velocity, a.pan])
+    }
+    for (let index = 0; index < 384; index++) {
+      const a = courtyardPulse(index, chapter)
+      const b = courtyardPulse(index, chapter, true)
+      expect(b.at).toBeCloseTo(a.at / 0.9)
+      expect(b.duration).toBeCloseTo(a.duration / 0.9)
+      expect([b.note, b.velocity, b.pan]).toEqual([a.note, a.velocity, a.pan])
+    }
+    for (let index = 0; index < 24; index++)
+      for (const offset of [-0.0001, 0.0001]) {
+        const t = index * normal.chordSeconds + offset
+        expect(courtyardChordAt(t / 0.9, chapter, true)).toEqual(courtyardChordAt(t, chapter))
+      }
+    expect(courtyardClock(chapter)).toEqual(normal)
+    expect(courtyardChordAt(-5, chapter, true)).toEqual(courtyardChordAt(0, chapter))
+  })
+})

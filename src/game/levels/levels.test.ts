@@ -89,12 +89,19 @@ describe('主线五章', () => {
     ])
     expect(mainLevels.slice(0, 6).map((level) => level.revision)).toEqual([2, 3, 4, 3, 3, 4])
     expect(mainLevels.slice(6, 12).map((level) => level.revision)).toEqual([1, 2, 2, 2, 2, 2])
-    expect(Object.keys(targets)).toEqual(mainLevels.map((level) => level.id))
-    expect(challengeLevels).toEqual([])
+    expect(Object.keys(targets)).toEqual([...mainLevels, ...challengeLevels].map((level) => level.id))
+    expect(challengeLevels.map((level) => [level.id, level.title, level.chapter, level.revision])).toEqual([
+      ['challenge-1', '回针', 1, 1],
+      ['challenge-2', '分岸', 2, 1],
+      ['challenge-3', '逆织', 3, 1],
+      ['challenge-4', '递位', 4, 1],
+      ['challenge-5', '相托', 5, 1],
+    ])
+    expect(challengeLevels.every((level) => level.challenge && !level.ending)).toBe(true)
     expect(mainLevels.slice(0, 14).every((level) => !level.ending)).toBe(true)
     expect(mainLevels[14].ending?.lanterns).toHaveLength(15)
   })
-  it.each(mainLevels)(
+  it.each([...mainLevels, ...challengeLevels])(
     '$id：通过全部结构、安全、解法、可见性、规模与难度校验',
     (level) => {
       expect(validateLevels([level], targets)).toEqual([])
@@ -759,5 +766,17 @@ describe('第五章正式求解预算', () => {
     expect(performance.now() - started).toBeLessThan(2000)
     expect(result.minActions).toBe(targets[level.id].minActions)
     expect(result.reachableStates).toBeLessThanOrEqual(30000)
+  })
+})
+
+describe('挑战正式求解预算', () => {
+  it.each(challengeLevels)('$id：独立新对象冷求解与规模门槛保持', (level) => {
+    const started = performance.now()
+    const metrics = analyze(structuredClone(level))
+    expect(performance.now() - started).toBeLessThan(2000)
+    expect(metrics.minActions).toBe(targets[level.id].minActions)
+    expect(metrics.minActionsAll).toBe(targets[level.id].minActionsAll)
+    expect(metrics.reachableStates).toBeGreaterThanOrEqual(150)
+    expect(metrics.reachableStates).toBeLessThanOrEqual(100000)
   })
 })

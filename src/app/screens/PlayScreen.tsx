@@ -64,7 +64,7 @@ function Run({
   onStart: () => void
 }) {
   const sample = list === 'sample'
-  const tactile = list === 'main' || sample
+  const tactile = list === 'main' || list === 'challenge' || sample
   const ending = useApp((state) => state.screen === 'ending')
   const goSelect = useApp((state) => (sample ? state.goTitle : state.goSelect))
   const play = useApp((state) => state.play)
@@ -287,14 +287,14 @@ function Run({
     })
     if (level.ending) goEnding()
   }
-  const hasNext = index + 1 < levelLists[list].length
+  const hasNext = list === 'main' && index + 1 < levelLists.main.length
   const status = playStatus(tactile, hud, motionNotice)
-  const footer = !result && sim.status !== 'won' ? (status ?? tutorial) : null
+  const footer = !result && sim.status !== 'won' ? (status ?? (list === 'main' ? tutorial : null)) : null
   const label = sample ? '独立体验' : list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
   const message =
     !hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined
   return (
-    <div className={`screen${sample ? ' sample-screen' : ''}`}>
+    <div className={`screen${list === 'challenge' ? ' challenge-screen' : ''}${sample ? ' sample-screen' : ''}`}>
       <Canvas
         className="stage"
         orthographic
@@ -326,7 +326,7 @@ function Run({
           onUnreachable={() => playSound('unreachable')}
           onTowerLit={() => playSound('finale')}
           onWon={won}
-          onBlocked={(text) => setToast(blockedCopy(list, level, text))}
+          onBlocked={(text) => setToast(blockedCopy(level, text))}
         />
       </Canvas>
       {started && (!ending || !endingReady) && (
@@ -351,7 +351,7 @@ function Run({
           }
         />
       )}
-      {!ending && list === 'main' && footer && (
+      {!ending && !sample && footer && (
         <footer className="hints" aria-live="polite">
           <span>{footer}</span>
         </footer>
@@ -422,8 +422,8 @@ function Run({
   )
 }
 
-function blockedCopy(list: LevelList, level: LevelDef, text: string): string {
-  if ((list !== 'main' && list !== 'sample') || !text.includes('换个角度')) return text
+function blockedCopy(level: LevelDef, text: string): string {
+  if (!text.includes('换个角度')) return text
   const adjustable = level.mechanisms.some((item) => item.type === 'rotator' || item.type === 'mover')
   if (adjustable) return '这里还没连通，试试调整建筑'
   if (level.mechanisms.length === 0) return '这里还没连通'
