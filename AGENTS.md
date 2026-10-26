@@ -13,10 +13,9 @@ Seemingly（中文名：积木错位）是一款浏览器里的等距视角解�
 | 1 | [docs/decisions.md](docs/decisions.md) | 每次都读。所有已定的决策，不要推翻 |
 | 2 | [docs/roadmap.md](docs/roadmap.md) | 每次都读。找到你要做的任务编号和验收标准 |
 | 3 | [docs/architecture.md](docs/architecture.md) | 写代码前读。目标架构、接口定义、目录规则 |
-| 4 | [docs/design.md](docs/design.md) | 涉及玩法、机关、界面流程时读 |
-| 5 | [docs/level-design.md](docs/level-design.md) | 制作或修改关卡时必读 |
+| 4 | [docs/design.md](docs/design.md) | 涉及玩法、机关、界面或视觉时读 |
+| 5 | [docs/level-design.md](docs/level-design.md) | 制作或修改关卡、检查运动净空时必读 |
 | 6 | `docs/levels/` 中对应的设计稿 | 实现某一关时必读，这是该关的唯一依据 |
-| 7 | [docs/art-direction.md](docs/art-direction.md) | 涉及画面、角色、配色、界面样式时读 |
 
 ## 工作方式
 

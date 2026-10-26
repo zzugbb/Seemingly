@@ -24,8 +24,6 @@
 | 遮挡 | [14 相守](level-14.md) | 13／15 | 1 | 箱与巡逻同时守门并保持回路 |
 | 遮挡 | [15 归来](level-15.md) | 15／19 | 1 | 取远庭光后联动揭退路，交换守门职责 |
 
-第三、四章构图参考：[停靠](../assets/design-07-mobile.png)、[联动](../assets/design-08-mobile.png)、[牵引](../assets/design-09-mobile.png)、[推动](../assets/design-10-mobile.png)、[越界](../assets/design-11-mobile.png)、[重量](../assets/design-12-mobile.png)。第五章和挑战的构图图见各关稿；这些图是设计参考，不代表真机性能测试。
-
 ## 挑战
 
 第一章通关解锁挑战一，其余各母章三关全收集后解锁。完成后仅在下一编号挑战已解锁时提供“下一关”，否则回选关，不跳过锁定项、不进入十五灯结局。
@@ -53,7 +51,7 @@
 
 每份稿保留教学点、投影草图、坐标与元素清单、标准解、干扰／恢复、难度目标和完整参考实现。`## 完整参考实现`（TS）与 `## 自动验证基准`（JSON）标题和代码围栏被校验器读取，不删除或改格式。前六关对应参考实现也作为正式设计依据保留。
 
-先读[关卡制作规范](../level-design.md)及[运动净空](../motion-clearance.md)，按完整稿实现，不额外补路或借旧版本数据。修改任一谜题须先获得用户和指定设计者授权；正式设计与源码、targets不一致时先反馈，不删断言或放宽门槛。修订只影响对应关的旧评价，不能清空全部存档。
+先读[关卡制作规范](../level-design.md)及[运动净空](../level-design.md#运动净空)，按完整稿实现，不额外补路或借旧版本数据。修改任一谜题须先获得用户和指定设计者授权；正式设计与源码、targets不一致时先反馈，不删断言或放宽门槛。修订只影响对应关的旧评价，不能清空全部存档。
 
 屏幕草图通常使用 `(a,b)=(x-y,z-y)`；`@`为起点，`G`为灯笼，`o`／`O`为必需／选做光点，数字为高度。具体以各稿图例为准，不能把投影坐标直接当世界坐标。
 
@@ -63,14 +61,9 @@
 node docs/levels/check-designs.mjs --runtime
 node docs/levels/check-chapter5.mjs --runtime
 node docs/levels/check-challenges.mjs --runtime
-npm run metrics
 npm run typecheck && npm run format:check && npm test && npm run build
 ```
 
 前三个命令分别核对第7～12关、第五章、五挑战的完整TS、源码／targets一致性、最短与全收集解、全部提示、关键反事实及181姿态净空；同时保护既有正式数据。去掉 `--runtime` 只检查设计，不能代替正式对象比对。前六关由正常测试与单关稿覆盖。
 
 [chapter-scores.mjs](chapter-scores.mjs)和[chapter-5-score.mjs](chapter-5-score.mjs)保留第三至五章独立谱面基准，校验器会与源码比对；这些文件不是试听资源，也不是待删除临时脚本。精确指标在各稿JSON中，数值通过不代替用户难度体验或真机性能验证。
-
-## 内部回归样段
-
-sample-01仅通过 `?sample=1` 进入，不在正常导航出现。它复用第五关建筑，主线11／全收集12步，保持独立ID、revision 1、进入说明和完成卡；不写正式成绩、解锁或主线教学，不播放正式评价奖励。当前测试仍依赖其乘坐、显露、提示与存档隔离，因此保留源码及测试，不另存重复设计稿。

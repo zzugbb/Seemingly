@@ -12,8 +12,6 @@
 
 共同行为、章节衔接与验证命令见[关卡索引](README.md)。
 
-![挑战2手机原型](../assets/design-challenge-2-mobile.png)
-
 ## 屏幕草图
 
 `(a,b)=(x-y,z-y)`；数字是高度。@起点、G灯笼、o必需、*选做、M活动路面、p普通路面、h按住板、t触发板、D门。光点与起终点优先标记；草图是现有rules生成的开局路面快照，门的模式、状态和单向入格方向以下表及完整实现为准，岛屿不可行走。
@@ -36,96 +34,12 @@ b\a    -3   -2   -1    0    1    2    3    4    5    6    7
 
 沿用母章的暖色积木、青绿机关、浅顶板、暖白人物与固定相机。岛屿4处，装饰6件。所有机关把手要在手机构图内可见且可点，人物运动使用现有轻微收身，遮挡时沿用剪影，不消除合法的投影错觉连接。
 
-岛屿精确范围：`[{"x":[-3,3],"z":[-2,3],"y":-1,"depth":2.5},{"x":[4,9],"z":[0,6],"y":-1,"depth":3.5},{"x":[10,12],"z":[6,8],"y":1,"depth":4},{"x":[10,13],"z":[2,6],"y":6,"depth":0.6}]`。其余装饰的坐标及类型在完整实现内；静态积木全部如下，重复高度列出的实体是柱体，不能当成额外路。
+岛屿精确范围：`[{"x":[-3,3],"z":[-2,3],"y":-1,"depth":2.5},{"x":[4,9],"z":[0,6],"y":-1,"depth":3.5},{"x":[10,12],"z":[6,8],"y":1,"depth":4},{"x":[10,13],"z":[2,6],"y":6,"depth":0.6}]`。其余装饰的坐标及类型在完整实现内；下表仅列非岛面结构与路面；岛面按上述范围生成，不逐格重复。完整建筑以参考实现为准，柱体不是额外路面。
 
 | 世界坐标 | 类型 | 颜色 | 单向入格 |
 | --- | --- | --- | --- |
-| `[-3, -1, -2]` | solid | sand | — |
-| `[-3, -1, -1]` | solid | sand | — |
-| `[-3, -1, 0]` | solid | sand | — |
-| `[-3, -1, 1]` | solid | sand | — |
-| `[-3, -1, 2]` | solid | sand | — |
-| `[-3, -1, 3]` | solid | sand | — |
-| `[-2, -1, -2]` | solid | sand | — |
-| `[-2, -1, -1]` | solid | sand | — |
-| `[-2, -1, 0]` | solid | sand | — |
-| `[-2, -1, 1]` | solid | sand | — |
-| `[-2, -1, 2]` | solid | sand | — |
-| `[-2, -1, 3]` | solid | sand | — |
-| `[-1, -1, -2]` | solid | sand | — |
-| `[-1, -1, -1]` | solid | sand | — |
-| `[-1, -1, 0]` | solid | sand | — |
-| `[-1, -1, 1]` | solid | sand | — |
-| `[-1, -1, 2]` | solid | sand | — |
-| `[-1, -1, 3]` | solid | sand | — |
-| `[0, -1, -2]` | solid | sand | — |
-| `[0, -1, -1]` | solid | sand | — |
-| `[0, -1, 0]` | solid | sand | — |
-| `[0, -1, 1]` | solid | sand | — |
-| `[0, -1, 2]` | solid | sand | — |
-| `[0, -1, 3]` | solid | sand | — |
-| `[1, -1, -2]` | solid | sand | — |
-| `[1, -1, -1]` | solid | sand | — |
-| `[1, -1, 0]` | solid | sand | — |
-| `[1, -1, 1]` | solid | sand | — |
-| `[1, -1, 2]` | solid | sand | — |
-| `[1, -1, 3]` | solid | sand | — |
-| `[2, -1, -2]` | solid | sand | — |
-| `[2, -1, -1]` | solid | sand | — |
-| `[2, -1, 0]` | solid | sand | — |
-| `[2, -1, 1]` | solid | sand | — |
-| `[2, -1, 2]` | solid | sand | — |
-| `[2, -1, 3]` | solid | sand | — |
-| `[3, -1, -2]` | solid | sand | — |
-| `[3, -1, -1]` | solid | sand | — |
-| `[3, -1, 0]` | solid | sand | — |
-| `[3, -1, 1]` | solid | sand | — |
-| `[3, -1, 2]` | solid | sand | — |
-| `[3, -1, 3]` | solid | sand | — |
 | `[0, 0, 2]` | path | terracotta | — |
 | `[1, 0, 2]` | path | terracotta | — |
-| `[4, -1, 0]` | solid | sand | — |
-| `[4, -1, 1]` | solid | sand | — |
-| `[4, -1, 2]` | solid | sand | — |
-| `[4, -1, 3]` | solid | sand | — |
-| `[4, -1, 4]` | solid | sand | — |
-| `[4, -1, 5]` | solid | sand | — |
-| `[4, -1, 6]` | solid | sand | — |
-| `[5, -1, 0]` | solid | sand | — |
-| `[5, -1, 1]` | solid | sand | — |
-| `[5, -1, 2]` | solid | sand | — |
-| `[5, -1, 3]` | solid | sand | — |
-| `[5, -1, 4]` | solid | sand | — |
-| `[5, -1, 5]` | solid | sand | — |
-| `[5, -1, 6]` | solid | sand | — |
-| `[6, -1, 0]` | solid | sand | — |
-| `[6, -1, 1]` | solid | sand | — |
-| `[6, -1, 2]` | solid | sand | — |
-| `[6, -1, 3]` | solid | sand | — |
-| `[6, -1, 4]` | solid | sand | — |
-| `[6, -1, 5]` | solid | sand | — |
-| `[6, -1, 6]` | solid | sand | — |
-| `[7, -1, 0]` | solid | sand | — |
-| `[7, -1, 1]` | solid | sand | — |
-| `[7, -1, 2]` | solid | sand | — |
-| `[7, -1, 3]` | solid | sand | — |
-| `[7, -1, 4]` | solid | sand | — |
-| `[7, -1, 5]` | solid | sand | — |
-| `[7, -1, 6]` | solid | sand | — |
-| `[8, -1, 0]` | solid | sand | — |
-| `[8, -1, 1]` | solid | sand | — |
-| `[8, -1, 2]` | solid | sand | — |
-| `[8, -1, 3]` | solid | sand | — |
-| `[8, -1, 4]` | solid | sand | — |
-| `[8, -1, 5]` | solid | sand | — |
-| `[8, -1, 6]` | solid | sand | — |
-| `[9, -1, 0]` | solid | sand | — |
-| `[9, -1, 1]` | solid | sand | — |
-| `[9, -1, 2]` | solid | sand | — |
-| `[9, -1, 3]` | solid | sand | — |
-| `[9, -1, 4]` | solid | sand | — |
-| `[9, -1, 5]` | solid | sand | — |
-| `[9, -1, 6]` | solid | sand | — |
 | `[6, 0, 4]` | solid | teal | — |
 | `[6, 1, 4]` | solid | teal | — |
 | `[6, 2, 4]` | solid | teal | — |
@@ -141,39 +55,10 @@ b\a    -3   -2   -1    0    1    2    3    4    5    6    7
 | `[1, 1, -1]` | path | rose | — |
 | `[-2, 0, -1]` | solid | terracotta | — |
 | `[-2, 1, -1]` | path | terracotta | — |
-| `[10, 1, 6]` | solid | sand | — |
-| `[10, 1, 7]` | solid | sand | — |
-| `[10, 1, 8]` | solid | sand | — |
-| `[11, 1, 6]` | solid | sand | — |
-| `[11, 1, 7]` | solid | sand | — |
-| `[11, 1, 8]` | solid | sand | — |
-| `[12, 1, 6]` | solid | sand | — |
-| `[12, 1, 7]` | solid | sand | — |
-| `[12, 1, 8]` | solid | sand | — |
 | `[12, 2, 8]` | solid | rose | — |
 | `[12, 3, 8]` | solid | rose | — |
 | `[12, 4, 8]` | solid | rose | — |
 | `[12, 5, 8]` | path | rose | — |
-| `[10, 6, 2]` | solid | sand | — |
-| `[10, 6, 3]` | solid | sand | — |
-| `[10, 6, 4]` | solid | sand | — |
-| `[10, 6, 5]` | solid | sand | — |
-| `[10, 6, 6]` | solid | sand | — |
-| `[11, 6, 2]` | solid | sand | — |
-| `[11, 6, 3]` | solid | sand | — |
-| `[11, 6, 4]` | solid | sand | — |
-| `[11, 6, 5]` | solid | sand | — |
-| `[11, 6, 6]` | solid | sand | — |
-| `[12, 6, 2]` | solid | sand | — |
-| `[12, 6, 3]` | solid | sand | — |
-| `[12, 6, 4]` | solid | sand | — |
-| `[12, 6, 5]` | solid | sand | — |
-| `[12, 6, 6]` | solid | sand | — |
-| `[13, 6, 2]` | solid | sand | — |
-| `[13, 6, 3]` | solid | sand | — |
-| `[13, 6, 4]` | solid | sand | — |
-| `[13, 6, 5]` | solid | sand | — |
-| `[13, 6, 6]` | solid | sand | — |
 | `[2, 1, -1]` | path | rose | — |
 | `[2, 0, -1]` | solid | rose | — |
 | `[10, 8, 6]` | path | rose | — |

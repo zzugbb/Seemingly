@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defineLevel, type LevelBuilder } from '../levels/builders'
 import { mainLevels } from '../levels'
-import sample from '../levels/sample-01'
 import { checkMotionClearance } from './clearance'
 import { advanceBrace, braceScale } from './shapes'
 
@@ -27,7 +26,7 @@ const supportedByBasicSweep = (level: { crates?: unknown[]; mechanisms: { type: 
   )
 
 describe('建筑运动净空', () => {
-  it.each([...mainLevels, sample].filter(supportedByBasicSweep))(
+  it.each(mainLevels.filter(supportedByBasicSweep))(
     '$id：可达姿态全扫掠，结构、顶板、底座和角色不相交',
     (level) => {
       const report = checkMotionClearance(level)

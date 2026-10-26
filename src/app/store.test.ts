@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { challengeLevels, mainLevels, sampleLevels, levelRevisions, type LevelDef } from '../game/levels'
+import { challengeLevels, mainLevels, levelRevisions, type LevelDef } from '../game/levels'
 import { targets } from '../game/levels/targets'
 import { emptySave, loadSave } from './save'
 import { campaignStats, ratingCount } from './entry'
@@ -7,7 +7,7 @@ import { firstPlayableIndex, isUnlocked, useApp } from './store'
 beforeEach(() => useApp.setState({ screen: 'title', current: { list: 'main', index: 0 }, save: emptySave() }))
 afterEach(() => vi.unstubAllGlobals())
 describe('进度与评价', () => {
-  it('已学教学跨重进与刷新保留、重复事件不写档，不写样段或影响评价', () => {
+  it('已学教学跨重进与刷新保留、重复事件不写档，不写挑战教学或影响评价', () => {
     const memory = new Map<string, string>()
     const setItem = vi.fn((key: string, value: string) => memory.set(key, value))
     vi.stubGlobal('localStorage', { getItem: (key: string) => memory.get(key) ?? null, setItem })
@@ -23,7 +23,9 @@ describe('进度与评价', () => {
     expect(setItem).toHaveBeenCalledTimes(1)
     app.completeLevel('level-01', { steps: 3, allOrbs: true, usedHint: false })
     expect(useApp.getState().save.levels['level-01'].parMet).toBe(true)
-    app.play('sample', 0)
+    app.completeLevel('level-02', { steps: 3, allOrbs: true, usedHint: false })
+    app.completeLevel('level-03', { steps: 4, allOrbs: true, usedHint: false })
+    app.play('challenge', 0)
     const before = useApp.getState().save
     app.learnTutorials(['lift', 'ride'])
     expect(useApp.getState().save).toBe(before)
@@ -61,17 +63,13 @@ describe('进度与评价', () => {
     expect(campaignStats(loadSave()).earned).toBe(16)
     expect(isUnlocked(loadSave(), 'main', 5)).toBe(true)
   })
-  it('独立样段随时可进入，通关不写入主线评价、修订或解锁', () => {
+  it('非正式关卡不能写入评价或修订，也不能解锁主线', () => {
     const before = useApp.getState().save
-    useApp.getState().play('sample', 0)
-    expect(useApp.getState().current).toEqual({ list: 'sample', index: 0 })
-    expect(useApp.getState().screen).toBe('play')
-    useApp.getState().completeLevel(sampleLevels[0].id, { steps: 12, allOrbs: true, usedHint: false })
+    useApp.getState().completeLevel('sample-01', { steps: 12, allOrbs: true, usedHint: false })
     expect(useApp.getState().save).toBe(before)
-    expect(levelRevisions[sampleLevels[0].id]).toBeUndefined()
+    expect(levelRevisions['sample-01']).toBeUndefined()
     expect(firstPlayableIndex(before)).toBe(0)
     expect(isUnlocked(before, 'main', 1)).toBe(false)
-    expect(isUnlocked(before, 'sample', 1)).toBe(false)
   })
   it('逐关解锁并继续到第一个未通关关卡，未知记录不解锁', () => {
     const save = emptySave()
@@ -133,7 +131,7 @@ describe('进度与评价', () => {
       { id: 'y', chapter: 2 },
       { id: 'z', chapter: 3 },
     ] as LevelDef[]
-    const lists = { main, challenge, sample: [] },
+    const lists = { main, challenge },
       save = emptySave()
     const record = { done: true, allOrbs: false, bestSteps: 3, parMet: false }
     save.levels.a = record

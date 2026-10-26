@@ -7,7 +7,7 @@ import { musicStage } from '../../audio/theory'
 import { stateKey } from '../../game/core/rules'
 import { LevelSim, type SimEvent } from '../../game/core/sim'
 import { type LevelDef } from '../../game/levels'
-import { sampleTargets, targets } from '../../game/levels/targets'
+import { targets } from '../../game/levels/targets'
 import { Scene } from '../../game/render/Scene'
 import type { RenderHint } from '../../game/render/feedback'
 import { prefersReducedMotion, qualitySettings } from '../../game/render/quality'
@@ -31,22 +31,11 @@ export function PlayScreen() {
 
 function LevelPlay({ level, list, index }: { level: LevelDef; list: LevelList; index: number }) {
   const [runId, setRunId] = useState(0)
-  const [started, setStarted] = useState(list !== 'sample')
   const restart = useCallback(() => {
     if (useApp.getState().screen === 'ending') useApp.getState().play(list, index)
     setRunId((id) => id + 1)
   }, [list, index])
-  return (
-    <Run
-      key={runId}
-      level={level}
-      list={list}
-      index={index}
-      onRestart={restart}
-      started={started}
-      onStart={() => setStarted(true)}
-    />
-  )
+  return <Run key={runId} level={level} list={list} index={index} onRestart={restart} />
 }
 
 function Run({
@@ -54,20 +43,14 @@ function Run({
   list,
   index,
   onRestart,
-  started,
-  onStart,
 }: {
   level: LevelDef
   list: LevelList
   index: number
   onRestart: () => void
-  started: boolean
-  onStart: () => void
 }) {
-  const sample = list === 'sample'
-  const tactile = list === 'main' || list === 'challenge' || sample
   const ending = useApp((state) => state.screen === 'ending')
-  const goSelect = useApp((state) => (sample ? state.goTitle : state.goSelect))
+  const goSelect = useApp((state) => state.goSelect)
   const play = useApp((state) => state.play)
   const completeLevel = useApp((state) => state.completeLevel)
   const goEnding = useApp((state) => state.goEnding)
@@ -78,7 +61,7 @@ function Run({
   const tutorial = useApp((state) => nextTutorial(level.id, state.save))
   const learnTutorials = useApp((state) => state.learnTutorials)
   const lessons = useRef(createTutorialSession())
-  const chapterPause = !sample && (level.id === 'level-09' || level.id === 'level-12')
+  const chapterPause = level.id === 'level-09' || level.id === 'level-12'
   const [showChapterResult, setShowChapterResult] = useState(false)
   const settings = useMemo(() => qualitySettings(quality), [quality])
   const reducedMotion = prefersReducedMotion()
@@ -93,9 +76,8 @@ function Run({
   const [endingReady, setEndingReady] = useState(false)
   const [hint, setHint] = useState<RenderHint | null>(null)
   const [thinking, setThinking] = useState(true)
-  const target = (sample ? sampleTargets : targets)[level.id]
+  const target = targets[level.id]
   const [minimum, setMinimum] = useState<number | null>(target?.minActions ?? null)
-  const [showSampleResult, setShowSampleResult] = useState(false)
   const [motionNotice, setMotionNotice] = useState<{ text: string; settled: boolean } | null>(null)
   const usedHint = useRef(false)
   const patrolMoving = useRef(false)
@@ -160,15 +142,6 @@ function Run({
   }, [level, target])
 
   useEffect(() => {
-    if (!sample || !result) {
-      setShowSampleResult(false)
-      return
-    }
-    const timer = window.setTimeout(() => setShowSampleResult(true), reducedMotion ? 200 : 2200)
-    return () => window.clearTimeout(timer)
-  }, [sample, result, reducedMotion])
-
-  useEffect(() => {
     if (!chapterPause || !result) {
       setShowChapterResult(false)
       return
@@ -217,7 +190,6 @@ function Run({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
-        !started ||
         event.repeat ||
         (event.target instanceof HTMLElement &&
           (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)))
@@ -237,7 +209,7 @@ function Run({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [goSelect, ending, started, onRestart, undo, requestHint])
+  }, [goSelect, ending, onRestart, undo, requestHint])
   useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(null), 1800)
@@ -257,12 +229,9 @@ function Run({
       music.setProgress(musicStage(progress, sim.status === 'won'))
     if (list === 'main') learnTutorials(lessons.current.observe(level, event, sim.state()))
     refresh()
-    if (tactile) {
-      if (event.type === 'walk-start' || event.type === 'undo') setMotionNotice(null)
-      if (event.type === 'mechanism-start' || event.type === 'mechanism-end') {
-        setMotionNotice(mechanismNotice(level, event.id, event.type === 'mechanism-end'))
-      }
-    }
+    if (event.type === 'walk-start' || event.type === 'undo') setMotionNotice(null)
+    if (event.type === 'mechanism-start' || event.type === 'mechanism-end')
+      setMotionNotice(mechanismNotice(level, event.id, event.type === 'mechanism-end'))
     if (event.type === 'patrol-move') {
       patrolMoving.current = true
       setMotionNotice({ text: '小生物正在移动', settled: false })
@@ -281,10 +250,6 @@ function Run({
     const steps = sim.steps()
     const progress = sim.orbProgress()
     const allOrbs = progress.collected === progress.total
-    if (sample) {
-      setResult({ steps, ratings: { done: true, allOrbs, parMet: false }, unlocked: '' })
-      return
-    }
     completeLevel(level.id, { steps, allOrbs, usedHint: usedHint.current })
     const after = useApp.getState().save
     playNewRatings(before.levels[level.id], after.levels[level.id])
@@ -300,14 +265,11 @@ function Run({
     if (level.ending) goEnding()
   }
   const hasNext = nextIndex !== null
-  const status = playStatus(tactile, hud, motionNotice)
+  const status = playStatus(hud, motionNotice)
   const footer = !result && sim.status !== 'won' ? (status ?? (list === 'main' ? tutorial : null)) : null
-  const label = sample ? '独立体验' : list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
-  const message =
-    result?.message ??
-    (!hasNext && list === 'main' ? (levelLists.main.length === 12 ? '第五章即将开放' : '后续章节即将开放') : undefined)
+  const label = list === 'challenge' ? `挑战 ${level.chapter}` : `${index + 1}`
   return (
-    <div className={`screen${list === 'challenge' ? ' challenge-screen' : ''}${sample ? ' sample-screen' : ''}`}>
+    <div className={`screen${list === 'challenge' ? ' challenge-screen' : ''}`}>
       <Canvas
         className="stage"
         orthographic
@@ -322,8 +284,8 @@ function Run({
           sim={sim}
           quality={settings}
           reducedMotion={reducedMotion}
-          tactile={tactile}
-          interactive={!ending && started}
+          tactile
+          interactive={!ending}
           hint={hint}
           onEndingReady={() => setEndingReady(true)}
           onEvent={onEvent}
@@ -342,7 +304,7 @@ function Run({
           onBlocked={(text) => setToast(blockedCopy(level, text))}
         />
       </Canvas>
-      {started && (!ending || !endingReady) && (
+      {(!ending || !endingReady) && (
         <Hud
           label={`${label} · ${level.title}`}
           steps={hud.steps}
@@ -356,68 +318,16 @@ function Run({
           onRestart={onRestart}
           onSelect={goSelect}
           onToggleMute={toggleMute}
-          selectLabel={sample ? '回到标题' : undefined}
-          description={
-            sample
-              ? `必需光点 ${hud.requiredCollected}/${hud.required} · 选做${hud.collected > hud.requiredCollected ? '已发现' : '未发现'}`
-              : undefined
-          }
         />
       )}
-      {!ending && !sample && footer && (
+      {!ending && footer && (
         <footer className="hints" aria-live="polite">
           <span>{footer}</span>
         </footer>
       )}
       <Toast message={toast} />
-      {sample && !started && (
-        <section className="sample-card sample-intro" aria-label="叠庭体验说明">
-          <p className="sample-eyebrow">独立体验</p>
-          <h1>{level.title}</h1>
-          <p>收集两束光，点亮庭院尽头的灯。</p>
-          <p className="sample-caption">
-            转轮转动桥臂 · 拉杆升降平台
-            <br />
-            点击浅色路面行走，站在平台上可以随它移动。
-          </p>
-          <div className="result-actions">
-            <button className="hud-button" type="button" onClick={onStart}>
-              走进庭院
-            </button>
-            <button className="hud-button" type="button" onClick={goSelect}>
-              返回
-            </button>
-          </div>
-        </section>
-      )}
-      {sample && started && !result && (
-        <footer className="hints sample-status" aria-live="polite">
-          <span>
-            {status ??
-              (hud.requiredCollected === hud.required ? '光已集齐，灯笼等待点亮' : '转轮转动桥臂 · 拉杆升降平台')}
-          </span>
-        </footer>
-      )}
-      {sample && result && showSampleResult && (
-        <section className="sample-card sample-result" aria-label="叠庭体验完成" aria-live="polite">
-          <p className="sample-eyebrow">{result.ratings.allOrbs ? '全部光点已找到' : '庭院已点亮'}</p>
-          <h2>{result.ratings.allOrbs ? '每一束光，都回到了庭院' : '灯亮了，回廊也有了新的模样'}</h2>
-          <p>
-            {result.ratings.allOrbs ? '你也探索了上层侧翼，找到了远处的光。' : '远处还有一束选做的光，等待下一次探索。'}
-          </p>
-          <p className="sample-caption">本次行走与操作共 {result.steps} 步</p>
-          <div className="result-actions">
-            <button className="hud-button" type="button" onClick={onRestart}>
-              再探索一次
-            </button>
-            <button className="hud-button" type="button" onClick={goSelect}>
-              回到标题
-            </button>
-          </div>
-        </section>
-      )}
       {ending && endingReady && <Ending />}
-      {result && !sample && !ending && !level.ending && (!chapterPause || showChapterResult) && (
+      {result && !ending && !level.ending && (!chapterPause || showChapterResult) && (
         <CompleteBanner
           title={level.title}
           ratings={{ ...result.ratings, parMet: !usedHint.current && minimum !== null && result.steps <= minimum }}
@@ -425,7 +335,7 @@ function Run({
           steps={result.steps}
           minimum={minimum}
           unlocked={result.unlocked}
-          message={message}
+          message={result.message}
           action={hasNext ? '下一关' : '回到选关'}
           onAction={() => (nextIndex !== null ? play(list, nextIndex) : goSelect())}
           onRetry={onRestart}
@@ -444,11 +354,9 @@ function blockedCopy(level: LevelDef, text: string): string {
 }
 
 function playStatus(
-  tactile: boolean,
   hud: { busy: boolean; walking: boolean },
   notice: { text: string; settled: boolean } | null,
 ): string | null {
-  if (!tactile) return null
   if (hud.busy) return hud.walking ? '正在前往路面' : (notice?.text ?? '建筑正在移动')
   return notice?.text ?? null
 }

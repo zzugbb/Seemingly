@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { challengeLevels, mainLevels, sampleLevels } from '../game/levels'
+import { challengeLevels, mainLevels } from '../game/levels'
 import { applyAction, initialState, stateKey, type Action } from '../game/core/rules'
 import { buildPolicy } from '../game/core/solver'
 import type { HintRequest, HintResponse } from './hints'
@@ -13,7 +13,7 @@ scope.onmessage = ({ data }: MessageEvent<HintRequest>) => {
       send({ type: 'hint', request: data.request, action: policy.get(data.key) ?? null })
       return
     }
-    const level = [...mainLevels, ...challengeLevels, ...sampleLevels].find((item) => item.id === data.id)
+    const level = [...mainLevels, ...challengeLevels].find((item) => item.id === data.id)
     if (!level) throw new Error('未知关卡')
     policy = buildPolicy(level)
     let state = initialState(level)

@@ -75,7 +75,7 @@ export function challengeMilestone(before: SaveData, after: SaveData): string | 
 }
 
 export function nextLevelIndex(save: SaveData, list: LevelList, index: number): number | null {
-  if (list === 'sample' || !levelLists[list][index] || !isUnlocked(save, list, index + 1)) return null
+  if (!levelLists[list][index] || !isUnlocked(save, list, index + 1)) return null
   return index + 1
 }
 

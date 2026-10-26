@@ -4,9 +4,8 @@ import { LevelSim } from '../core/sim'
 import { surfaceY } from '../core/iso'
 import { analyze } from '../core/solver'
 import { validateLevels } from '../core/validate'
-import sample from './sample-01'
 import level05 from './level-05'
-import { sampleTargets, targets } from './targets'
+import { targets } from './targets'
 import type { SolutionStep } from './types'
 
 function step(sim: LevelSim, action: SolutionStep) {
@@ -14,10 +13,9 @@ function step(sim: LevelSim, action: SolutionStep) {
   for (let frame = 0; frame < 800 && !sim.isIdle(); frame++) sim.update(1 / 30)
   expect(sim.isIdle()).toBe(true)
 }
-describe.each([
-  ['独立样段：叠庭', sample, sampleTargets],
-  ['正式第五关：叠庭', level05, { 'level-05': targets['level-05'] }],
-] as const)('%s', (_title, level, levelTargets) => {
+describe('第五关：叠庭', () => {
+  const level = level05
+  const levelTargets = { 'level-05': targets['level-05'] }
   const fullSolution: SolutionStep[] = [
     ...level.solution.slice(0, 5),
     { type: 'walk', to: [-2, 1, -1] },

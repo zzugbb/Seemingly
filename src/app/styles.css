@@ -125,30 +125,6 @@ body {
   letter-spacing: 0.06em;
 }
 
-.title-center {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.title-center h1 {
-  margin: 0;
-  font-size: 64px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-}
-
-.title-center p {
-  margin: 12px 0 28px;
-  letter-spacing: 0.42em;
-  color: var(--ink-soft);
-}
-
 .title-actions {
   display: flex;
   gap: 12px;
@@ -183,88 +159,6 @@ body {
 .screen {
   height: 100%;
   touch-action: none;
-}
-.select-screen {
-  height: 100%;
-  overflow-y: auto;
-  touch-action: pan-y;
-  padding: calc(88px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));
-}
-.chapter-list {
-  max-width: 920px;
-  margin: auto;
-}
-.chapter-list section + section {
-  margin-top: 32px;
-}
-.chapter-list h1 {
-  margin: 0 0 16px;
-  font-size: 20px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-}
-
-.back {
-  position: fixed;
-  top: 28px;
-  left: 32px;
-  z-index: 4;
-}
-
-.level-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.level-card {
-  width: 100%;
-  min-width: 0;
-  flex: 1 1 0;
-  min-height: 150px;
-  border: 1px solid rgba(74, 58, 82, 0.16);
-  border-radius: 24px;
-  background: var(--card);
-  color: var(--ink);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font: inherit;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-}
-
-.level-card:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.level-index {
-  font-size: clamp(20px, 2.2vw, 28px);
-  letter-spacing: 0.08em;
-}
-
-.level-name {
-  letter-spacing: 0.2em;
-}
-
-.lantern {
-  width: 10px;
-  height: 14px;
-  border: 2px solid #fff7ea;
-  outline: 1px solid #5b4569;
-  border-radius: 3px;
-  background: #7a5f86;
-  box-shadow: 0 7px 0 -5px #de8d64;
-}
-
-.lantern.lit {
-  background: #ffd98a;
-  box-shadow:
-    0 8px 0 -6px #de8d64,
-    0 0 12px #ffd98a;
 }
 
 .hints {
@@ -428,30 +322,6 @@ body {
     white-space: normal;
     text-align: center;
   }
-
-  .title-center h1 {
-    font-size: 40px;
-  }
-
-  .level-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-  }
-
-  .level-card {
-    width: auto;
-    min-height: 126px;
-  }
-
-  .level-index {
-    font-size: 28px;
-  }
-
-  .back {
-    top: calc(12px + env(safe-area-inset-top));
-    left: calc(12px + env(safe-area-inset-left));
-  }
 }
 
 button:disabled {
@@ -518,18 +388,6 @@ button:disabled:hover {
 .ratings-animate .rating.earned {
   animation: rating-in 0.5s ease both;
 }
-.rating-total {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-.level-card small {
-  font-size: 11px;
-  padding: 0 8px;
-}
 .result-actions {
   display: flex;
   gap: 8px;
@@ -561,13 +419,6 @@ button:disabled:hover {
     padding: 7px 10px;
     letter-spacing: 0;
   }
-  .select-screen {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-  .chapter-list h1 {
-    font-size: 18px;
-  }
   .result-card {
     padding: 16px;
   }
@@ -582,71 +433,6 @@ button:disabled:hover {
   .result {
     animation-duration: 0.01ms;
     animation-delay: 0s;
-  }
-}
-
-.sample-card {
-  position: absolute;
-  z-index: 2;
-  left: 24px;
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  width: min(420px, calc(100% - 48px));
-  padding: 24px;
-  border: 1px solid rgba(74, 58, 82, 0.12);
-  border-radius: 24px;
-  background: var(--card);
-  backdrop-filter: blur(12px);
-}
-.sample-card h1,
-.sample-card h2 {
-  margin: 8px 0 12px;
-  font-weight: 500;
-}
-.sample-card h1 {
-  font-size: 36px;
-  letter-spacing: 0.18em;
-}
-.sample-card h2 {
-  font-size: 22px;
-  line-height: 1.5;
-}
-.sample-card p {
-  line-height: 1.8;
-  margin: 8px 0;
-}
-.sample-card .sample-caption,
-.sample-eyebrow {
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-.sample-eyebrow {
-  letter-spacing: 0.14em;
-}
-.sample-card .result-actions {
-  margin-top: 16px;
-  flex-wrap: wrap;
-}
-.sample-screen .title p {
-  letter-spacing: 0;
-}
-@media (max-width: 720px) {
-  .sample-card {
-    left: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom));
-    width: calc(100% - 32px);
-    padding: 18px;
-  }
-  .sample-card h1 {
-    font-size: 28px;
-  }
-  .sample-card h2 {
-    font-size: 19px;
-  }
-  .sample-screen .title {
-    max-width: 190px;
-  }
-  .sample-screen .title p {
-    font-size: 10px;
   }
 }
 

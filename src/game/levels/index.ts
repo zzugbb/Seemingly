@@ -18,7 +18,6 @@ import level12 from './level-12'
 import level13 from './level-13'
 import level14 from './level-14'
 import level15 from './level-15'
-import sample01 from './sample-01'
 
 import type { LevelDef } from './types'
 export type { LevelDef } from './types'
@@ -43,7 +42,6 @@ export const mainLevels = [
 
 export const challengeLevels: LevelDef[] = [challenge1, challenge2, challenge3, challenge4, challenge5]
 export const levels = mainLevels
-export const sampleLevels = [sample01]
 export const levelRevisions: Record<string, number> = Object.fromEntries(
   [...mainLevels, ...challengeLevels].map((level) => [level.id, level.revision ?? 1]),
 )

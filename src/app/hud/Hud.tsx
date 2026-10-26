@@ -11,8 +11,6 @@ export function Hud({
   onRestart,
   onSelect,
   onToggleMute,
-  description,
-  selectLabel = '选关',
 }: {
   label: string
   steps: number
@@ -26,8 +24,6 @@ export function Hud({
   onRestart: () => void
   onSelect: () => void
   onToggleMute: () => void
-  description?: string
-  selectLabel?: string
 }) {
   const options = (
     <>
@@ -35,7 +31,7 @@ export function Hud({
         重新开始
       </button>
       <button className="hud-button" type="button" onClick={onSelect}>
-        {selectLabel}
+        选关
       </button>
       <button className="hud-button" type="button" aria-pressed={muted} onClick={onToggleMute}>
         {muted ? '取消静音' : '静音'}
@@ -46,7 +42,7 @@ export function Hud({
     <>
       <header className="title">
         <h1>{label}</h1>
-        <p>{description ?? `步数 ${steps} · 光点 ${orbs.collected}/${orbs.total}`}</p>
+        <p>{`步数 ${steps} · 光点 ${orbs.collected}/${orbs.total}`}</p>
       </header>
       <div className="hud-actions">
         <button className="hud-button" type="button" disabled={!canUndo} onClick={onUndo}>

@@ -1,15 +1,13 @@
 import { create } from 'zustand'
-import { challengeLevels, mainLevels, sampleLevels, type LevelDef } from '../game/levels'
+import { challengeLevels, mainLevels, type LevelDef } from '../game/levels'
 import { targets } from '../game/levels/targets'
 import { detectQuality } from '../game/render/quality'
 import { loadSave, writeSave, type SaveData } from './save'
 import { learnedTutorials, tutorialIds, type TutorialId } from './tutorials'
 
 export type Screen = 'title' | 'select' | 'play' | 'ending'
-export type LevelList = 'main' | 'challenge' | 'sample'
-export const levelLists = { main: mainLevels, challenge: challengeLevels, sample: sampleLevels }
-
-const sampleEntry = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sample') === '1'
+export type LevelList = 'main' | 'challenge'
+export const levelLists = { main: mainLevels, challenge: challengeLevels }
 
 interface AppState {
   screen: Screen
@@ -26,8 +24,8 @@ interface AppState {
 }
 
 export const useApp = create<AppState>((set, get) => ({
-  screen: sampleEntry ? 'play' : 'title',
-  current: { list: sampleEntry ? 'sample' : 'main', index: 0 },
+  screen: 'title',
+  current: { list: 'main', index: 0 },
   save: loadSave(),
   quality: detectQuality(),
   goTitle: () => set({ screen: 'title' }),
@@ -86,7 +84,6 @@ export function isUnlocked(
 ): boolean {
   const level = lists[list][index]
   if (!level) return false
-  if (list === 'sample') return true
   if (list === 'main') return index === 0 || Boolean(save.levels[lists.main[index - 1]?.id]?.done)
   const chapter = lists.main.filter((item) => item.chapter === level.chapter)
   return (

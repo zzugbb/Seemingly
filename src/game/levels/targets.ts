@@ -149,14 +149,3 @@ export const targets: Record<string, LevelTarget> = {
     tradeoffsMin: 2,
   },
 }
-
-export const sampleTargets: Record<string, LevelTarget> = {
-  'sample-01': {
-    minActions: 11,
-    minActionsAll: 12,
-    reachableStatesMin: 40,
-    randomWin: { steps: 30, maxRate: 0.35 },
-    illusionsMin: 2,
-    tradeoffsMin: 1,
-  },
-}

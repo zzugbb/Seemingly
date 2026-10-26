@@ -162,12 +162,12 @@ describe('挑战完成与连续进入', () => {
     expect(nextLevelIndex(save, 'challenge', 5)).toBeNull()
   })
 
-  it('主线下一关照常解锁，终章和内部样段没有下一关', () => {
+  it('主线下一关照常解锁，终章和越界索引没有下一关', () => {
     expect(nextLevelIndex(emptySave(), 'main', 0)).toBeNull()
     const save = saveWith({ 'level-01': record(3) })
     expect(nextLevelIndex(save, 'main', 0)).toBe(1)
     expect(nextLevelIndex(save, 'main', 14)).toBeNull()
-    expect(nextLevelIndex(save, 'sample', 0)).toBeNull()
+    expect(nextLevelIndex(save, 'main', 15)).toBeNull()
   })
 })
 
