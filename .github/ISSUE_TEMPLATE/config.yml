@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使用与求助
+    url: https://github.com/zzugbb/Seemingly/blob/main/SUPPORT.md
+    about: 操作、解锁、存档、声音和成绩卡的常见问题。
+  - name: 安全漏洞报告
+    url: https://github.com/zzugbb/Seemingly/security/policy
+    about: 按安全政策联系维护者，不在公开 Issue 中披露敏感细节。

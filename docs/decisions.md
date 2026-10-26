@@ -67,6 +67,7 @@
 | D38 | 减少动态效果时关闭漂浮、云移动与光粒，保留必要动作位移 |
 | D39 | 谜题由用户指定的设计者制作；实现者按正式稿执行，不擅改谜题、targets 或删减验收 |
 | D40 | 只保留正式运行与维护必需内容：不保留独立开发样段、开发指标打印入口和原型附件；正式设计、独立基准、有效测试及验证边界保留 |
+| D41 | 开源协作入口为贡献指南、求助说明、行为准则、安全政策及 Issue／PR 模板；不重复运行和设计文档，不虚构私密渠道、响应时限或旧版本支持承诺 |
 
 允许的依赖：运行时 `react`、`react-dom`、`three`、`@react-three/fiber`、`@react-three/drei`、`zustand`；开发时 `vite`、`@vitejs/plugin-react`、`typescript`、`@types/react`、`@types/react-dom`、`@types/three`、`vitest`、`prettier`。新增依赖、外部素材、核心玩法或风格变更须先获得用户同意。
 

@@ -6,7 +6,13 @@
   <a href="https://zzugbb.github.io/Seemingly/">在线游玩</a> ·
   <a href="docs/design.md">游戏设计</a> ·
   <a href="docs/levels/README.md">关卡设计</a> ·
+  <a href="SUPPORT.md">求助</a> ·
+  <a href="CONTRIBUTING.md">贡献</a> ·
   <a href="LICENSE">MIT</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/zzugbb/Seemingly/actions/workflows/pages.yml?query=branch%3Amain" title="main 分支最近一次推送的检查与发布"><img src="https://github.com/zzugbb/Seemingly/actions/workflows/pages.yml/badge.svg?branch=main&amp;event=push" alt="检查与 Pages 发布"></a>
 </p>
 
 ![挑战五「相托」：运回箱子，让出站位](docs/assets/gameplay.png)
@@ -75,6 +81,10 @@ public/           favicon与社交分享图
 | [项目状态](docs/roadmap.md) | 已完成里程碑、当前维护任务与暂缓事项 |
 
 已测绘制峰值高／低347／275次，低于400次预算；首屏gzip约357KB，低于1MB。手机目前以尺寸模拟验证，真机分享／保存、Safari兼容及目标设备长期帧率仍待补验，详见验收记录。
+
+## 参与与反馈
+
+使用问题与常见排障见[求助说明](SUPPORT.md)，可通过[Issue 模板](https://github.com/zzugbb/Seemingly/issues/new/choose)报告缺陷、改进建议或使用问题。贡献流程见[贡献指南](CONTRIBUTING.md)，交流遵循[行为准则](CODE_OF_CONDUCT.md)，安全问题按[安全政策](SECURITY.md)私密报告。解法与关键截图请标注“含剧透”。
 
 ## 许可证
 
