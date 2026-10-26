@@ -1377,6 +1377,7 @@ button:disabled:hover {
 
 .entry-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   width: 100%;
   order: 3;
@@ -1395,4 +1396,10 @@ button:disabled:hover {
 
 .ending-message button {
   white-space: nowrap;
+}
+
+.journey-load-notice {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 1.6;
 }

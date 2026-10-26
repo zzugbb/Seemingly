@@ -723,3 +723,7 @@ solver.stateGraph在analyze／reachableStates中不保存未消费的正向动�
 `app/journey-image.ts`以独立LevelSim执行最终主线的正式solution，仍由原command／update调用规则；不运行求解器、不调用completeLevel。Scene的snapshot与Finale的complete默认为false，只给非交互导出初始化已点亮静态结局，避免等待或重播演出，正常游玩默认路径保持。图片局部画布按1080×1000、dpr=1、高画质、减少动态渲染，复用材料与CameraRig，第四帧显式绘制后同帧复制至1080×2100的原生Canvas2D，不改变游戏preserveDrawingBuffer。文字与背景颜色从palette读取，无静态截图资源。
 
 导出完成后立即卸载额外Canvas，仅保留PNG Blob／File与一个对象URL，预览、下载和系统分享使用同一文件；关闭或重试时清理，晚到异步结果不更新已卸载组件。生成失败或12秒无结果显示重试，WebGL上下文丢失也退出生成。canShare检查文件能力，share在已准备文件的用户点击内调用；AbortError静默，其他失败保留图片与下载。系统目标与相册行为取决于浏览器，不将尺寸模拟或方法替身当作真机系统分享验证。
+
+## T6.22f动态模块故障隔离
+
+JourneyButton在点击处理内按需import成绩卡模块，成功后保存稳定的组件引用并打开弹窗。加载期间禁用重复请求，网络或分块缺失通过入口的简短说明反馈，游戏仍保留；不让React.lazy未捕获的拒绝导致整个React根卸载。组件离开后通过effect清理活动标记，晚到成功／失败不更新状态或重开旧弹窗。成功加载仍由浏览器模块缓存复用，图片生成、下载、原生dialog与声音行为保持；资源已更新导致旧分块缺失时说明刷新页面后重试，不自动刷新或清理存档。
