@@ -1,729 +1,150 @@
 # 架构说明
 
-> M0～M5 已完成首版九关。2026-10-16 起进行可玩性改版（[路线图 M6](roadmap.md#m6-可玩性改版)），本文的接口定义是改版的目标；与现有代码不一致时，以本文为准逐步改造。
-
 ## 技术栈
 
-| 层 | 选择 |
-| --- | --- |
-| 构建 | Vite 8，开发端口 5180，`base: './'` |
-| 界面 | React 19 + TypeScript（严格模式） |
-| 3D | Three.js + React Three Fiber 9 + drei 10 |
-| 页面状态 | zustand |
-| 测试 | Vitest |
-| 格式化 | Prettier（无分号、单引号、行宽 120） |
-| 部署 | GitHub Actions + GitHub Pages |
+Vite、React、TypeScript 严格模式、Three.js、React Three Fiber、drei、zustand；测试用 Vitest，格式化用 Prettier。Node 24，版本与依赖以 `.nvmrc`、package.json 和 package-lock.json 为准。
 
 ## 目录
 
 ```text
-docs/levels/                   关卡设计稿 level-01.md … level-15.md、challenge-1.md … challenge-5.md（设计者编写）
 src/
-├── main.tsx
-├── app/                       页面与界面（React DOM）
-│   ├── App.tsx                按 store.screen 切换页面
-│   ├── store.ts               zustand：页面、当前关卡、存档、静音、画质
-│   ├── save.ts                本地存储读写，键名 seemingly:save:v2
-│   ├── sounds.ts              模拟器事件 → 音效
-│   ├── hint.worker.ts         后台线程：计算整关最优策略
-│   ├── hints.ts               与提示 Worker 通信
-│   ├── screens/
-│   │   ├── TitleScreen.tsx    含评价总数
-│   │   ├── LevelSelect.tsx    按章分行，卡片含三项评价
-│   │   ├── PlayScreen.tsx     创建模拟器，挂载画布与 HUD
-│   │   └── Ending.tsx
-│   ├── hud/
-│   │   ├── Hud.tsx            关名、步数、光点、撤销、提示、重新开始、选关、静音
-│   │   ├── Toast.tsx
-│   │   └── CompleteBanner.tsx 三项评价与步数
-│   └── styles.css
-├── audio/                     Web Audio 合成，不依赖 React
-│   ├── engine.ts              AudioContext、主音量、压缩器、音乐与音效总线、静音
-│   ├── theory.ts              纯函数：音名、频率、各章和弦与音阶
-│   ├── instruments.ts         主题音乐柔和键盘、持续声层、木质触感缓冲合成与缓存
-│   ├── reverb.ts              生成混响脉冲响应
-│   ├── music.ts               生成式环境音乐（调度器、铺底、低音、八音盒、换章）
-│   └── sfx.ts                 带音高的操作音
+├── main.tsx                 React 入口
+├── app/
+│   ├── App.tsx              页面切换、音频解锁与导航同步
+│   ├── store.ts / save.ts   当前关卡、解锁、历史评价、本地存储
+│   ├── entry.ts             入口统计、主线续玩、挑战下一关
+│   ├── tutorials.ts         首次能力教学与记忆
+│   ├── hints.ts / hint.worker.ts  后台提示通信与策略
+│   ├── JourneyButton.tsx / JourneyDialog.tsx  成绩卡入口与弹窗
+│   ├── journey.ts / journey-image.ts        成绩汇总、分享与PNG
+│   ├── screens/             标题、选关、游玩、结局
+│   ├── hud/                 游戏工具、评价、完成卡、提示
+│   └── styles.css           DOM 样式
+├── audio/
+│   ├── engine.ts            音频上下文、总线、音源容量与取消
+│   ├── music.ts / theory.ts 背景调度、谱面、和声、进展层
+│   ├── sfx.ts / instruments.ts / reverb.ts  合成音色与混响
+│   └── mix.ts               音量与反馈让位包络
 └── game/
-    ├── core/                  纯 TypeScript，禁止导入 three / react
-    │   ├── iso.ts             屏幕坐标、连通、寻路、移动插值
-    │   ├── mechanisms.ts      机关积木位置、平移台往返
-    │   ├── rules.ts           规则层：游戏状态与瞬时状态转移
-    │   ├── sim.ts             LevelSim：在规则层上做动画、撤销
-    │   ├── solver.ts          求解器：最优解、难度指标、提示
-    │   ├── metrics.ts         指标报告与固定种子随机模拟参数
-    │   ├── visibility.ts      顶面可见性射线检测
-    │   ├── validate.ts        关卡校验
-    │   ├── solve.ts           按标准解法运行模拟器
-    │   └── *.test.ts
-    ├── levels/
-    │   ├── types.ts
-    │   ├── builders.ts
-    │   ├── targets.ts         每关难度目标（设计者给出）
-    │   ├── index.ts           导出 mainLevels（15 关）与 challengeLevels（5 关）
-    │   ├── level-01.ts … level-15.ts
-    │   ├── challenge-1.ts … challenge-5.ts
-    │   └── levels.test.ts     校验加难度指标
-    └── render/
-        ├── Scene.tsx          一关的完整场景，每帧驱动模拟器
-        ├── CameraRig.tsx
-        ├── Lights.tsx
-        ├── Blocks.tsx
-        ├── Mechanisms.tsx     转盘、平移台、压板、把手；提示高亮
-        ├── Orbs.tsx           光点与收集动画
-        ├── Crates.tsx         积木箱与推动动画
-        ├── Gates.tsx          开关门
-        ├── Patrols.tsx        巡逻者
-        ├── Character.tsx
-        ├── Lantern.tsx        亮度随光点递增
-        ├── Finale.tsx
-        ├── ending.ts
-        ├── Decor.tsx
-        ├── quality.ts
-        ├── feedback.ts        提示目标与渲染反馈时间戳
-        ├── materials.ts
-        └── palette.ts
+    ├── core/                纯逻辑，不导入 Three.js／React
+    ├── levels/              类型、builder、十五主线、五挑战、targets
+    └── render/              场景、固定相机、几何材质、反馈、角色和装饰
 ```
-
-依赖方向只能是：`app → render → core`、`app → audio`、`render → levels → core`。`core` 和 `levels` 不能导入 `render`、`app`、`audio`。
 
 ## 关卡数据
 
-T6.14曾按第二稿把第7～12关写入正式mainLevels和targets；T6.14b～f已按[第三稿](levels/chapter-3-4.md)逐项替换第八至十二关，第七关保持。设计验证器`docs/levels/check-designs.mjs`仍可单独核对文档；`--runtime`比对12关顺序、前六关revision、新六关完整定义与targets，再对正式对象复跑规则和净空。新章谱面数据写在`audio/theory.ts`，正式模块不导入docs。循环、和弦时长、拍点和调度一起读取章节速度：前两章保持80 BPM／96秒，第三章88 BPM，第四章96 BPM。第9、12关的章末四音走音效总线，撤销、静音、重开和换关沿用既有清理。第三、四章声音及h1混音已于2026-10-23获用户确认。
+[types.ts](../src/game/levels/types.ts) 定义 `LevelDef`，包含 ID、中文名、章节、revision、静态积木、机关、光点、箱、巡逻者、起终点、装饰、标准解法及可选 ending。使用 [builders.ts](../src/game/levels/builders.ts) 构造，坐标只写在关卡数据中。
 
-第五关已学集合固定为walk、collect、rotate、ride、lift，不随后来追加的教学标识扩张。推箱开始事件只记候选；联动、召台、推动、按住和限次在模拟器空闲且状态已经提交后才写入。单向格在成功踏入箭头格时记录。详见[开发前复核](levels/chapter-3-4.md#开发前复核t613b)。
+- 静态路面以 `cellId([x,y,z])` 标识；机关路面以 `机制ID#块索引` 标识，机关运动后身份不变。
+- `TileRef` 引用静态坐标或机关块；光点、箱和巡逻路线共用该引用。
+- 机关为 rotator、mover、plate、gate；把手可省略，links 只做一层联动，不递归。
+- `solution` 是 walk／operate／push 序列，walk 的坐标取动作当时的实际位置。
+- `ending` 在第十五关列出十五灯及塔，渲染层不写关卡坐标。
+- index.ts 导出主线、挑战及修订表。内部 sample-01 复用第五关数据，仅用于回归，不加入正式进度或解锁。
 
-`src/game/levels/types.ts`。注释标明各字段接入任务；T6.2、T6.6与T6.16均已实现：
-
-```ts
-export type Vec3 = [number, number, number]
-export type Axis = 'x' | 'y' | 'z'
-export type Face = 'x' | 'z'
-export type ColorName = 'sand' | 'terracotta' | 'rose' | 'teal' | 'tealLight' | 'plum' | 'cream'
-export type ScreenDir = '+a' | '-a' | '+b' | '-b' // T6.6：屏幕方向，+a 即 +x 方向（右下），+b 即 +z 方向（左下）
-
-export interface BlockDef {
-  pos: Vec3
-  color: ColorName
-  kind: 'path' | 'solid'
-  oneWay?: ScreenDir // T6.6：单向格，只能沿该屏幕方向进入
-}
-
-export interface MechBlockDef {
-  offset: Vec3
-  color?: ColorName // 默认 tealLight
-  kind?: 'path' | 'solid' // 默认 path
-}
-
-export interface HandleDef {
-  block: Vec3 // 把手所在的静态结构积木
-  face: Face
-  uses?: number // T6.6：限次把手的可用次数，省略为不限
-}
-
-export interface LinkDef {
-  // T6.2
-  target: string // 被联动的转盘、平移台或切换门（T6.6）
-  reverse?: boolean // 只对转盘有效：逆时针
-}
-
-export interface RotatorDef {
-  type: 'rotator'
-  id: string
-  pivot: Vec3
-  blocks: MechBlockDef[]
-  initialStep?: 0 | 1 | 2 | 3
-  handle?: HandleDef // T6.2：可选，没有把手时只能被联动或压板触发
-  links?: LinkDef[] // T6.2
-}
-
-export interface MoverDef {
-  type: 'mover'
-  id: string
-  origin: Vec3
-  axis: Axis
-  stops: number[]
-  initialStop?: number
-  blocks: MechBlockDef[]
-  handle?: HandleDef // T6.2：可选
-  links?: LinkDef[] // T6.2
-}
-
-export interface PlateDef {
-  type: 'plate'
-  id: string
-  tile: Vec3
-  target: string
-  once?: boolean // 只对触发压板有效
-  mode?: 'trigger' | 'hold' // T6.6：默认 trigger
-}
-
-export interface GateDef {
-  // T6.6
-  type: 'gate'
-  id: string
-  tile: Vec3 // 门所在的静态路面
-  mode: 'toggle' | 'hold' // toggle 由把手、触发压板、联动切换；hold 只受按住压板控制（按住压板的 target 指向它）
-  initiallyOpen?: boolean // 只对 toggle 有效
-  handle?: HandleDef // 只对 toggle 有效
-}
-
-export type MechanismDef = RotatorDef | MoverDef | PlateDef | GateDef
-
-export type TileRef = { tile: Vec3 } | { mechanism: string; block: number } // 静态路面或机关积木
-
-export type OrbDef = TileRef & { optional?: boolean } // T6.2
-
-export type CrateDef = TileRef // T6.6
-
-export interface PatrolDef {
-  // T6.16
-  route: TileRef[] // 开局时相邻两格屏幕相邻
-  mode: 'pingpong' | 'loop'
-}
-
-export type SolutionStep =
-  | { type: 'walk'; to: Vec3 }
-  | { type: 'operate'; mechanism: string }
-  | { type: 'push'; crate: string } // T6.6
-
-export interface LevelDef {
-  id: string // 'level-01' … 'level-15'，'challenge-1' … 'challenge-5'
-  title: string
-  chapter: 1 | 2 | 3 | 4 | 5 // T6.2 为 1～4，T6.6 扩展到 5
-  challenge?: boolean // T6.6
-  revision?: number // T6.12a：未写为 1，用于使旧谜题评价失效
-  soundtrack?: 'courtyard' // 校准关卡的主题乐句；章节 1 为启程，2 为空庭，省略沿用生成式音乐
-  blocks: BlockDef[]
-  mechanisms: MechanismDef[]
-  orbs: OrbDef[] // T6.2
-  crates?: CrateDef[] // T6.6
-  patrols?: PatrolDef[] // T6.16
-  start: Vec3
-  goal: Vec3
-  decor: DecorDef
-  hints?: string[]
-  solution: SolutionStep[]
-  ending?: EndingDef // 最终关：15 盏灯笼与塔
-}
-```
-
-约定：
-
-- 静态路面的格子编号是 `"x,y,z"`，机关积木的编号是 `"机关id#下标"`。机关积木的编号与位置无关，所以小人乘坐时编号不变。
-- 光点编号：`orb-0`、`orb-1`……按 `orbs` 数组顺序；光点所在格子编号按上一条规则。光点不能放在起点。
-- 积木箱编号 `crate-0`……，巡逻者编号 `patrol-0`……，按数组顺序。
-- `builders.ts` 已有 `orb(def)` 与 `chapter`；T6.6 新增 `crate`、`gate`、`oneWay` 选项和 `challenge` 参数，T6.16 新增 `patrol`。
-- 单向路面的 builder 写法为 `b.path(pos, color, { oneWay: '+a' })`；未放箱子时 builder 生成空的 `crates` 数组。
-
-`src/game/levels/targets.ts`：
-
-```ts
-export interface LevelTarget {
-  minActions: number // 精确值，同时作为「步数」评价的标准
-  minActionsAll: number // 精确值
-  reachableStatesMin?: number
-  randomWin?: { steps: number; maxRate: number }
-  illusionsMin: number
-  tradeoffsMin?: number
-}
-
-export const targets: Record<string, LevelTarget>
-```
-
-`targets.ts` 由设计者根据关卡设计稿填写，实现者不得为通过测试而修改。
+具体布局、完整参考实现、目标与反事实见[关卡索引](levels/README.md)，不得用简化说明替代正式稿。
 
 ## 规则层
 
-`src/game/core/rules.ts` 定义游戏状态和**瞬时**的状态转移，不涉及时间和动画。模拟器、求解器、提示、标准解法验证都调用它，保证规则只有一份。
+[rules.ts](../src/game/core/rules.ts) 是唯一游戏规则实现；sim、solver、提示和校验共用。`GameState` 记录人物格、机关档位／往返方向、光点、一次性压板、门、把手用量、箱、巡逻位置／方向与通关状态。
 
-```ts
-export interface GameState {
-  at: string // 小人所在格子编号
-  rotator: Record<string, number> // 档位，0～3
-  mover: Record<string, { stopIndex: number; direction: 1 | -1 }>
-  orbs: string[] // 已收集的光点编号，升序
-  spentPlates: string[] // 已用掉的一次性压板编号，升序
-  won: boolean
-  // 以下由 T6.6 / T6.16 新增
-  gates: Record<string, boolean> // 切换门是否打开（按住门不存，由按住压板实时算出）
-  handleUses: Record<string, number> // 限次把手已用次数
-  crates: Record<string, string> // 积木箱编号 → 所在格子编号
-  patrols: Record<string, { index: number; direction: 1 | -1 }> // 巡逻者在路线上的位置
-}
+| 接口 | 职责 |
+| --- | --- |
+| initialState | 初始化状态并清理关卡缓存 |
+| tilesOf / visibleTilesOf | 当前路面及可见路面 |
+| walkGraph / reachableFrom | 动态可行走图与一次 BFS 得到的全部路线 |
+| legalActions | 枚举合法行走、推动、操作 |
+| applyAction | 返回独立的 Transition 或 null，不改变输入状态 |
+| stateKey | 序列化完整求解状态 |
+| gatesOf / patrolTilesOf | 当前门与巡逻占位的只读视图 |
 
-export type Action =
-  | { type: 'walk'; tileId: string }
-  | { type: 'operate'; mechanism: string }
-  | { type: 'push'; crate: string } // T6.6
+动作先应用玩家变化、收光、停板和联动，再更新压力与门、依编号推进巡逻、重新计算压力，最后判断通关。巡逻受阻会等待，不收光、不触发普通压板。按住门须把人物视为已经离开自己的压板，门内占位保护仍适用。
 
-export interface Transition {
-  state: GameState
-  route: string[] // walk：经过的格子（不含起点）；push：[积木箱原来的格子]；operate：空
-  collected: string[] // 本次收集的光点
-  moved: string[] // 本次运动的机关（含联动、压板触发、按住压板引起的变化）
-  plate: string | null // 本次触发的触发压板
-  goalLocked: number // 走到灯笼但必需光点不足时，缺少的数量；否则为 0
-  pushed: { crate: string; from: string; to: string } | null // T6.6
-  gatesChanged: string[] // T6.6：开关状态发生变化的门
-  patrolMoves: { patrol: string; from: string; to: string }[] // T6.16
-}
+规则同时处理顶压、遮挡、单向、门及人物／箱／巡逻占位。屏幕连通不得增加三维距离／高度差门槛；“看不见不能进入”不等于运行时实体碰撞。
 
-export function initialState(level: LevelDef): GameState
-export function tilesOf(level: LevelDef, state: GameState): Map<string, Tile>
-export function visibleTilesOf(level: LevelDef, state: GameState): Set<string> // 遮挡规则的只读视图，渲染用于点击过滤
-export function occupiedOf(level: LevelDef, state: GameState): Set<string>
-export function tileRefId(ref: TileRef): string
-export function gatesOf(level: LevelDef, state: GameState, departing?: boolean): Record<string, boolean>
-export function walkGraph(level: LevelDef, state: GameState): Graph
-export function reachableFrom(level: LevelDef, state: GameState): Map<string, string[]> // 目标格 → 路线
-export function legalActions(level: LevelDef, state: GameState): Action[]
-export function applyAction(level: LevelDef, state: GameState, action: Action): Transition | null // 非法动作返回 null
-export function stateKey(state: GameState): string
-```
-
-规则：
-
-- **walk**：目标必须可达且不是当前格。路线与 `findPath` 完全一致（`reachableFrom` 必须给出相同路线，用测试保证）。沿路线进入的每一格，若有未收集的光点则收集。路线终点：
-  - 是终点且必需光点已齐：`won = true`；
-  - 是终点但必需光点不齐：`goalLocked = 缺少数量`；
-  - 是压板：按压板规则触发目标机关（等同 operate，含联动）。
-- **operate**：机关必须有把手，且限次把手还有剩余次数。触发集合 = 该机关 + 其 `links` 中的机关（只展开一层）。转盘档位 +1（`reverse` 时 −1，取模 4）；平移台按往返规则前进一站；切换门开关取反。限次把手的已用次数 +1。
-- **乘坐**无需特殊处理：小人、积木箱、巡逻者的格子编号不变，位置随机关状态重新计算。
-- `won` 为真后不再有合法动作。
-- `gatesOf` 派生所有门的开关状态；`departing = true` 时忽略小人对按住压板的压力，供寻路与离开压板的动画使用。`walkGraph` 在 `buildGraph` 的邻居顺序上过滤不可进入的边，`findPath` 与 `reachableFrom` 使用同一张图。只有限次把手记录 `handleUses`，不限次把手不累加计数，以保持状态空间有限。
-
-T6.6 新增：
-
-- **不可进入的格子**：有积木箱、关着的门（含此刻未被按住的按住门）、巡逻者的格子，不能作为路线中的任何一格，也不能作为行走目标。
-- **单向格**：只能从箭头的反方向那一格、沿箭头方向进入；从其他方向进入的边在寻路时视为不存在。离开不受限制。积木箱同样受约束。
-- **push**：小人与积木箱屏幕相邻（积木箱所在格的屏幕坐标 = 小人屏幕坐标 + 方向 `d`）。目标格 = 积木箱格的屏幕坐标再加 `d` 处的路面；目标格必须存在、可行走（顶上无积木），且不是不可进入的格子；若目标格是单向格，`d` 必须与箭头一致。成立时积木箱移到目标格，小人移到积木箱原来的格子（这一格的光点照常收集）。
-- **按住压板**：在静止状态下被小人、积木箱或巡逻者占着即为「按下」，按住门在按下时打开。按住压板只能绑定按住门。
-- **自己压着不算**：计算 walk 的可达路线、判断 push 的目标格时，小人当前所在的按住压板按「没有小人」重新计算（只剩积木箱、巡逻者算数），由此得出的关闭的门视为不可进入。模拟器在小人离开压板格的第一步就播放关门动画。
-- **门里有东西时不关**：门所在格有小人、积木箱或巡逻者时门保持打开。切换门在此时被切换为「关」：这次切换对该门无效（`gates` 不变），同一次触发的其他机关照常运动。按住门在这一格空出来后的下一次求值时再关闭。
-- **遮挡断路**：路面顶面中心沿 `(1, 1, 1)` 的射线碰到任何积木（静态积木与机关积木，不含积木箱、门、巡逻者）时，这一格不能进入、不能作为行走目标、不能作为推动目标。小人所在格不受此限，仍可离开。射线检测复用 `visibility.ts`。
-
-T6.16 新增：
-
-- **巡逻者**：沿 `route` 移动。下一格 = `route[index + direction]`（环形路线首尾相接；往返路线到端点时先反向再取下一格）。下一格与当前格此刻屏幕相邻且相连、可进入（不被小人、积木箱、其他巡逻者、关着的门占据，未被遮挡，不逆着单向格）时移动过去，否则原地等待。
-
-**每个动作的求值顺序**（必须严格遵守，求解器与模拟器一致）：
-
-1. 执行动作本身（walk 的路线与光点收集、push、operate 及其联动）。
-2. walk 的终点若是触发压板，触发它（等同 operate 其目标，含联动）。
-3. 重新计算所有按住压板，更新按住门（遵守「门里有东西时不关」）。
-4. 每个巡逻者按编号顺序走一格（T6.16）。
-5. 再次重新计算按住压板与按住门。
-6. 判断通关：小人在终点、必需光点已齐、本次动作是 walk 且终点为灯笼。
+性能复用限定在 rules.ts：按关卡身份索引只读定义；按机关布局缓存几何、邻接、单向与静态可进入集合，每关最多64布局。动态门、占位和压力逐状态计算。路线缓存校验影响通路的字段及索引身份，公开图返回副本；完整 stateKey 不删字段。不得为缓存命中删合法动作或更改邻居顺序。
 
 ## 模拟器
 
-T6.12v1 的角色遮挡提示只属于渲染层：PlayScreen 的 WebGL 画布启用 stencil；世界不写模板位，正常角色在不被场景遮住的像素写模板位 1。共享剪影材质使用反向深度测试、只读取模板位 0、不写深度或模板缓冲，排除角色自身重叠。角色在普通场景之后绘制，剪影随后绘制；几何体与材质均由 materials.ts 共享，不增加每帧射线搜索或 React 状态更新。Scene 仅在 interactive 时启用，标题与选关预览关闭。此渲染信息不返回规则层或作为可点击路面的依据。
+[LevelSim](../src/game/core/sim.ts) 将规则层的瞬时 Transition 展示为动画，整步完成才提交新状态。渲染使用 `state()`、`tiles()`、`characterPose()`、机关／门／箱／巡逻姿态和 `orbProgress()`。
 
-`src/game/core/sim.ts` 在规则层之上负责动画、事件和撤销。
+- `command(action)` 返回 ok／busy／unreachable 等结果；`update(delta)` 推进动作并返回事件。
+- 先展示人物行走或推动，再展示机关与旧巡逻压力、巡逻移动和新门状态；多机关按各自实际时长插值。
+- 机关运动中不接受行走；行走中可改目标，仍记一步，路线与规则层相同。
+- `undo()` 恢复人物、机关、箱、门、巡逻朝向、光点及步数；行走可中止，机关运动期间不可撤销。
+- `isIdle()`、`steps()`、`canUndo()` 供界面读取，历史成绩不随本局撤销而回退。
 
-```ts
-export type Command = Action // 与规则层的 Action 相同（walk、operate、push）
+## 求解器与校验
 
-export type CommandResult =
-  | 'ok'
-  | 'busy'
-  | 'unreachable'
-  | 'no-handle'
-  | 'unknown-target'
-  | 'handle-used-up' // T6.6
-  | 'cannot-push' // T6.6：不相邻或前方过不去
+solver.ts 仅通过规则层展开状态，BFS 计算最短解，反向搜索计算死局和提示策略。`analyze`、`reachableStates` 不保存未使用的正向动作边，仍展开全部动作并保留反向边；`buildPolicy`、`nextHint`、固定随机模拟保留完整边与动作顺序。
 
-export type SimEvent =
-  | { type: 'walk-start'; route: string[] }
-  | { type: 'step'; tileId: string }
-  | { type: 'orb'; id: string } // 动画走到光点格时发出
-  | { type: 'goal-locked'; missing: number }
-  | { type: 'mechanism-start'; id: string }
-  | { type: 'mechanism-tick'; id: string }
-  | { type: 'mechanism-end'; id: string }
-  | { type: 'plate'; id: string; triggered: boolean }
-  | { type: 'push'; crate: string } // T6.6
-  | { type: 'gate'; id: string; open: boolean } // T6.6
-  | { type: 'patrol-move'; patrol: string } // T6.16
-  | { type: 'undo' }
-  | { type: 'won' }
+- 每个状态只做一次可达搜索，不对每个目标格单独寻路。
+- 冷求解小于两秒，主线／挑战状态上限30000／100000；完整结构、安全、解法和500次随机组合校验使用10秒测试窗口，不能放宽求解预算。
+- metrics.ts 与根目录 metrics.mjs 统一输出难度指标，随机种子 `20261016`，每关500次。
+- validate.ts 负责结构、引用、可见性、遮挡、乘坐安全、解法与规模检查；运动净空是额外的设计工具，见[规范](motion-clearance.md)。
+- 三个 `docs/levels/check-*.mjs` 从正式稿提取 TS／JSON 基准，独立验证设计并在 `--runtime` 下核对源码；谱面基准 `.mjs` 不进入站点运行。
 
-export class LevelSim {
-  constructor(level: LevelDef)
-  readonly level: LevelDef
-  readonly status: 'playing' | 'won'
-
-  command(cmd: Command): CommandResult
-  update(dt: number): SimEvent[]
-  isIdle(): boolean
-
-  undo(): boolean // 机关运动中或没有记录时返回 false
-  canUndo(): boolean
-  steps(): number // = 撤销记录长度
-  state(): Readonly<GameState> // 当前已提交的规则状态
-  orbProgress(): { required: number; requiredCollected: number; total: number; collected: number }
-
-  tiles(): Map<string, Tile>
-  tileAt(pos: Vec3): Tile | undefined
-  characterPose(): { position: Vec3; heading: number; walking: boolean; pushing?: boolean }
-  mechanismPose(id: string): { rotationY: number } | { offset: Vec3 }
-  orbPose(id: string): { position: Vec3; collected: boolean }
-  cratePose(id: string): { position: Vec3 } // T6.6
-  gatePose(id: string): { open: number } // T6.6：0 关闭，1 完全打开
-  platePose(id: string): { pressed: boolean; spent: boolean } // T6.7：当前展示的静止压力与一次性状态
-  patrolPose(id: string): { position: Vec3; heading: number } // T6.16
-}
-```
-
-行为要求：
-
-- `command` 在空闲时调用 `applyAction` 得到转移结果，把动作前的状态压入撤销记录，然后按结果播放动画；动画结束时提交新状态。
-- 小人行走中发出新的 `walk`：当前这一格走完后改走新路线，替换撤销记录中的最后一项（不增加步数）。
-- 行走中或机关运动中，`operate` 返回 `busy`；机关运动中，`walk` 返回 `busy`。
-- 多个机关同时运动（联动），全部结束后才发出最后一个 `mechanism-end` 并接受新指令。
-- **乘坐**：小人所在格属于正在运动的机关时，`characterPose` 按该机关当前动画姿态计算小人位置；转盘还要把转过的角度加到朝向上。
-- 撤销立即恢复状态，不播放动画，发出 `undo` 事件。
-- 一个动作的动画按规则层求值顺序依次播放：行走或推动 → 触发压板引起的机关运动 → 按住压板引起的门变化 → 巡逻者移动。前一段结束再播下一段，全部结束后才接受新指令。
-- 推动：积木箱滑动 0.35 秒，小人同步跟进；跨越错觉连接时积木箱同样用 `segmentPoint` 插值。
-- 开关门 0.4 秒；巡逻者每格 0.3 秒。
-- 所有时长常量定义在 `sim.ts` 顶部，和设计稿一致。
-
-## 求解器
-
-`src/game/core/solver.ts` 只依赖规则层。
-
-```ts
-export interface LevelMetrics {
-  minActions: number | null // 无解为 null
-  minActionsAll: number | null
-  reachableStates: number
-  deadEndStates: number
-  illusions: number // 标准解法中的错觉连接次数
-  tradeoffs: number // 标准解法中的取舍次数
-}
-
-export function analyze(level: LevelDef): LevelMetrics
-export function reachableStates(level: LevelDef): ReadonlyArray<Readonly<GameState>> // 校验器使用完整可达状态
-export function randomWinRate(level: LevelDef, opts: { runs: number; maxActions: number; seed: number }): number
-export function buildPolicy(level: LevelDef): Map<string, Action | null> // 状态键 → 最优下一步；死局为 null
-export function nextHint(level: LevelDef, state: GameState): Action | null // 测试用；游戏内用 buildPolicy 的结果
-```
-
-- 广度优先搜索全部可达状态；每个状态的行走动作用 `reachableFrom` 一次算出，不要对每个目标单独寻路。
-- 规则层复用同一关卡、同一状态的可达路线供动作枚举与执行使用，对外返回的路线保持独立；关卡定义在查询期间视为只读，状态变化会使旧路线失效。T6.14f为三站运输规模增加几何结果复用：按关卡身份、转盘档位及平移停靠位缓存路面／积木／占位与可见性，最多64个布局；initialState开始新局或搜索时清理对应关卡缓存。人物、箱子、门及按住压力仍逐状态求值，不缓存进入许可。公开路面坐标与集合均返回独立副本，不能污染后续查询；不改规则或邻居次序。求解器的状态扩展只调用 `legalActions`、`applyAction`、`stateKey`；标准解法指标复用 `tilesOf`、`reachableFrom` 的只读视图，不另写规则。
-- 死局：建出状态图后，从所有通关状态反向搜索，搜不到的可达状态即死局。
-- 随机通关率用固定种子的伪随机数（如 mulberry32），不用 `Math.random`。
-- 「取舍」：一次操作或推动前后，从小人当前位置可达的路面集合，既有新增又有减少。
-- 状态键必须包含 `GameState` 的全部字段；新增字段时同步更新 `stateKey`，否则求解器会把不同状态当成同一个。
-- 「错觉连接」：路线上相邻两格的三维坐标差不是水平单位向量。
-- 性能要求：每关 `analyze` 在测试中不超过 2 秒；规模上限见 [level-design.md](level-design.md#规模上限)。
-- 所有状态搜索在发现第 30001 个主线状态或第 100001 个挑战状态前抛出 `StateLimitError`，校验器将其报告为「规模上限」，避免先穷举超大状态图再检查。元素数量限制在搜索前检查；巡逻者的数量与安全检查已随T6.16接入。
-- `npm run metrics` 通过根目录 `metrics.mjs` 复用 Vite 加载 TypeScript 模块，输出全部关卡的指标表；随机模拟统一使用种子 `20261016`、500 次，步数预算采用目标表的 `randomWin.steps`，缺省为 30。`core/metrics.ts` 共享这些参数，供指标命令与难度校验使用。
-- `validateLevels(levels, targets)` 只对目标表登记的关卡强制检查难度指标和标准解法最优步数；首版九关不登记目标，仍接受结构、安全与可见性等校验。组合数超过 64 时，无重叠检查覆盖全部可达布局；乘坐安全始终检查全部可达状态；光点检查开局路面顶面中心的可见性。引用错误在模拟和求解前返回，避免无效引用导致异常。
-- **游戏内提示**：`src/app/hint.worker.ts` 是一个 Web Worker（Vite 原生支持，不需要依赖）。进入关卡时把关卡编号发给它，它调用 `buildPolicy` 算出整关的最优策略并保存；点击提示时把当前状态键发过去，立即得到下一步。策略还没算完时，提示按钮显示「思考中…」，算完后自动给出结果。`src/app/hints.ts` 封装与 Worker 的通信。
+提示 Worker 在进入关卡时预建策略，界面通过 hints.ts 查询。请求序号忽略旧回复，重开／退出释放 Worker。只有获得有效提示或明确无解结果才设置 usedHint；创建或运行失败只显示不可用说明，不影响评价。策略未就绪期间可正常游玩。
 
 ## 渲染与驱动
 
-- `PlayScreen` 用 `useMemo` 按关卡和重开次数创建 `LevelSim`，传给 `Scene`。
-- `Scene` 的 `useFrame` 是唯一调用 `sim.update(dt)` 的地方，事件交给 `PlayScreen` 的回调（音效、提示、横幅、HUD 数字）。
-- `Scene` 的更新优先级为 `-1`，在其他显示组件读取姿态之前推进模拟器，避免小人与乘坐平台相差一帧；负优先级不接管渲染循环。
-- 渲染组件每帧从 `characterPose()`、`mechanismPose()`、`orbPose()` 读取位置，写到 `ref` 上。
-- `Crates`、`Gates`、两种压板分别读取 `cratePose`、`gatePose`、`platePose`，不推导游戏规则；箱子推动后、按住门动画尚未结束时，压板已显示按下。`visibleTilesOf` 在规则状态真正改变时刷新，禁止点击被遮挡的路面。
-- `Scene` 接受可选 `hint: { action, at }`，`at` 使用 `performance.now()`；路面、箱子、把手按该目标显示 2 秒高亮，提示计算和按钮由 T6.8 接入。光点收集和灯笼闪烁在模拟器事件发生时开始；撤销同步恢复光点、压板、把手和灯笼显示。动画更新只写 ref，几何体与材质由 `materials.ts` 共享，独立颜色或透明度动画使用该模块提供的实例材质并在卸载时释放。
-- HUD 的步数和光点数在模拟器事件后更新 React 状态；`Scene.onStateChange` 在规则状态或空闲状态变化时补充通知（含门动画结束），不每帧更新。
-- 撤销按钮调用 `sim.undo()`；提示按钮通过 `app/hints.ts` 查询 `stateKey(sim.state())` 的下一步，把结果交给 `Mechanisms`、`Blocks` 或 `Crates` 做 2 秒高亮，并在本局标记「用过提示」。
+Scene 每帧调用 sim.update，消费真实事件；useFrame 只修改 ref，状态变化时才更新 React。palette.ts 统一颜色，materials.ts 共享几何与材质，同色静态实心积木及灯笼光粒实例化；不在每帧分配几何或材质。
+
+- CameraRig 固定正交方向 `(1,1,1)`，按静态建筑、机关全部位置与岛屿底部包围范围自动取景。
+- Character 只在游玩中启用遮挡剪影，不改变规则或可进入格；乘坐与机关动画共用姿态。
+- 交互反馈由实际输入／事件触发，不能推断正确解法；非交互预览禁用 tactile。
+- 扩大点击范围使用透明且 depthWrite=false 的可见网格，不依赖 visible=false。
+- WebGL2 不可用时显示说明；使用默认 shadows，保留已评估的库警告。
 
 ## 页面状态与存档
 
-```ts
-interface LevelRecord {
-  done: boolean
-  allOrbs: boolean
-  bestSteps: number | null
-  parMet: boolean
-}
+store.ts 只管理 title／select／play／ending、当前列表与索引、历史存档和画质；解锁集中由 `isUnlocked` 决定。标题续玩找首个未抵达主线关，选关预览不写 current 或触发音乐换章。
 
-interface SaveData {
-  version: 2
-  levels: Record<string, LevelRecord>
-  muted: boolean
-  tutorials?: ('walk' | 'collect' | 'rotate' | 'ride' | 'lift')[] // T6.12v4：已学能力
-}
+本地键 `seemingly:save:v2` 保存每关 done／allOrbs／bestSteps／parMet、静音、教学及修订信息。三项评价历史分别取并集，步数取最小值；未知关和 sample 不能写正式成绩。只清除修订不匹配的单关记录，不清空整份存档；存储不可用仍可维持会话进度。
 
-interface AppState {
-  screen: 'title' | 'select' | 'play' | 'ending'
-  current: { list: 'main' | 'challenge'; index: number } // 替代原来的 levelIndex
-  save: SaveData
-  quality: 'high' | 'low'
-  goTitle(): void
-  goSelect(): void
-  play(list: 'main' | 'challenge', index: number): void
-  completeLevel(id: string, result: { steps: number; allOrbs: boolean; usedHint: boolean }): void
-  toggleMute(): void
-}
+首次教学由 tutorials.ts 选择文案，实际动作提交后记忆，不计提示使用；学过后跨撤销／重开／刷新保持。挑战与内部样段不写主线教学，旧记录只推断其确已接触的能力。
 
-function isUnlocked(save: SaveData, list: 'main' | 'challenge', index: number): boolean
-```
+## 界面与成绩卡
 
-- T6.12v3：选关常显数量、三项名称和勾／短横，最少步数并入对应评价；移除“不用提示”和重复已抵达文案。CompleteBanner只接收本次ratings、usedHint与步数，不接收历史记录；历史累计由选关展示。ratingCount只汇总三个既有布尔值，不新增判定、存档字段或修订。
-- `completeLevel`：`done = true`；`allOrbs ||= result.allOrbs`；`bestSteps` 取较小值；`parMet ||= !usedHint && steps <= targets[id].minActions`。
-- `isUnlocked`：主线第 1 关始终解锁，第 N+1 关在第 N 关 `done` 后解锁；挑战关 N 的规则见[设计稿](design.md#挑战章)——第 1 章挑战在第 1 章全部 `done` 后解锁，第 2～5 章挑战在该章所有关卡 `allOrbs` 后解锁。挑战关的解锁只看存档记录，不依赖当前会话。
-- 读取存档：v2 正常读取；v1 只保留 `muted`，其余丢弃；损坏或未知版本用空存档，不报错。本地存储不可用时仍保留当前会话进度。
-- T6.11 开发版主线为前两章六关，`mainLevels` 与 `levels` 指向同一列表，`challengeLevels` 为空；第六关完成后显示「后续章节即将开放」。全部关卡使用设计稿给定的 `targets`，通关保存不在主线程搜索状态图。
-- 存储的 v2 对象额外记录 `campaign: 'remake'`，区分 T6.8～T6.9 兼容期的同名旧关卡；没有该标记的旧记录仅保留静音。内存中的 `SaveData` 接口与存储键名不变，后续章节沿用该标记，不重复清理重制关卡进度。
-- T6.12a：保存对象增加 `revisions`（关卡编号到修订号）；`levels/index.ts` 从关卡的 `revision ?? 1` 导出版本表。读取旧记录时缺省修订号为 1，不匹配的关卡仅清除自身记录。第六关 T6.12a 升级为 2，T6.12b 升级为 3，前五关和静音保留；新评价保存后刷新不再清除。`soundtrack` 与 `revision` 均由 builder 透传，不参与规则状态。
+标题一个真实首关 Canvas；选关宽度至少960px时只挂一个真实初始状态预览，按关卡切换 Scene／sim，窄屏不挂载预览。它们不建立提示策略、执行解法或写成绩。完成流程与响应式要求见[界面流程](design.md#界面流程)。
 
-## 首次教学（T6.12v4）
+主线全通后 JourneyButton 在点击内按需 import 成绩卡模块；捕获网络／分块错误，保留游戏，提示检查网络或刷新。加载中忽略重复请求且保留按钮焦点；卸载后忽略晚到结果。页面、音频与存档不因打开卡片改变。
 
-`app/tutorials.ts`仅处理文案和已学能力，不计算动作合法性或路线。PlayScreen消费模拟器实际事件：step、orb、mechanism-end，机关到位且角色格号属于该机关时记录乘坐。只有主线写入教学状态，内部样段和挑战不写。底部优先显示原运动／到位反馈，再显示当前关尚未完成的一句教学；完成后不挂载空底栏，通关不显示底栏。
+journey.ts 只汇总正式 ID 的已有历史。journey-image.ts 用独立 LevelSim 执行第十五关正式 solution，Scene.snapshot／Finale.complete 只初始化静态已点亮结局，不触发成绩、声音或演出回调。按1080×1000、DPR1、高画质和减少动态渲染，第四帧显式绘制后同步复制至1080×2100 Canvas2D；不更改游戏的 preserveDrawingBuffer。
 
-SaveData增加可选tutorials；缺省为空，读档过滤未知值、去重，不使旧进度失效。T6.14在原有walk／collect／rotate／ride／lift之外增加link／plate／push／hold／oneway／limited。第五关通关只证明前五项。推动要等箱子位置提交，按住要等推箱教学已经记下且箱子静压开门，联动和召台要等到相关机关全部到位，限次把手要等该次操作到位，单向格只在踏入箭头格时记下。只在首次学会新能力时写入，撤销／重开不清除；旧成绩推断已完成关卡证明的能力，不清理评价、静音或修订。该字段不参与规则、求解器、步数或usedHint。
+导出完成立即卸载额外 Canvas，仅保留 PNG Blob／File 与一个对象URL；预览、下载和系统分享使用同一文件，关闭释放URL并忽略迟到结果。12秒无结果、上下文丢失或生成错误可重试。原生 dialog 隔离游戏输入，Tab循环、Esc关闭并回到入口。canShare 检查文件能力，share 在用户点击内调用；取消静默，其余失败保留图片与下载。
 
 ## 音频
 
-- `engine.ts`：唯一的 `AudioContext`，首次真实交互时解锁。信号链：音乐总线（0.18）和音效总线（0.5）→ 主音量（0.28）→ 压缩器 → 输出；混响作为发送效果，两条总线都有发送量。静音时主音量归零并停止音乐调度。
-- `theory.ts`：纯函数与数据，可单元测试。MIDI 编号与频率换算；五章的和弦进行与音阶，见[设计稿](design.md#音乐)；给定章节和时间返回当前和弦。
-- `reverb.ts`：用双声道指数衰减噪声生成 2.5 秒脉冲响应，交给 `ConvolverNode`。
-- 和弦铺底将每个音的双三角波合成到可循环的缓冲波形，低通与包络仍实时处理；每个上下文最多缓存 8 组波形。无需外部音频文件，换和弦及换章时仍可叠加淡化。引擎统一登记、释放音乐与音效音源，含预调度音源在内最多 12 个，超过时略过新音符。
-- `music.ts`：`MusicPlayer`，提供 `start(chapter, challenge?, soundtrack?)`、`setChapter(chapter, challenge?, soundtrack?)`（3 秒交叉淡化）、`stop()`、`currentChord()`、`currentScale()`。用前瞻调度：每 100 毫秒安排接下来 0.3 秒内的音符。同一时刻最多 12 个发声音源。
-- `sfx.ts`：`step`、`mechanism`、`orb`、`lantern`、`unreachable`、`undo`、`goalLocked`、`push`、`gate`、`patrol`，音高取自 `music.currentChord()` 和 `currentScale()`；音乐未启动时使用第 1 章的和弦。
-- `app/sounds.ts`：把模拟器事件映射到音效：`step`→脚步，`mechanism-tick`→机关，`orb`→光点，`goal-locked`→提醒音，`undo`→撤销，`push`→推动，`gate`→开关门，`patrol-move`→巡逻者，`won`→灯笼。
-- 静音时立即停止全部音源并清理调度器，混响位于主音量之前，尾音也归零；取消静音时从暂停的和弦位置淡入。章内八音盒间隔随章节略作变化，均在 1.5～4 秒内，挑战关再按 90% 速度延长间隔。
-- 删除首版的 `ambient.ts`；旧的音频节点模拟测试随之移除，纯函数由 `theory.test.ts` 验证，音频生命周期及静音输出在真实浏览器中验证。巡逻者事件已由T6.16接线。
-- T6.12b：仅游玩第六关时启用 `courtyard` 配置，`App` 读取关卡字段传给 `MusicPlayer`；同章配置变化也三秒淡化，选关和标题恢复原生成式配置。`theory.ts` 的 `courtyardChordAt`、`courtyardNote` 与周期常量定义 96 秒乐句，实时音乐与效果音共用当前和弦。调度器跳过过去的整周期和音符，静音恢复不重新播放已经过去的音符。
-- `instruments.ts` 用 Web Audio 缓冲波形合成音色，不加载外部音频：柔和键盘采用基频加非整数泛音及各自衰减，持续声层用整数周期谐波保证循环接缝连续，木质触感用固定种子噪声与共鸣。缓存按音频上下文分离，键盘最多 12 音、持续层最多 8 和弦、木质触感两种。音乐单音与操作音复用键盘缓存，仍统一受引擎 12 音源上限管理。
-- 第六关持续声层不叠加独立低音；四秒起音、五秒释放，层增益 8.8（T6.12c：比上一版增加约 12 dB）。`sounds.ts` 接收关卡定义，只有 `courtyard` 在 `mechanism-start` 发运动材质声，并按机关顺序分配根音与五度音区；其他关卡的事件映射不变。`sfx.ts` 在第六关改用木质脚步和共用键盘回应；不参与任何规则求值。
+正式关卡使用 courtyard 五章谱面，theory.ts 统一实际起音、时值、节拍、和弦、循环和进展层。挑战将整套谱面时钟统一缩放到90%，反馈速度与已确认混音保持。当前参数与听感约束见[音乐](design.md#音乐)。
 
-- T6.12d 将第六关铺底包络电平从 0.32 降到 0.08，并在铺底低通之前串联 180 Hz 高通（Q=0.707）；键盘旋律包络系数从 0.3 提到 1.2，继续乘音符力度。层增益仍为 8.8，操作音及其他关卡保持原值。
-- T6.12e：仅第一关新增 `soundtrack: 'courtyard'`，沿用相同音色与混音；`courtyardChordAt(seconds, chapter=2)`、`courtyardNote(index, chapter=2)` 在章节 1 选择 C 大调启程乐句，其他章节保持空庭乐句。实时调度与 `currentChord()` 均传入章节，音效同步使用实际和弦。默认参数保留第六关已有输出；第 2～5 关、标题和选关仍为生成式配置。
-- 第一关 `revision: 2`，旧第一关评价独立失效，其他五关记录和静音保留；加载时不级联清空后续已解锁关卡。
+- AudioEngine 只建立一个上下文；首次可信点击／按键解锁。总线为主音量、音乐、音效和混响，所有当前及未来音源登记管理。
+- 最多12源，其中音乐最多8源；反馈优先替换最晚排程的音乐。换章使用既有交叉淡化，同章时钟连续。
+- sfx 在真实反馈时调用共享背景让位包络，35ms进入；重叠取较低目标，不叠乘。脚步／巡逻不反复压低背景，恢复期新事件保持连续。
+- PlayScreen 消费收光／撤销／通关事件切换进展层和音效；sample不发正式评价奖励。重开／换关／撤销取消旧排程，退出回探索；静音清源并暂停，恢复不补播。
+- 第十五关进入可取消的F结局铺底；塔实际亮起才接塔音序，装饰灯不逐灯发成功音。撤销恢复探索，已有历史不回退。
 
-- T6.12f：第二关 `revision: 2`，接入章节 1 的 `courtyard` 乐句与材质音效，不新增音频管线；存档按原有修订表仅清除第二关旧评价。第一关迁移测试显式提供第二关当前修订，以验证各关评价相互独立。
-- T6.12g：第三关 `revision: 2`，接入章节 1 的主题声景；沿用已有按关修订迁移，不影响其他关卡与静音。
-- T6.12h：第四关 `revision: 2`，使用章节 2 的空庭主题。主线保留静态可走中心，转盘定义增加低一格的长臂乘台与实心连接梁；把手移到前方底座，渲染仍完全读取关卡数据。
-- T6.12i：第五关 `revision: 2`，第二章主题；一个转盘含短臂、长臂登船位与高平台，中心是实心。长臂下方折形梁不可行走，静态南侧与北台提供两种换乘路线；规则层与渲染无特例。
-- T6.12j：标题读取主线第一关的章节与 `soundtrack`，选关读取当前关卡配置；同章返回选关沿用音乐层，跨章与返回标题沿用三秒交叉淡化。前六关已全部接入章节主题，省略 `soundtrack` 的后续关卡仍使用生成式音乐，不更改播放器、合成音色或混音。
+## 核心算法
 
-### T6.12v6 接线与生命周期
+投影坐标 `(x-y,z-y)` 的上下左右相邻路面建立图，BFS 寻路。三维差分为水平单位方向加 `k×(1,1,1)`；segmentPoint 在中点切到目标侧等价位置，固定正交视角下连续。
 
-2026-10-22用户已确认本轮声音试听，v6已勾选；随后用户明确确认前六关整体体验，T6.12已通过，下一项为T6.13设计。最新声音目标以[声音设计](design.md#音乐推进与成功反馈t612v6)为准；上方b～j保留历史记录。courtyard的96秒和声结构保持，旋律改为51音；`courtyardNote`与`courtyardPulse`给出纯数据，后者按0.75秒拍长、半拍错位，`pulseActive`与`pulseLevel`定义探索／收集／待点灯／完成层。`MusicPlayer.setProgress`只改变律动密度、强度和完成时的背景让位，不重启乐句。`musicStage`仅接收模拟器已显示的收光计数及won，不查询解法或判断机关连接。
-
-`instruments.pluckedBuffer`按上下文缓存最多12个0.9秒短拨弦，与felt／silk缓存独立；新增律动使用240Hz高通，主旋律也高通180Hz，原铺底0.08／180Hz与主混音参数保持。`renderCourtyardNote`、`renderCourtyardPad`及`sfx.renderSound`可供临时OfflineAudioContext导出调用，复用实际合成代码，不向站点增加音频文件。AudioBus.context使用BaseAudioContext，实际引擎仍只建立一个AudioContext。
-
-`PlayScreen`在实际orb／undo／won事件后更新音乐层；撤销先调用`AudioEngine.stopEffects`取消排程，再以已恢复的收光数回退进度，undo事件播放简短撤销音。Run卸载清理音效并重置探索层，覆盖重开与换关；App导航重置音效，标题／选关重置探索层，原章节和配置同步保持。音乐未解锁或静音时仍保留进度层状态，恢复只安排未来乐句，不补播效果音。
-
-`sounds.orbSound`将普通必需／最后必需／选做映射为orb／ready／optionalOrb，最后必需用ready替代orb。`successNotes`定义三类收光、lantern及rating的实际音序与力度。正式won保存前后比较done／allOrbs／parMet独立新增条件，`playNewRatings`只在新增时发1～3音，约0.85秒后接在点灯琶音之后；重复通关和较差提示局不重复奖励，sample不触发正式评价。
-
-引擎仍登记包括未来排程在内最多12个音源，音乐最多8个；音效在满额时替换最晚排程的音乐音。登记项含总线与排程时间，取消、结束、静音及上下文重建均删除并释放；stopEffects只清理音效，不重启同章音乐。静音将主音量立即归零并停止所有音源，混响自然尾音也不会输出；撤销／换关允许短暂自然混响尾音消散，但不保留未来音效。
-
-## 结尾
-
-最终关（第 15 关）在 `ending` 中列出 15 盏灯笼与塔的静态积木位置，其余时序沿用首版：终点灯笼先亮，其余每隔 0.45 秒点亮；全部亮后 0.6 秒照亮塔，再过 0.9 秒显示「谢谢游玩」和「回到标题」。阶段一版本没有第 15 关，第 12 关通关后按设计稿显示「第五章即将开放」。
+遮挡射线沿 `(1,1,1)`：运行规则采样顶面中心，解法可见性校验采样顶面五点；门和箱不参与遮挡射线。取景将全部建筑投到相机右方向 `(1,0,-1)/√2` 与上方向 `(-1,2,-1)/√6`，据包围范围设置中心和缩放。
 
 ## 画质档位
 
 | 项目 | 高 | 低 |
 | --- | --- | --- |
-| 像素比上限 | 2 | 1.5 |
+| DPR 上限 | 2 | 1.5 |
 | 阴影 | 2048 | 关闭 |
-| 光点粒子 | 全量 | 减半 |
-| 云 | 3 朵 | 1 朵 |
+| 光粒 | 全量 | 减半 |
+| 云 | 3朵 | 1朵 |
 
-开启「减少动态效果」时，额外关闭场景漂浮、云朵移动和光点粒子；收集光点的飞行动画改为直接消失。
-
-## 核心算法
-
-### 屏幕坐标与连通
-
-积木 `(x, y, z)` 的屏幕坐标为 `(x - y, z - y)`。`buildGraph` 收集当前所有路面，过滤顶上压着积木的格子，屏幕坐标上下左右相邻的格子互相连通；`findPath` 做广度优先搜索。
-
-### 跨越错觉连接的移动
-
-两格的三维差分解为水平单位方向 `d` 加 `k × (1, 1, 1)`。`segmentPoint` 前半程沿 `d` 走到中点，过中点后切到目标一侧的等价位置继续走，正交视角下看不出跳变。
-
-### 可见性检测
-
-`visibility.ts` 判断一个点沿 `(1, 1, 1)` 方向的射线是否碰到任何积木，供关卡校验与规则层的遮挡断路判断使用。遮挡断路采样路面顶面中心，解法可见性校验仍采样顶面 5 点；积木箱、门不参与遮挡射线。
-
-### 相机取景
-
-把所有积木（含机关所有可达状态下的位置和岛屿底部）投影到相机的右方向 `(1, 0, -1)/√2` 和上方向 `(-1, 2, -1)/√6`，求包围范围，设置中心和缩放。
+减少动态效果额外关闭漂浮、云移动和光粒，保留必要位移，收光飞行改为直接消失。
 
 ## 性能预算
 
-- 首次加载传输量（压缩后）不超过 1 MB。
-- 集成显卡笔记本、中端手机保持 60 帧。
-- 单关绘制调用不超过 400 次；超出时，同色静态积木改用 `InstancedMesh`。
-- 所有积木共用一份几何体，材质按颜色缓存。
-
-T6.22已重测正式二十关：[性能检查记录](performance.md)中桌面高画质主线及挑战峰值347次，手机尺寸低画质全收集峰值275次，含完整十五灯与塔。沿用T6.15静态积木及T6.19灯笼光粒合批，本轮无需改渲染。关卡、规则层与混音保持。帧时间来自Apple M5 Pro，手机仅尺寸模拟，不能替代目标集成显卡／中端手机真机长期帧率验收。此前三轮数据保留为历史，当前结论以二十关记录为准。
+首次加载 gzip 不超过1MB，单关绘制不超过400次，目标为集显笔记本／中端手机60帧；目标设备长期帧率尚未由真机覆盖。已测数据、方法与限制集中在[验收记录](performance.md)。
 
 ## 部署
 
-- `.github/workflows/pages.yml`：推送到 `main` 或提交 PR 时，执行类型检查、格式检查、测试和构建；只有推送到 `main` 时才发布。
-- 地址：`https://zzugbb.github.io/Seemingly/`。
-
-## 独立体验样段（T6.12m）
-
-独立样段 T6.12m：`levels/index.ts` 单独导出 `sampleLevels`，不加入主线、挑战或正式修订号表。`sampleTargets` 独立保存难度目标。页面状态增加 `sample`，无需解锁；`completeLevel` 仅接受主线与挑战 ID，样段通关不写评价。T6.12u2 起正常标题不提供样段入口，仅内部 `?sample=1` 控制初始页面；提示 worker 与样段共用现有求解策略。样段页面重试重建模拟器，撤销取消结果计时器。
-
-`DecorDef.lanterns` 与 builder 的 `lamp` 只添加装饰坐标。场景复用灯笼组件，在通关后点亮、撤销后恢复，不生成路面或改变规则。
-
-T6.12n 先由样段通过 `Scene.tactile` 开启操作反馈。T6.12p 起，main 与 sample 游玩显式开启，标题不传该参数因而关闭，挑战关留待以后评估，不按关名判断。`RenderFeedback.mechanisms` 记录模拟器启动、到位事件的时间戳；材质、把手缩放与标记透明度在 `useFrame` 更新 ref，不更改模拟器状态。撤销清空时间戳和目标圆圈；底部文字仅在事件或计时结束时更新。临时材质沿用 `useAnimatedMaterial` 的创建与释放，几何体复用现有缓存。
-
-## 前六关重排的实现边界（T6.12o／o1，已实现）
-
-设计与任务分解见 [opening-plan.md](opening-plan.md)。目标仍为六个主线 ID、两章各三关；新二至六关沿用现有 builder、规则、模拟器、求解器与存档格式，不新增关卡模式或迁移框架。T6.12q～t1 已逐关替换数据与该关目标、修订、行为测试，T6.12u 已完成主线连续回归。
-
-T6.12p 已把现有 tactile 反馈扩大到 main 游玩，并按交接文档切换底部状态与不可达文案；正式 HUD、CompleteBanner、评价与下一关保持。样段独有的免评价、进入卡和完成卡仍按 list 分支，不按关名判断。T6.12t 已实现正式第五关，使用独立 id level-05 的完整定义，sample-01 仍留在 sampleLevels 且不写正式进度。T6.12t1 已将第六关替换为回环、revision 4；不新增联动、镜头或存档格式。T6.12u 在 t3 后从新入口核对新第五、六关连续流程，不能沿用旧版第六关的验收。
-
-## 入口页面实现边界（T6.12o2，已实现）
-
-[entry-design.md](entry-design.md) 为标题／选关的实现合同。t2、t3 已实现标题和选关，u 已回归全流程；u1 修正预览 Canvas 复用，u2 移除正常页面的样段入口。复用现有 store 的 firstPlayableIndex、isUnlocked、play 和 toggleMute；展示统计只遍历实际正式 ID，不新增存档字段、解锁规则、音频或关卡 metadata 字段。主题短句放 app 展示数据，必要纯辅助函数可放既有 app 目录。
-
-标题只渲染 mainLevels[0] 初始场景。选关桌面最多一个 Canvas，初始预览 firstPlayableIndex，hover／focus 只更改本页状态；不能改变 store.current、触发音乐切换、启动提示 Worker 或写存档。窄屏不挂载选关预览画布。复用 Scene／LevelSim／CameraRig、共享材质与几何体；两个非游戏场景均 interactive=false、tactile=false，CameraRig 全局算法与固定方向不变。
-
-DOM 样式限定入口作用域，关内 HUD、评价和样段完成流程保持。docs/assets 的入口图是设计参考，不作为站点资源导入。标题／选关已按稿替换；样段只保留内部直达及存档隔离，不在正常导航中提供重复关卡入口。
-
-## 提交约定
-
-- 提交信息用中文，前缀沿用 `feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`chore:`。
-- 一个任务一个提交，提交信息里写上任务编号，例如 `feat: 规则层支持联动（T6.2）`。
-
-## T6.12v2 运动净空修复
-
-第四至六关按当前关卡稿分开实际纵深并修整实心支架，保留换乘／降空台显露／双桥返程及原targets。角色运动时0.12秒轻微收身至94%，到位恢复，足底与剪影对齐；没有新增弹跳、镜头、点击限制或三维行走碰撞。`core/shapes.ts`共享角色姿态参数及岩层尺寸，`core/clearance.ts`只供设计和测试，不进入规则或每帧渲染。完整包络、轴承接缝例外与181姿态采样边界见[运动净空](motion-clearance.md)。第六关旧称“西高台”的接回端现为同实际高度的西远端，以当前level-06稿为准。
-
-## T6.14a 第三稿接入边界（数据已接入）
-
-T6.14a当时只修改设计与文档验证；现src已完整运行第三稿，正式连续流程已由g验收。新数据只使用既有LevelDef／builder／rules／sim／solver接口，无新规则、依赖、存档版本或目录。第七关revision 1保持，第八至十二关各在实施时升2；现有revisions读取仅清对应旧评价，前七关、muted和tutorials保留。不能清空全存档或预先把未实施关卡的targets改成未来值。
-
-第八关两处手动转盘各links同一remote，单层联动不递归；第九关三处必需光和三门切换；第十关同一hold门改在近岸；第十一关新增trigger→toggle出口门；第十二关三站[0,2,6]、uses=8、两种远庭门和反推恢复侧廊，均由既有接口表达。八次是总额度，最优只使用四次，不能把最后一步剩余亮点当成未完成。各稿完整对象与预期指标是接入合同。
-
-首次教学保留动作提交时点和既有能力记忆，第八关更新为“两个转轮，都能带动远处的桥”，不新增技能或重置旧link。第十二关call-far仍只有停住才触发；路过收光不等于开门。不更改自动寻路或提示动作选择来迎合标准路线。
-
-默认check-designs检查第三稿；--runtime在接入前应明确拒绝旧revision，b～f后g必须全通过正式对象与targets比对。设计原型只在隔离Vite进程替换数据，不能把该预览配置、测试存档或临时文件打入正式构建。新章音乐与事件生命周期保持现实现；听感及难度仍待用户确认。
-
-
-## T6.14h 反馈混音校准（实现交付，待用户试听）
-
-本轮用户授权修复背景掩盖音效，并包含前六关；此节覆盖上述历史固定混音参数。乐谱、音色、高通、速度、玩法及存档不变。主音量0.28、音乐总线0.18与混响发送0.35保留，courtyard主题层8.8→4.4（-6dB），音效总线0.5→0.75（约+3.5dB），四章与内部样段共同采用。
-
-`audio/mix.ts`集中总线参数、按声音种类的让位预设与纯函数包络；`sfx.playSound`只在真实音效事件时调用`AudioEngine.focusFeedback`。音乐总线之后加一个共享GainNode，位于音乐干声及其混响发送之前，因此当前层与跨章退出层一起让位。脚步／巡逻不触发反复压低，机关／门／推动／拒绝／撤销轻让位，收光与成功更明确；不读取解法或连接是否正确。
-
-包络35ms进入，按反馈持续时间保留窗口后线性恢复。重叠取更低目标而不相乘，较轻反馈不提前结束较强反馈；在恢复中接新事件保持连续。章末窗覆盖延后2.1～5.35秒的实际四音。只使用AudioParam排程，无新计时器。stopEffects取消未来音源并在80ms恢复背景，撤销本身可接一次短让位；静音取消并立即复位，新上下文不保留旧包络。自然混响尾音继续遵循既有规则。
-
-音源总上限12／音乐8与优先替换音乐的策略不改。纯函数验证包络与重叠；真实Web Audio验证总线、取消、自然恢复、静音与重建，不用伪节点测试声学表现。四章源码合成对照、实际桌面／手机录音与电平记录在/private/tmp/seemingly-t614h/，不是站点音频资源。技术检查不代替本轮用户试听，roadmap的h在确认前保持未勾选。
-
-### T6.14h1 主旋律退后（待用户试听）
-
-用户反馈h首版主声仍大。主题层4.4→3.3，旋律包络系数1.2→0.5，主旋律合计再降约10.1dB，铺底与律动约降2.5dB；反馈总线0.75与h的共享让位／恢复、12／8音源容量均保持。参数仍由theory.ts统一提供，四章及入口共同生效；乐谱、音色和滤波不改。验收对照h而不是最早8.8版本，h仍待本轮用户试听。
-
-2026-10-23最新状态：用户试玩h1后确认“OK，那就先这样吧”，当前正式四章声音与混音试听通过，保留9fe9196参数。上文“待试听／待确认”是各次历史交付状态，以此次用户确认和roadmap勾选为准；下一项为T6.15十二关性能及README收尾，尚未执行，不自动发布。
-
-
-### T6.15 阶段一收尾
-
-用户认可当前关卡和h1声音后授权继续，完成十二关性能与连续流程回归、README玩法及实景截图更新。静态积木合批只改变提交绘制的方式，未改布局、规则、交互、revision或已确认混音。桌面主线114步、手机尺寸全收集128步全部实际点击完成；生产构建另验 `/Seemingly/` 子路径。详细数据与真机验证限制见性能记录；本地交付，不自动推送发布，下一项T6.16尚未开始。
-
-
-## T6.16 巡逻者实现
-
-`PatrolDef`、`b.patrol`、`GameState.patrols`和`Transition.patrolMoves`已实现；无巡逻关卡保留省略的可选定义，正式十二关数据与存档格式保持。规则层`patrolTilesOf`统一解析当前路线格，供占位、按住门与校验使用。端点先更新方向，再尝试下一格，阻挡时位置不变；环线按方向环绕。压力在整轮巡逻前后各求值一次，占位则按编号即时更新；路线只接受当下相邻且可进入的格子。玩家整段行走只推进一次，改道仍替换当前动作，不逐格推进巡逻。
-
-模拟器保持旧状态直到整个动作动画提交；先展示机关与旧巡逻位置下的压力，再按`patrolMoves`依次插值0.3秒，最后显示新压力。`patrolPose`的hop只供渲染；`Patrols.tsx`在useFrame更新ref，减少动态关闭跳动，位置仍使用既有segmentPoint。撤销快照恢复朝向、游标、门及压力，无额外规则副本。真实移动发出patrol-move，app/sounds映射已有patrol合成音，等待不发脚步音。
-
-校验覆盖路线引用、至少两格、开局相邻与环形闭合、开局元素独占、最多一个巡逻者及全部可达状态的头顶安全；另查随机关到位、巡逻离开之前的占位，避免用随后走开掩盖不安全到位。此项没有为第五章登记任何目标或新增正式入口。T6.17须遵守关卡规范中的阶段二衔接要求，用户试玩与新章声音仍按后续关卡任务验收。
-
-## T6.17 第五章第一稿边界（历史，T6.17a覆盖）
-
-第五章仅完成文档对象与隔离原型，正式mainLevels、targets、revision和音乐保持十二关基线。[chapter-5.md](levels/chapter-5.md)与三份完整参考实现是T6.18合同：留步10／11、相守13／15、归来15／16。巡逻使用已完成T6.16状态与规则；唯一新增教学记忆为patrol，须在实际移动到位后记录，不能扩张旧第五关的能力推断。
-
-T6.18需接入第五章courtyard时钟与谱面，避免chapter 5回落到第二章默认；沿用h1合成和反馈总线。最终home联动veil是既有一层联动，转盘0.9秒、平移3格1.35秒分别插值，全部到位后才推进巡逻；不得按同一角度／距离进度偷换动画时序。设计净空工具按实际时长差采样，含巡逻球体与运载箱，仍为离散检查。
-
-新校验器`docs/levels/check-chapter5.mjs`保留前十二关完整对象摘要、各关revision、旧存档边界和--runtime拒绝门槛。正式15关后旧check-designs.mjs的12关长度检查应改核对前缀，保留全部旧关几何与指标；不删除旧检查或更改目标迎合实现。结局读取level-15.ending的15灯与6块静态塔，不在渲染层写坐标。正式实现须补撤销中止演出、换关／静音取消及手机全流程；设计原型不代替这一验收。
-
-## T6.17a设计复核修订（未正式接入）
-
-本节覆盖T6.17第一稿的对象与交接边界，最新合同为[第五章](levels/chapter-5.md)。目标10／14、13／15、15／19。十四关两台运输取消限次；十五关两台运输不限次，home无把手，由一次性exchange驱动，并同轮联动veil及landing-door。转盘0.9秒、遮挡块2格0.9秒分别按自身时长插值，不能套用旧3格1.35秒。首次教学仍只新增patrol。
-
-结局须接入可取消的音乐模式：终点后停止未来探索旋律并淡到F收束铺底；14盏装饰灯不逐灯发完整灯笼音，塔亮时才接finaleNotes。撤销／退出／静音取消排程，重开回探索。第五章新声实际试听仍待T6.18～19，前四章h1参数保持。三关目前仍只存在于文档与隔离原型，不改src／targets／存档。
-
-T6.18另按T6.17a参考图调整桌面ending-message为横排（>720px，bottom=20px加安全区、gap=20px、h1=24px），手机现有横排保持，避免结局文字覆盖岩层；不修改CameraRig。
-
-## T6.18第五章正式接入
-
-正式mainLevels为十五关，13～15按T6.17a完整稿与targets接入，revision均1；前十二关完整摘要与修订保持。旧7～12检查器验证前十二关前缀，第五章--runtime额外核对正式谱面、时钟、调式和塔收束；不从docs导入运行数据。
-
-patrol能力只在真实patrol-move发生且模拟器整步提交后确认；旧第五关和十二关完成记录不推断patrol。移动／停下的忙碌文案不提供解法。第五章courtyard使用84 BPM、51音与八段和声，其他四章乐谱与h1混音参数保持。
-
-MusicPlayer.setFinale切换可取消的结局模式：停止未来探索旋律与律动，旧活动层1.2秒淡出，Fmaj9#11铺底淡入；固定和声每8秒续接，完成层维持半幅表达，单层包络不超过0.08。Layer.sources记录音源开始时间，换章或换模式先取消未来源，再淡出已活动源。静音释放音源，恢复只重建当前模式，不补发塔或评价。
-
-Scene在塔实际亮起时触发一次finale音序，14盏装饰灯不发完整灯笼声；撤销清除塔亮状态并卸载Finale。演出期间HUD保留撤销／重开／选关／静音，提示禁用；完成消息出现后键盘Z／R／Esc仍可操作。撤销／重开从ending返回同关play，清除结果和未来声音；既得存档不回退。桌面完成消息按设计改横排，手机保持。
-
-结构／全部状态／500次随机的组合校验使用10秒测试执行窗口；另对全新克隆对象单独强制冷求解小于2秒、状态≤30000，未放宽游戏求解或谜题目标。T6.19十五关性能与用户新声音／整体体验确认仍待完成。
-
-## T6.19阶段二收尾
-
-2026-10-24用户在T6.18正式交付后认可第五章关卡、完整结局与新声音，上文待确认描述保留为各轮历史边界。本轮十五关连续性能复测发现十五灯全亮时481次绘制，超过400次预算。Lantern.Sparks改为每盏灯一个InstancedMesh，复用materials.ts原几何与材质，矩阵在useFrame中复用并更新instanceMatrix；保守包围球覆盖散开及环绕，避免每帧重算。高／低画质光粒数量10／5、轨迹、尺寸、灯光、时序与减少动态行为不变。
-
-完整十五关的性能、生产子路径、加载、连续进度与用户确认统一见[性能检查](performance.md)。只改绘制提交，不修改规则、关卡、targets、revision、存档格式、已确认混音或依赖；真机长期帧率限制保留。本地提交不代表已推送发布或开始挑战章。
-
-## T6.20挑战设计合同（T6.21已接入）
-
-[挑战交接](levels/challenges.md)和challenge-1～5给出五个独立LevelDef与精确targets；check-challenges.mjs从文档严格编译、默认检查设计，--runtime在T6.21接入后比对正式五关、目标和顺序，并锁定十五关对象不变。T6.20设计时challengeLevels为空，现已由T6.21正式接入；设计检查仍不能代替正式运行。
-
-正式接线范围：挑战卡桌面预览复用真实Scene、手机不挂预览；挑战完成统一返回选关，避免下一母章未解锁时“下一关”无效；复用主线tactile、运动／到位状态与正文墨色无解吐司，但不写教学或恢复常驻说明。保存格式与规则保持，挑战只增加独立成绩及revision 1。
-
-T6.20时courtyard没有应用challenge的90%时钟；T6.21现已同时缩放音符、和弦、脉冲、循环、currentChord与暂停／切换，不仅延长八音盒间隔；反馈音速度与h1电平保持。慢速新听感待用户试听，不继承母章原速确认。运行源码、音轨和前十五关本轮均未改。
-
-## T6.21挑战正式接入
-
-五个challenge-N完整对象、目标与revision 1已按T6.20合同导出，十五关及原targets未改。levelLists／hint.worker沿用原管线，metrics新增挑战列表；campaignStats默认汇总20关／60项，主线续玩与十五灯仍只看15关。存档格式保持v2，挑战成绩分别历史累计，不推断或写入主线教学。
-
-LevelSelect以列表与索引记录预览，同一Canvas按真实LevelDef切换，重复悬停不重建sim；锁定项不改变预览，手机不挂预览。PlayScreen挑战完成总回选关，复用tactile与临时运动／到位，空闲不显示首次教学或常驻底栏。无解吐司仅在challenge-screen使用正文墨色与暖白底，主线样式保持。
-
-courtyardClock／Note／Pulse／ChordAt增加缺省false的challenge参数。真实播放秒数保持不变，纯函数将谱面起音、时值、拍长与周期除以0.9，按实际秒×0.9查询和声；MusicPlayer所有循环、前瞻和currentChord读取同一配置。静音保存真实elapsed，恢复跳过已过音符；返回母章清除challenge并按既有交叉淡化切回原速，不修改h1电平或反馈音速度。新慢速听感已于2026-10-25获T6.22本轮用户确认，当前关卡与混音保持。
-
-## T6.22最终收尾
-
-2026-10-25用户明确确认五挑战整体体验及慢速音乐没有问题。本轮二十关两档画质逐动作实点通过，桌面主线及挑战246步、手机尺寸全收集290步；后台准备最慢约1.45秒，完整十五灯结局与减少动态检查保持。生产 `/Seemingly/` 验证首关及第五挑战提示、资源与存档入口，无探针或请求错误。首屏gzip约356.2 KB，详见性能记录。
-
-README与三张正式实景、旧九关分享简介更新；不修改玩法源码、谜题、targets、revision、音乐、存档格式或依赖。四项检查及393项测试通过后本地提交，不自动推送发布；5180用户存档未访问或预置。
-
-## T6.22a整体排查与边界修复
-
-2026-10-25用户要求整体排查。修正entry重访说明仅代表主线通关；PlayScreen在提示Worker构造失败、client缺失时主动反馈既有不可用文案。仅当实际返回提示或无解结果时设置usedHint；本轮未改该规则，失败请求仍不影响步数评价。无新监听器、状态字段、依赖或存档版本。
-
-复跑三套正式设计检查、五尺寸UI与异常环境：行走中撤销／重开、提示未返回时退出、连续六次重开仅留一个Worker；禁用存储和音频后会话仍可通关解锁下一关，无WebGL2有明确说明。五章主线及对应挑战的音乐配置、当前和弦、静音清源／暂停／恢复和退出取消通过，音源峰值6，未改音乐代码或h1混音。二十关完整正常流程与性能仍见T6.22记录，本轮没有宣称重新实点二十关全部解法。
-
-## T6.22b规则查询性能修复
-
-静态邻接图、单向格及未被顶压／遮挡的可进入集合并入rules.ts既有Geometry缓存，仍按关卡身份与机关布局复用、最多64布局，initialState清理。行走与巡逻读取同一静态邻接，保持buildGraph邻居顺序；门、人物、箱子、巡逻占位及按住压力不缓存，逐状态过滤。公开walkGraph仍返回独立Map和邻接数组，不能污染静态缓存。
-
-路线缓存键包含at、rotator、mover、gates、crates、patrols，每次查询核对，支持调用方原地修改；orbs、spentPlates、handleUses和won不改变通路，不再为路线复用重复序列化。求解器完整stateKey仍包含全部字段，动作合法性、求值顺序、规模与两秒门槛不变。gatesOf仅减少临时集合，保留离板压力与门内占位。具体等价及性能记录见[性能检查](performance.md#ci求解性能修复t622b)，远程修复结果须后续用户授权推送后确认。
-
-## T6.22c完成反馈与导航
-
-entry.campaignStats增加challengeDone／challengeCount，标题与选关同样分两行展示抵达及评价。journeyChoice保持主线续玩／重访判定，仅在正式历史评价全满时替换caption。challengeMilestone比较completeLevel前后历史done，最后缺口从任意挑战补齐时返回全通文案；只存在本次result，撤销／重开清理，不写新存档或持久标记。
-
-nextLevelIndex只调用原isUnlocked检查当前列表的下一编号，不搜索或跳过锁定项；PlayScreen订阅该派生索引，主线及挑战完成后按该索引进入下一关或回选关，内部样段不连续进入。主线最终关仍优先goEnding，十五灯与声音生命周期保持，无新每帧状态、Worker或监听器。
-
-## T6.22d只读引用索引与搜索分配
-
-rules.ts新增按LevelDef身份保存的LevelIndex，仅索引只读定义中的机关、门格、按住／触发压板、光点格与必需光点编号、终点格。initialState与几何缓存一起清理该索引；路线缓存同时校验索引身份，避免新局改定义后仍复用旧路线。动态门、人物／箱／巡逻占位和压力仍逐状态计算，不跨状态缓存进入许可。转移直接构造全部GameState字段，保持独立副本和原字段顺序，不改完整stateKey或求值顺序。
-
-solver.stateGraph在analyze／reachableStates中不保存未消费的正向动作边，仍调用legalActions／applyAction／stateKey展开每个动作、记录全部可达状态及反向边；最短路与死局完整计算。buildPolicy／nextHint／randomWinRate继续保存全部正向动作边，动作顺序与固定随机结果保持。两秒求解、10秒组合校验及状态门槛不变，本机结果与远程CI结果分开记录。
-
-## T6.22e旅程成绩卡
-
-`app/journey.ts`复用campaignStats，只遍历正式main／challenge ID派生三项历史计数、主线全通开放条件与三个里程碑，无新持久字段。JourneyButton在已有四处入口按条件挂载，懒加载JourneyDialog；原生dialog隔离后台交互，Tab循环、Esc关闭并恢复入口焦点，按键不传给游戏快捷键。打开时取当前历史快照，关闭卸载，不改变screen、current、音频或存档。
-
-`app/journey-image.ts`以独立LevelSim执行最终主线的正式solution，仍由原command／update调用规则；不运行求解器、不调用completeLevel。Scene的snapshot与Finale的complete默认为false，只给非交互导出初始化已点亮静态结局，避免等待或重播演出，正常游玩默认路径保持。图片局部画布按1080×1000、dpr=1、高画质、减少动态渲染，复用材料与CameraRig，第四帧显式绘制后同帧复制至1080×2100的原生Canvas2D，不改变游戏preserveDrawingBuffer。文字与背景颜色从palette读取，无静态截图资源。
-
-导出完成后立即卸载额外Canvas，仅保留PNG Blob／File与一个对象URL，预览、下载和系统分享使用同一文件；关闭或重试时清理，晚到异步结果不更新已卸载组件。生成失败或12秒无结果显示重试，WebGL上下文丢失也退出生成。canShare检查文件能力，share在已准备文件的用户点击内调用；AbortError静默，其他失败保留图片与下载。系统目标与相册行为取决于浏览器，不将尺寸模拟或方法替身当作真机系统分享验证。
-
-## T6.22f动态模块故障隔离
-
-JourneyButton在点击处理内按需import成绩卡模块，成功后保存稳定的组件引用并打开弹窗。加载期间禁用重复请求，网络或分块缺失通过入口的简短说明反馈，游戏仍保留；不让React.lazy未捕获的拒绝导致整个React根卸载。组件离开后通过effect清理活动标记，晚到成功／失败不更新状态或重开旧弹窗。成功加载仍由浏览器模块缓存复用，图片生成、下载、原生dialog与声音行为保持；资源已更新导致旧分块缺失时说明刷新页面后重试，不自动刷新或清理存档。
+Vite 使用 `base: './'`；所有资源使用相对路径。main 的推送与手动工作流通过类型、格式、测试、构建后发布 GitHub Pages，PR 只检查不发布；工作流在 `.github/workflows/pages.yml`。推送或发布必须由用户明确指示。
