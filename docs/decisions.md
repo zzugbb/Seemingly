@@ -71,4 +71,4 @@
 
 允许的依赖：运行时 `react`、`react-dom`、`three`、`@react-three/fiber`、`@react-three/drei`、`zustand`；开发时 `vite`、`@vitejs/plugin-react`、`typescript`、`@types/react`、`@types/react-dom`、`@types/three`、`vitest`、`prettier`。新增依赖、外部素材、核心玩法或风格变更须先获得用户同意。
 
-不做自由镜头、自由建造、拖拽机关、关卡编辑器、用户自制关卡分享、多语言、计时、排行榜、对话或第三方脚本。个人主页任务 T5.4 继续暂缓。手机真机分享／保存、Safari 兼容及目标设备长期帧率仍待补验，见[验收记录](performance.md)。
+不做自由镜头、自由建造、拖拽机关、关卡编辑器、用户自制关卡分享、多语言、计时、排行榜、对话或第三方脚本。个人主页任务 T5.4 继续暂缓。用户已确认发布与真机基本试玩正常，具体来源及专项验证边界见[验收记录](performance.md)。
