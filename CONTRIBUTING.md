@@ -6,20 +6,11 @@
 
 当前十五主线、五挑战、结局和音乐已完成，维护以可复现缺陷、兼容性、可访问性和文档修正为主。新功能或会改变核心玩法、关卡难度、画面风格、目录结构、依赖的改动，请先开 Issue 与维护者讨论，确认范围后再实现。
 
-固定相机、投影连通、遮挡断路和乘坐是既定规则；不通过修改谜题、targets 或放宽预算来消除测试失败。不增加外部模型、贴图、音频、后端、统计或广告。完整约束以[项目决策](docs/decisions.md)和[开发指南](AGENTS.md)为准。
+完整约束以[项目决策](docs/decisions.md)和[开发指南](AGENTS.md)为准，不通过修改谜题、targets 或放宽预算来消除测试失败。
 
 ## 开发准备
 
-使用 Node.js 24（见 `.nvmrc`）及仓库锁文件：
-
-```bash
-git clone https://github.com/zzugbb/Seemingly.git
-cd Seemingly
-npm ci
-npm run dev
-```
-
-默认地址为 `http://127.0.0.1:5180`，已有服务时先检查再复用。自动化验收使用隔离端口和浏览器上下文，例如 `npm run dev -- --port 5182 --strictPort`；不要清空、预置或覆盖日常游玩的存档。
+按[README](README.md#本地运行)准备 Node.js 24、锁定依赖和开发服务，已有服务先检查再复用。自动化验收使用隔离端口和浏览器上下文，例如 `npm run dev -- --port 5182 --strictPort`；不要清空、预置或覆盖日常游玩的存档。
 
 动手前按[开发指南的必读顺序](AGENTS.md#必读文档)了解决策、任务和相关规范，沿用现有模块与写法。游戏规则只写在 `src/game/core/rules.ts`，关卡数据和渲染分离。
 
@@ -28,7 +19,7 @@ npm run dev
 1. 先搜索已有 Issue；外部贡献可 Fork 后创建分支，保持一个 PR 解决一个明确问题。
 2. 缺陷说明触发条件及修改后的行为；新增或调整逻辑时补能验证问题的测试，避免机械重复实现。
 3. 同步受影响文档。维护任务记录在[任务列表](docs/roadmap.md)，已完成过程从 Git 历史查询，不另建开发流水账。
-4. 所有提交前通过以下完整检查，使用简体中文 Conventional Commits；维护任务带任务编号，例如 `docs: 补齐开源协作资料（T7.4）`。
+4. 所有提交前通过以下完整检查。提交使用简体中文 Conventional Commits，例如 `fix: 修复提示不可用时的反馈`；项目维护任务同时标注编号。
 
 ```bash
 npm run typecheck && npm run format:check && npm test && npm run build
