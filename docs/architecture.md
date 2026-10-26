@@ -709,3 +709,9 @@ README与三张正式实景、旧九关分享简介更新；不修改玩法源�
 entry.campaignStats增加challengeDone／challengeCount，标题与选关同样分两行展示抵达及评价。journeyChoice保持主线续玩／重访判定，仅在正式历史评价全满时替换caption。challengeMilestone比较completeLevel前后历史done，最后缺口从任意挑战补齐时返回全通文案；只存在本次result，撤销／重开清理，不写新存档或持久标记。
 
 nextLevelIndex只调用原isUnlocked检查当前列表的下一编号，不搜索或跳过锁定项；PlayScreen订阅该派生索引，主线及挑战完成后按该索引进入下一关或回选关，内部样段不连续进入。主线最终关仍优先goEnding，十五灯与声音生命周期保持，无新每帧状态、Worker或监听器。
+
+## T6.22d只读引用索引与搜索分配
+
+rules.ts新增按LevelDef身份保存的LevelIndex，仅索引只读定义中的机关、门格、按住／触发压板、光点格与必需光点编号、终点格。initialState与几何缓存一起清理该索引；路线缓存同时校验索引身份，避免新局改定义后仍复用旧路线。动态门、人物／箱／巡逻占位和压力仍逐状态计算，不跨状态缓存进入许可。转移直接构造全部GameState字段，保持独立副本和原字段顺序，不改完整stateKey或求值顺序。
+
+solver.stateGraph在analyze／reachableStates中不保存未消费的正向动作边，仍调用legalActions／applyAction／stateKey展开每个动作、记录全部可达状态及反向边；最短路与死局完整计算。buildPolicy／nextHint／randomWinRate继续保存全部正向动作边，动作顺序与固定随机结果保持。两秒求解、10秒组合校验及状态门槛不变，本机结果与远程CI结果分开记录。

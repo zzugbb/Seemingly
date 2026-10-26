@@ -32,7 +32,7 @@ export class StateLimitError extends Error {
   }
 }
 
-function stateGraph(level: LevelDef, start: GameState): StateNode[] {
+function stateGraph(level: LevelDef, start: GameState, storeEdges = true): StateNode[] {
   const nodes: StateNode[] = [{ state: start, depth: 0, edges: [], incoming: [] }]
   const indices = new Map([[stateKey(start), 0]])
   for (let from = 0; from < nodes.length; from++) {
@@ -48,7 +48,7 @@ function stateGraph(level: LevelDef, start: GameState): StateNode[] {
         indices.set(key, to)
         nodes.push({ state: transition.state, depth: node.depth + 1, edges: [], incoming: [] })
       }
-      node.edges.push({ action, to })
+      if (storeEdges) node.edges.push({ action, to })
       nodes[to].incoming.push(from)
     }
   }
@@ -115,7 +115,7 @@ function solutionCounts(level: LevelDef): { illusions: number; tradeoffs: number
 }
 
 export function analyze(level: LevelDef): LevelMetrics {
-  const nodes = stateGraph(level, initialState(level))
+  const nodes = stateGraph(level, initialState(level), false)
   const distances = winDistances(nodes)
   let minActionsAll: number | null = null
   for (const node of nodes) {
@@ -139,7 +139,7 @@ export function buildPolicy(level: LevelDef): Map<string, Action | null> {
 }
 
 export function reachableStates(level: LevelDef): ReadonlyArray<Readonly<GameState>> {
-  return stateGraph(level, initialState(level)).map((node) => node.state)
+  return stateGraph(level, initialState(level), false).map((node) => node.state)
 }
 
 export function nextHint(level: LevelDef, state: GameState): Action | null {

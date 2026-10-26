@@ -344,6 +344,30 @@ describe('可达路线、合法动作与状态键', () => {
     ])
   })
 
+  it('同一关卡重新初始化后读取更新的光点和终点，不沿用上一局引用', () => {
+    const level = fixture()
+    const state = initialState(level)
+    expect(transitioned(applyAction(level, state, { type: 'walk', tileId: '1,0,0' })).collected).toEqual(['orb-0'])
+    level.orbs[0] = { tile: [2, 0, 0] }
+    level.goal = [2, 0, 0]
+    const fresh = initialState(level)
+    expect(transitioned(applyAction(level, fresh, { type: 'walk', tileId: '1,0,0' })).collected).toEqual([])
+    const finish = transitioned(applyAction(level, fresh, { type: 'walk', tileId: '2,0,0' }))
+    expect(finish.collected).toEqual(['orb-0'])
+    expect(finish.state.won).toBe(true)
+  })
+
+  it('重新初始化后门的位置变化也参与进入许可', () => {
+    const level = fixture((b) => b.gate({ id: 'door', tile: [1, 0, 0], mode: 'toggle' }))
+    expect(reachableFrom(level, initialState(level)).has('1,0,0')).toBe(false)
+    const door = level.mechanisms.find((item) => item.type === 'gate')!
+    if (door.type !== 'gate') throw new Error('缺少测试门')
+    door.tile = [0, 0, 1]
+    const fresh = initialState(level)
+    expect(reachableFrom(level, fresh).has('1,0,0')).toBe(true)
+    expect(reachableFrom(level, fresh).has('0,0,1')).toBe(false)
+  })
+
   it('所有目标路线与 findPath 完全一致，包括等长分岔、错觉连接和不可达路面', () => {
     const level = fixture((b) => b.path([99, 0, 99], 'sand'))
     const initial = initialState(level)

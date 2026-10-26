@@ -1,4 +1,4 @@
-import type { GateDef, LevelDef, MoverDef, RotatorDef, ScreenDir, TileRef, Vec3 } from '../levels/types'
+import type { GateDef, LevelDef, MoverDef, PlateDef, RotatorDef, ScreenDir, TileRef, Vec3 } from '../levels/types'
 import { buildGraph, cellId, screenKey, type Graph, type Tile } from './iso'
 import { advanceMover, moverBlocks, moverCursor, rotatorBlocks, type MoverCursor } from './mechanisms'
 import { rayHitsAny } from './visibility'
@@ -32,7 +32,7 @@ export interface Transition {
 }
 
 type Operable = RotatorDef | MoverDef | GateDef
-const routeCache = new WeakMap<GameState, { level: LevelDef; key: string; routes: Map<string, string[]> }>()
+const routeCache = new WeakMap<GameState, { index: LevelIndex; key: string; routes: Map<string, string[]> }>()
 interface Geometry {
   tiles: Map<string, Tile>
   blocks: Vec3[]
@@ -43,6 +43,48 @@ interface Geometry {
   graph?: Graph
 }
 const geometryCache = new WeakMap<LevelDef, Map<string, Geometry>>()
+interface LevelIndex {
+  mechanisms: Map<string, LevelDef['mechanisms'][number]>
+  gates: { definition: GateDef; tile: string }[]
+  holds: { tile: string; target: string }[]
+  triggers: Map<string, PlateDef>
+  orbs: Map<string, string[]>
+  requiredOrbs: string[]
+  goal: string
+}
+const levelIndices = new WeakMap<LevelDef, LevelIndex>()
+
+function indexOf(level: LevelDef): LevelIndex {
+  const cached = levelIndices.get(level)
+  if (cached) return cached
+  const index: LevelIndex = {
+    mechanisms: new Map(),
+    gates: [],
+    holds: [],
+    triggers: new Map(),
+    orbs: new Map(),
+    requiredOrbs: [],
+    goal: cellId(level.goal),
+  }
+  for (const mechanism of level.mechanisms) {
+    if (!index.mechanisms.has(mechanism.id)) index.mechanisms.set(mechanism.id, mechanism)
+    if (mechanism.type === 'gate') index.gates.push({ definition: mechanism, tile: cellId(mechanism.tile) })
+    if (mechanism.type !== 'plate') continue
+    const tile = cellId(mechanism.tile)
+    if (mechanism.mode === 'hold') index.holds.push({ tile, target: mechanism.target })
+    else if (!index.triggers.has(tile)) index.triggers.set(tile, mechanism)
+  }
+  level.orbs.forEach((orb, number) => {
+    const tile = tileRefId(orb)
+    const id = `orb-${number}`
+    const orbs = index.orbs.get(tile)
+    if (orbs) orbs.push(id)
+    else index.orbs.set(tile, [id])
+    if (!orb.optional) index.requiredOrbs.push(id)
+  })
+  levelIndices.set(level, index)
+  return index
+}
 
 function geometryOf(level: LevelDef, state: GameState): Geometry {
   const key = JSON.stringify([state.rotator, Object.entries(state.mover).map(([id, cursor]) => [id, cursor.stopIndex])])
@@ -94,6 +136,7 @@ function* blocksOf(level: LevelDef, state: GameState) {
 export function initialState(level: LevelDef): GameState {
   // 新的一局或搜索重新读取关卡定义；同次查询期间关卡数据保持只读。
   geometryCache.delete(level)
+  levelIndices.delete(level)
   const state: GameState = {
     at: cellId(level.start),
     rotator: {},
@@ -147,20 +190,16 @@ export function patrolTilesOf(level: LevelDef, state: GameState): Record<string,
 }
 
 export function gatesOf(level: LevelDef, state: GameState, departing = false): Record<string, boolean> {
+  const index = indexOf(level)
   const objects = [...Object.values(state.crates), ...Object.values(patrolTilesOf(level, state))]
   const held = new Set<string>()
-  for (const item of level.mechanisms) {
-    if (item.type !== 'plate' || item.mode !== 'hold') continue
-    const tile = cellId(item.tile)
-    if ((!departing && state.at === tile) || objects.includes(tile)) held.add(item.target)
+  for (const { tile, target } of index.holds) {
+    if ((!departing && state.at === tile) || objects.includes(tile)) held.add(target)
   }
   const gates: Record<string, boolean> = {}
-  for (const item of level.mechanisms) {
-    if (item.type !== 'gate') continue
+  for (const { definition: item, tile } of index.gates) {
     gates[item.id] =
-      item.mode === 'toggle'
-        ? state.gates[item.id]
-        : held.has(item.id) || state.at === cellId(item.tile) || objects.includes(cellId(item.tile))
+      item.mode === 'toggle' ? state.gates[item.id] : held.has(item.id) || state.at === tile || objects.includes(tile)
   }
   return gates
 }
@@ -208,7 +247,9 @@ function entryFilter(
   )
   const gates = options.gates ?? gatesOf(level, state, !options.patrol)
   const closed = new Set(
-    level.mechanisms.flatMap((item) => (item.type === 'gate' && !gates[item.id] ? [cellId(item.tile)] : [])),
+    indexOf(level)
+      .gates.filter(({ definition }) => !gates[definition.id])
+      .map(({ tile }) => tile),
   )
   const oneWays = geometry.oneWays
   return (from: string, to: string): boolean => {
@@ -237,13 +278,14 @@ export function walkGraph(level: LevelDef, state: GameState): Graph {
 }
 
 function routesOf(level: LevelDef, state: GameState): Map<string, string[]> {
+  const index = indexOf(level)
   // 收光、额度与一次性压板记录不参与寻路；影响通路的状态仍逐次核对，允许调用方原地更新。
   const key = JSON.stringify([state.at, state.rotator, state.mover, state.gates, state.crates, state.patrols])
   const cached = routeCache.get(state)
-  if (cached?.level === level && cached.key === key) return cached.routes
+  if (cached?.index === index && cached.key === key) return cached.routes
   const graph = walkGraph(level, state)
   const routes = new Map<string, string[]>()
-  routeCache.set(state, { level, key, routes })
+  routeCache.set(state, { index, key, routes })
   if (!graph.has(state.at)) return routes
   routes.set(state.at, [])
   const queue = [state.at]
@@ -304,7 +346,7 @@ function moveMechanisms(level: LevelDef, state: GameState, source: Operable): st
       if (!triggers.has(link.target)) triggers.set(link.target, link.reverse === true)
   const moved: string[] = []
   for (const [id, reverse] of triggers) {
-    const mechanism = level.mechanisms.find((item) => item.id === id)
+    const mechanism = indexOf(level).mechanisms.get(id)
     if (!mechanism || mechanism.type === 'plate') continue
     if (mechanism.type === 'rotator') state.rotator[id] = (state.rotator[id] + (reverse ? 3 : 1)) % 4
     else if (mechanism.type === 'mover') state.mover[id] = advanceMover(mechanism, state.mover[id])
@@ -350,6 +392,7 @@ function movePatrols(level: LevelDef, state: GameState): Transition['patrolMoves
 
 export function applyAction(level: LevelDef, state: GameState, action: Action): Transition | null {
   if (state.won) return null
+  const index = indexOf(level)
   let route: string[] = [],
     operated: Operable | undefined,
     pushed: Transition['pushed'] = null
@@ -364,15 +407,17 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
     pushed = { crate: action.crate, from: state.crates[action.crate], to }
     route = [pushed.from]
   } else {
-    operated = level.mechanisms.find((item): item is Operable => item.id === action.mechanism && item.type !== 'plate')
-    if (!operated || !hasUses(operated, state)) return null
+    const mechanism = index.mechanisms.get(action.mechanism)
+    if (!mechanism || mechanism.type === 'plate' || !hasUses(mechanism, state)) return null
+    operated = mechanism
   }
   const next: GameState = {
-    ...state,
+    at: state.at,
     rotator: { ...state.rotator },
     mover: { ...state.mover },
     orbs: [...state.orbs],
     spentPlates: [...state.spentPlates],
+    won: state.won,
     gates: { ...state.gates },
     handleUses: { ...state.handleUses },
     crates: { ...state.crates },
@@ -395,22 +440,19 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
   } else {
     const collected = new Set(state.orbs)
     for (const tileId of route)
-      level.orbs.forEach((orb, index) => {
-        const id = `orb-${index}`
-        if (tileRefId(orb) === tileId && !collected.has(id)) {
+      for (const id of index.orbs.get(tileId) ?? []) {
+        if (!collected.has(id)) {
           collected.add(id)
           result.collected.push(id)
         }
-      })
+      }
     next.at = route[route.length - 1]
     next.orbs = [...collected].sort()
     if (pushed) next.crates[pushed.crate] = pushed.to
     if (action.type === 'walk') {
-      const plate = level.mechanisms.find(
-        (item) => item.type === 'plate' && item.mode !== 'hold' && cellId(item.tile) === next.at,
-      )
+      const plate = index.triggers.get(next.at)
       if (plate?.type === 'plate' && !(plate.once && state.spentPlates.includes(plate.id))) {
-        const target = level.mechanisms.find((item) => item.id === plate.target)
+        const target = index.mechanisms.get(plate.target)
         if (target && target.type !== 'plate' && (target.type !== 'gate' || target.mode === 'toggle')) {
           result.plate = plate.id
           result.moved = moveMechanisms(level, next, target)
@@ -424,8 +466,8 @@ export function applyAction(level: LevelDef, state: GameState, action: Action): 
     after = gatesOf(level, next)
   result.gatesChanged = Object.keys(after).filter((id) => before[id] !== after[id])
   for (const id of result.gatesChanged) if (!result.moved.includes(id)) result.moved.push(id)
-  if (action.type === 'walk' && cellId(geometryOf(level, next).tiles.get(next.at)!.pos) === cellId(level.goal)) {
-    result.goalLocked = level.orbs.filter((orb, index) => !orb.optional && !next.orbs.includes(`orb-${index}`)).length
+  if (action.type === 'walk' && cellId(geometryOf(level, next).tiles.get(next.at)!.pos) === index.goal) {
+    result.goalLocked = index.requiredOrbs.filter((id) => !next.orbs.includes(id)).length
     next.won = result.goalLocked === 0
   }
   return result
