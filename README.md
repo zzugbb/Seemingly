@@ -3,16 +3,17 @@
 <p align="center"><strong>积木错位 · 路看似相连，就能走过去。</strong></p>
 
 <p align="center">
-  <a href="https://zzugbb.github.io/Seemingly/">在线游玩</a> ·
-  <a href="docs/design.md">游戏设计</a> ·
-  <a href="docs/levels/README.md">关卡设计</a> ·
-  <a href="SUPPORT.md">求助</a> ·
-  <a href="CONTRIBUTING.md">贡献</a> ·
-  <a href="LICENSE">MIT</a>
+  <a href="https://zzugbb.github.io/Seemingly/"><img src="https://img.shields.io/badge/Play-Online-6B8F71" alt="在线游玩"></a>
+  <a href="https://github.com/zzugbb/Seemingly/actions/workflows/pages.yml?query=branch%3Amain" title="main 分支最近一次推送的检查与发布"><img src="https://github.com/zzugbb/Seemingly/actions/workflows/pages.yml/badge.svg?branch=main&amp;event=push" alt="检查与 Pages 发布"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8A667D" alt="MIT 许可证"></a>
+  <a href=".nvmrc"><img src="https://img.shields.io/badge/Node.js-24-5F8575" alt="开发环境：Node.js 24"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/zzugbb/Seemingly/actions/workflows/pages.yml?query=branch%3Amain" title="main 分支最近一次推送的检查与发布"><img src="https://github.com/zzugbb/Seemingly/actions/workflows/pages.yml/badge.svg?branch=main&amp;event=push" alt="检查与 Pages 发布"></a>
+  <a href="https://zzugbb.github.io/Seemingly/">在线游玩</a> ·
+  <a href="docs/design.md">游戏设计</a> ·
+  <a href="SUPPORT.md">使用帮助</a> ·
+  <a href="CONTRIBUTING.md">参与贡献</a>
 </p>
 
 固定等距视角的浏览器解谜游戏。转动桥梁、移动平台，让屏幕上看似相连的路变得可走，带小人收集光点、抵达灯笼。
