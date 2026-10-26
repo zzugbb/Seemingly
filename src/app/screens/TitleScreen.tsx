@@ -6,6 +6,7 @@ import { Scene } from '../../game/render/Scene'
 import { prefersReducedMotion, qualitySettings } from '../../game/render/quality'
 import { campaignStats, journeyChoice } from '../entry'
 import { useApp } from '../store'
+import { JourneyButton } from '../JourneyButton'
 
 export function TitleScreen() {
   const play = useApp((state) => state.play)
@@ -47,9 +48,12 @@ export function TitleScreen() {
             {journey.label}
           </button>
           <p className="entry-caption">{journey.caption}</p>
-          <button className="entry-secondary" type="button" onClick={goSelect}>
-            选择关卡
-          </button>
+          <div className="entry-links">
+            <button className="entry-secondary" type="button" onClick={goSelect}>
+              选择关卡
+            </button>
+            <JourneyButton className="entry-secondary" />
+          </div>
         </div>
         <div className="entry-stage" aria-hidden="true">
           <Canvas

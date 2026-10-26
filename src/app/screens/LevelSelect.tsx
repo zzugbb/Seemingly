@@ -8,6 +8,7 @@ import { Ratings } from '../hud/Ratings'
 import { campaignStats, chapterArrival, initialPreviewIndex, levelThemes, ratingCount, selectStatus } from '../entry'
 import { targets } from '../../game/levels/targets'
 import { isUnlocked, useApp } from '../store'
+import { JourneyButton } from '../JourneyButton'
 
 const chapterNames = ['看似', '转动', '升起', '推动', '遮挡']
 const numerals = ['一', '二', '三', '四', '五']
@@ -48,6 +49,7 @@ export function LevelSelect() {
     <div className="entry-select">
       <div className="entry-select-frame">
         <div className="entry-select-tools">
+          <JourneyButton className="entry-tool" />
           <button className="entry-tool" type="button" onClick={goTitle}>
             返回标题
           </button>

@@ -14,4 +14,10 @@ export const palette = {
   trunk: '#a8745a',
   glow: '#ffd98a',
   cream: '#fff7ea',
+  journeyInk: '#4a3a52',
+  journeyPaper: '#fff2df',
+  journeySky: '#f8dbc3',
+  journeyHorizon: '#d7b0c4',
+  journeyLine: '#ddcbbd',
+  journeyFooter: '#f4e4d1',
 }

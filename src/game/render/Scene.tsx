@@ -43,6 +43,7 @@ export function Scene({
   onTowerLit,
   hint,
   tactile = false,
+  snapshot = false,
 }: {
   level: LevelDef
   sim: LevelSim
@@ -58,10 +59,11 @@ export function Scene({
   onTowerLit?: () => void
   hint?: RenderHint | null
   tactile?: boolean
+  snapshot?: boolean
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
-  const [won, setWon] = useState(false)
-  const [towerLit, setTowerLit] = useState(false)
+  const [won, setWon] = useState(snapshot && sim.state().won)
+  const [towerLit, setTowerLit] = useState(snapshot && sim.state().won)
   const [marker, setMarker] = useState<{ pos: Vec3; ok: boolean; at: number } | null>(null)
   const characterRef = useRef<Group>(null)
   const plateFx = useRef<PlateFx>({ spent: new Set(), flashAt: new Map() })
@@ -250,6 +252,7 @@ export function Scene({
         />
         {won && level.ending && (
           <Finale
+            complete={snapshot}
             ending={level.ending}
             sparkleScale={quality.sparkleScale}
             reducedMotion={reducedMotion}

@@ -12,6 +12,7 @@ export function Finale({
   onTowerLit,
   onReady,
   onLanternLit,
+  complete = false,
 }: {
   ending: EndingDef
   sparkleScale: number
@@ -19,11 +20,12 @@ export function Finale({
   onTowerLit: () => void
   onReady: () => void
   onLanternLit?: () => void
+  complete?: boolean
 }) {
   const elapsed = useRef(0)
-  const progress = useRef(endingProgress(0, ending.lanterns.length))
-  const [litCount, setLitCount] = useState(1)
-  const [towerLit, setTowerLit] = useState(false)
+  const progress = useRef(endingProgress(complete ? Infinity : 0, ending.lanterns.length))
+  const [litCount, setLitCount] = useState(complete ? ending.lanterns.length : 1)
+  const [towerLit, setTowerLit] = useState(complete)
   useFrame((_, delta) => {
     if (progress.current.finished) return
     elapsed.current += Math.min(delta, 1 / 30)

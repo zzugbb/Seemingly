@@ -715,3 +715,11 @@ nextLevelIndex只调用原isUnlocked检查当前列表的下一编号，不搜�
 rules.ts新增按LevelDef身份保存的LevelIndex，仅索引只读定义中的机关、门格、按住／触发压板、光点格与必需光点编号、终点格。initialState与几何缓存一起清理该索引；路线缓存同时校验索引身份，避免新局改定义后仍复用旧路线。动态门、人物／箱／巡逻占位和压力仍逐状态计算，不跨状态缓存进入许可。转移直接构造全部GameState字段，保持独立副本和原字段顺序，不改完整stateKey或求值顺序。
 
 solver.stateGraph在analyze／reachableStates中不保存未消费的正向动作边，仍调用legalActions／applyAction／stateKey展开每个动作、记录全部可达状态及反向边；最短路与死局完整计算。buildPolicy／nextHint／randomWinRate继续保存全部正向动作边，动作顺序与固定随机结果保持。两秒求解、10秒组合校验及状态门槛不变，本机结果与远程CI结果分开记录。
+
+## T6.22e旅程成绩卡
+
+`app/journey.ts`复用campaignStats，只遍历正式main／challenge ID派生三项历史计数、主线全通开放条件与三个里程碑，无新持久字段。JourneyButton在已有四处入口按条件挂载，懒加载JourneyDialog；原生dialog隔离后台交互，Tab循环、Esc关闭并恢复入口焦点，按键不传给游戏快捷键。打开时取当前历史快照，关闭卸载，不改变screen、current、音频或存档。
+
+`app/journey-image.ts`以独立LevelSim执行最终主线的正式solution，仍由原command／update调用规则；不运行求解器、不调用completeLevel。Scene的snapshot与Finale的complete默认为false，只给非交互导出初始化已点亮静态结局，避免等待或重播演出，正常游玩默认路径保持。图片局部画布按1080×1000、dpr=1、高画质、减少动态渲染，复用材料与CameraRig，第四帧显式绘制后同帧复制至1080×2100的原生Canvas2D，不改变游戏preserveDrawingBuffer。文字与背景颜色从palette读取，无静态截图资源。
+
+导出完成后立即卸载额外Canvas，仅保留PNG Blob／File与一个对象URL，预览、下载和系统分享使用同一文件；关闭或重试时清理，晚到异步结果不更新已卸载组件。生成失败或12秒无结果显示重试，WebGL上下文丢失也退出生成。canShare检查文件能力，share在已准备文件的用户点击内调用；AbortError静默，其他失败保留图片与下载。系统目标与相册行为取决于浏览器，不将尺寸模拟或方法替身当作真机系统分享验证。

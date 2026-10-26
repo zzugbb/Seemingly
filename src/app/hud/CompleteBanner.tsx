@@ -1,5 +1,6 @@
 import { Ratings, type RatingsValue } from './Ratings'
 import { ratingCount } from '../entry'
+import { JourneyButton } from '../JourneyButton'
 export function CompleteBanner({
   title,
   ratings,
@@ -44,6 +45,7 @@ export function CompleteBanner({
           <button type="button" onClick={onRetry}>
             再试一次
           </button>
+          <JourneyButton />
         </div>
       </div>
     </div>
