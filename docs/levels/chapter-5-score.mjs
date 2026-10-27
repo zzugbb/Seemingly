@@ -1,4 +1,4 @@
-// 第五章交接谱面；运行时在T6.18按此接入，不由站点导入文档。
+// 第五章与结局的独立谱面基准，供正式校验器比对，不由站点导入。
 export function chapterFiveScore() {
   const bpm = 84
   const beat = 60 / bpm

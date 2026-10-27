@@ -117,7 +117,7 @@ try {
     runtime.mainLevels.slice(0, 12).map((l) => l.revision),
     [2, 3, 4, 3, 3, 4, 1, 2, 2, 2, 2, 2],
   )
-  if (runtimeMode) assert.equal(runtime.mainLevels.length, 15, 'T6.18尚未接入15关，设计检查不能代替正式实现')
+  if (runtimeMode) assert.equal(runtime.mainLevels.length, 15, '正式主线必须包含十五关')
   if (runtimeMode) {
     const theory = await s.ssrLoadModule('/src/audio/theory.ts')
     assert.deepEqual(theory.courtyardClock(5), {

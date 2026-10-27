@@ -105,7 +105,7 @@ try {
     formalHashes,
     '十五关完整对象不能漂移',
   )
-  if (runtimeMode) assert.equal(runtime.challengeLevels.length, 5, 'T6.21尚未接入五关，设计检查不能代替正式实现')
+  if (runtimeMode) assert.equal(runtime.challengeLevels.length, 5, '正式挑战必须包含五关')
   assert.equal(
     createHash('sha256')
       .update(JSON.stringify(runtime.mainLevels.map((l) => targets[l.id])))

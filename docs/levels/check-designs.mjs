@@ -33,7 +33,7 @@ assert.notDeepEqual(intervals(chapterScore(3).notes), intervals(chapterScore(4).
 const options = process.argv.slice(2)
 assert(
   options.every((option) => option === '--runtime'),
-  '只支持 --runtime 正式接入核对选项',
+  '只支持 --runtime 正式对象比对选项',
 )
 const checkRuntime = options.includes('--runtime')
 
@@ -111,11 +111,11 @@ try {
   const runtimeTargets = checkRuntime ? await server.ssrLoadModule('/src/game/levels/targets.ts') : null
   if (runtime) {
     const missing = [...baselines.keys()].filter((id) => !runtime.mainLevels.some((level) => level.id === id))
-    assert.equal(missing.length, 0, `正式主线尚未接入：${missing.join('、')}；当前只能通过设计稿检查`)
+    assert.equal(missing.length, 0, `正式主线缺少设计稿对应关卡：${missing.join('、')}`)
     assert.deepEqual(
       runtime.mainLevels.slice(0, 12).map((level) => level.id),
       Array.from({ length: 12 }, (_, i) => `level-${String(i + 1).padStart(2, '0')}`),
-      'T6.14正式主线前缀须按顺序保留12关',
+      '正式主线前十二关须按顺序排列',
     )
     assert.deepEqual(
       runtime.mainLevels.slice(0, 6).map((level) => level.revision),
@@ -131,7 +131,7 @@ try {
       assert.equal(
         level.revision ?? 1,
         documented.revision ?? 1,
-        `${id} 正式revision仍旧；请按T6.14b～f逐关接入第三稿，不能据设计检查通过宣称正式完成`,
+        `${id} 正式revision与当前设计稿不一致`,
       )
       assert.deepEqual(level, documented, `${id} 正式关卡与当前完整设计稿不一致`)
     }
@@ -163,7 +163,7 @@ try {
       illusionsMin: 2,
       tradeoffsMin: 1,
     }
-    if (runtimeTargets) assert.deepEqual(runtimeTargets.targets[id], target, `${id} 正式targets与设计交接不一致`)
+    if (runtimeTargets) assert.deepEqual(runtimeTargets.targets[id], target, `${id} 正式targets与设计基准不一致`)
     assert.deepEqual(validateLevel(level, ids, target), [], `${id} 主线校验`)
     assert.deepEqual(measureLevel(level, target.randomWin.steps), expected.metrics, `${id} 指标漂移`)
     assert.equal(expected.all.length, target.minActionsAll, `${id} 全收集解法必须最优`)
