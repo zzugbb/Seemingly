@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://zzugbb.github.io/Seemingly/">在线游玩</a> ·
+  <a href="#项目演示">视频演示</a> ·
   <a href="#本地运行">本地运行</a> ·
   <a href="SUPPORT.md">使用帮助</a> ·
   <a href="CONTRIBUTING.md">参与贡献</a>
@@ -25,6 +26,14 @@
 - **随时试错**：无限撤销与主动提示；挑战不影响主线结局。
 - **本地旅程成绩卡**：主线全通后可生成 PNG，按浏览器能力保存或系统分享。
 
+## 项目演示
+
+约 77 秒项目介绍，结合动画讲解投影错觉、机关与实现，并穿插游戏实录。下方可直接播放 720p 版本（约 9.3 MB）。
+
+https://github.com/user-attachments/assets/364dae7d-32f0-47b8-916c-5550bc07dfbc
+
+[下载 1080p 原片（约 14.3 MB）](https://github.com/zzugbb/Seemingly/raw/refs/heads/main/docs/assets/seemingly-promo-v6-1080p.mp4) · [直接游玩](https://zzugbb.github.io/Seemingly/)
+
 ## 怎么玩
 
 点击浅色路面行走，点击金色转轮或拉杆操作机关。集齐必需光点后抵达灯笼通关，带细环的是选做光点；小人可站在移动积木上随它一起移动，相机保持固定。
@@ -33,7 +42,12 @@
 
 需要支持 WebGL2 的浏览器，首次交互后播放声音。进度保存在当前浏览器本地，无账号、云存档、统计或广告。解锁、声音、画质与图片保存等问题见[使用与求助](SUPPORT.md)；设备兼容与实测边界见[验收记录](docs/performance.md#仍未覆盖)。
 
+<details>
+<summary>查看手机尺寸游戏截图</summary>
+
 <img src="docs/assets/gameplay-mobile.png" alt="手机尺寸模拟下的高画质游戏画面" width="300" />
+
+</details>
 
 ## 本地运行
 
